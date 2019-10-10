@@ -44,8 +44,6 @@ spec:
             runAsUser: 65533 # git-sync user
             runAsGroup: 0 # root group to read mounted Secrets
           env:
-            - name: GIT_SYNC_REPO
-              value: "git@github.com:org/repo.git"
             - name: GIT_SYNC_DEST
               value: "modules"
             - name: GIT_SYNC_SSH
@@ -67,10 +65,6 @@ spec:
         - name: terraform-applier
           image: quay.io/utilitywarehouse/terraform-applier:v0.1.0
           env:
-            - name: DIFF_URL_FORMAT
-              value: "https://github.com/org/repo/commit/%s"
-            - name: REPO_PATH
-              value: "/src/modules/exp-1-aws"
           volumeMounts:
             - name: git-repo
               mountPath: /src
