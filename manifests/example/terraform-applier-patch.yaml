@@ -1,0 +1,29 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: terraform-applier
+spec:
+  template:
+    spec:
+      containers:
+        - name: terraform-applier
+          env:
+            # AWS credentials for use by an S3 backend/AWS provider. Substitute the configuration for your particular
+            # backends and providers.
+            - name: AWS_ACCESS_KEY_ID
+              value: AAAAAAAAAAAAAAAAAAAA
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: aws
+                  key: aws-secret-access-key
+            - name: REPO_PATH
+              value: "/src/modules/example-env"
+            - name: REPO_PATH_FILTERS
+              value: "my-module-1,my-module-2,env-*"
+            - name: DIFF_URL_FORMAT
+              value: "https://github.com/org/repo/commit/%s"
+        - name: git-sync
+          env:
+            - name: GIT_SYNC_REPO
+              value: "git@github.com:org/repo.git"
