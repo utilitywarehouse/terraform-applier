@@ -1,0 +1,21 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+bases:
+  - ../base/
+  #  - github.com/utilitywarehouse/terraform-applier//manifests/base?ref=0.1.0
+resources:
+  - terraform-applier-ingress.yaml
+patchesStrategicMerge:
+  - terraform-applier-patch.yaml
+secretGenerator:
+  # aws secret access key
+  - name: aws
+    type: Opaque
+    files:
+      - aws-secret-access-key=secrets/aws-secret-access-key
+  # ssh key to clone the "root" terraform modules repository, used by git-sync
+  - name: ssh
+    type: Opaque
+    files:
+      - ssh=secrets/ssh
+      - known_hosts=resources/known_hosts
