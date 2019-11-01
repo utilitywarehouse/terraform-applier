@@ -29,10 +29,11 @@ Git repository.
 - `POLL_INTERVAL_SECONDS` - (int) (default: `5`) Number of seconds to wait between each check for new commits to the repo
 - `REPO_PATH_FILTERS` - (string) (default: `""`) A comma separated list of sub directories to be applied. Supports [shell file name patterns](https://golang.org/pkg/path/filepath/#Match).
 
-#### Variables needed by terraform resources
+#### Variables used by terraform resources
 
-Apart from the variables needed to run terraform-applier, you also need to provide all the variables needed by the used terraform providers
-and by other terraform resources that you want applied.
+You can also provide environment variables for use by terraform providers (such as AWS_ACCESS_KEY_ID) or variables for use in your
+code (TF_VAR_your_variable_name). This is useful for providing sensitive values that you don't want to save in version control or
+variables that are only available in your Kube environment
 
 ## Monitoring
 
