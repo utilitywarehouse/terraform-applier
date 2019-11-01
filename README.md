@@ -29,6 +29,11 @@ Git repository.
 - `POLL_INTERVAL_SECONDS` - (int) (default: `5`) Number of seconds to wait between each check for new commits to the repo
 - `REPO_PATH_FILTERS` - (string) (default: `""`) A comma separated list of sub directories to be applied. Supports [shell file name patterns](https://golang.org/pkg/path/filepath/#Match).
 
+#### Variables needed by terraform resources
+
+Appart from the variables needed to run terraform-applier, you also need to provide all the variables needed by the used terraform providers
+and by other terraform resources that you want applied.
+
 ## Monitoring
 
 ### Metrics

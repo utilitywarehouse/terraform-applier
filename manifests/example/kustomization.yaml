@@ -8,14 +8,16 @@ resources:
 patchesStrategicMerge:
   - terraform-applier-patch.yaml
 secretGenerator:
-  # aws secret access key
-  - name: aws
+  # Needed by git-sync to clone repositories
+  - name: git-sync
     type: Opaque
     files:
-      - aws-secret-access-key=secrets/aws-secret-access-key
-  # ssh key to clone the "root" terraform modules repository, used by git-sync
-  - name: ssh
+      - ssh=secrets/git-sync-ssh-key
+      - known_hosts=resources/git-sync-known_hosts
+  # Used by terraform-applier. Will differ based on terraform resources being applied
+  # Example for the AWS provider and for a custom resource secret
+  - name: terraform-applier
     type: Opaque
     files:
-      - ssh=secrets/ssh
-      - known_hosts=resources/known_hosts
+      - terraform-aws-provider-secret=secrets/terraform-applier-terraform-aws-provider-secret
+      - example-app-s3-reader-secret=secrets/terraform-applier-example-app-s3-reader-secret
