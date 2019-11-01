@@ -21,7 +21,7 @@ spec:
               value: "https://github.com/org/repo/commit/%s"
             #
             # Variables from now depend on what terraform providers and resources you use
-            # Substitue above configuration for your particular needs
+            # Substitute above configuration for your particular needs
             #
             # terraform-provider-aws vars
             - name: AWS_ACCESS_KEY_ID

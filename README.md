@@ -31,7 +31,7 @@ Git repository.
 
 #### Variables needed by terraform resources
 
-Appart from the variables needed to run terraform-applier, you also need to provide all the variables needed by the used terraform providers
+Apart from the variables needed to run terraform-applier, you also need to provide all the variables needed by the used terraform providers
 and by other terraform resources that you want applied.
 
 ## Monitoring
