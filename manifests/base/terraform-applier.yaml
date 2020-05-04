@@ -33,7 +33,7 @@ spec:
     spec:
       containers:
         - name: git-sync
-          image: k8s.gcr.io/git-sync:v3.1.5
+          image: k8s.gcr.io/git-sync:v3.1.6
           securityContext:
             runAsUser: 65533 # git-sync user
             runAsGroup: 0 # root group to read mounted Secrets
