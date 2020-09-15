@@ -8,7 +8,7 @@ RUN apk --no-cache add git &&\
   go test ./... &&\
   go build -o /terraform-applier .
 
-FROM alpine:3.10
+FROM alpine:3.12
 
 ENV TERRAFORM_VERSION 0.13.2
 COPY templates/ /templates/
