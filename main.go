@@ -2,8 +2,10 @@ package main
 
 import (
 	"os"
+	"os/signal"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/utilitywarehouse/terraform-applier/git"
@@ -154,7 +156,29 @@ func main() {
 	go runner.Start()
 	go webserver.Start()
 
+	// Wait for apply runs to finish before exiting when a SIGINT or SIGTERM
+	// is received. This should prevent state locks being left behind by
+	// interrupted terraform commands.
+	go func() {
+		sigCh := make(chan os.Signal, 1)
+		signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+
+		sig := <-sigCh
+
+		log.Info("Received signal: %s, waiting for apply runs to finish before exiting", sig)
+
+		for {
+			select {
+			case sig := <-sigCh:
+				log.Fatal("Received a second signal: %s, force exiting", sig)
+			default:
+				if !runner.Applying() {
+					os.Exit(0)
+				}
+			}
+		}
+	}()
+
 	err := <-errors
 	log.Fatal("Fatal error, exiting: %v", err)
-
 }
