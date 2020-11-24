@@ -23,7 +23,7 @@ spec:
     app: terraform-applier
 ---
 apiVersion: apps/v1
-kind: Deployment
+kind: StatefulSet
 metadata:
   name: terraform-applier
 spec:
@@ -31,6 +31,7 @@ spec:
   selector:
     matchLabels:
       app: terraform-applier
+  serviceName: terraform-applier
   template:
     metadata:
       labels:

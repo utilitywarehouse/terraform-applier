@@ -22,6 +22,8 @@ type Runner struct {
 	RepoPathFilters []string
 	RunResults      chan<- Result
 	RunQueue        <-chan bool
+
+	applying bool
 }
 
 // Start runs a continuous loop that starts a new run when a request comes into the queue channel.
@@ -36,10 +38,18 @@ func (r *Runner) Start() {
 	}
 }
 
+func (r *Runner) Applying() bool {
+	return r.applying
+}
+
 // Run performs a full apply run, and returns a Result with data about the completed run (or nil if the run failed to complete).
 func (r *Runner) run() (*Result, error) {
-
 	log.Info("Started apply run")
+
+	r.applying = true
+	defer func() {
+		r.applying = false
+	}()
 
 	dirs, err := sysutil.ListDirs(r.RepoPath)
 	if err != nil {
