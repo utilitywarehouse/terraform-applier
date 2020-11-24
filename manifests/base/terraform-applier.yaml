@@ -23,16 +23,15 @@ spec:
     app: terraform-applier
 ---
 apiVersion: apps/v1
-kind: Deployment
+kind: StatefulSet
 metadata:
   name: terraform-applier
 spec:
   replicas: 1
-  strategy:
-    type: Recreate
   selector:
     matchLabels:
       app: terraform-applier
+  serviceName: terraform-applier
   template:
     metadata:
       labels:
