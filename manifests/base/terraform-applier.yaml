@@ -64,7 +64,7 @@ spec:
               cpu: 500m
               memory: 512Mi
         - name: terraform-applier
-          image: quay.io/utilitywarehouse/terraform-applier:0.3.0
+          image: quay.io/utilitywarehouse/terraform-applier:0.3.1
           volumeMounts:
             - name: git-repo
               mountPath: /src
