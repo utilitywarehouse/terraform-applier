@@ -1,7 +1,11 @@
 # terraform-applier
 
-Heavily adapted from [kube-applier](https://github.com/utilitywarehouse/kube-applier), terraform-applier enables continuous deployment of Terraform code by applying modules from a
-Git repository.
+[![Build Status](https://drone.prod.merit.uw.systems/api/badges/utilitywarehouse/terraform-applier/status.svg)](https://drone.prod.merit.uw.systems/utilitywarehouse/terraform-applier)
+
+Heavily adapted from
+[kube-applier](https://github.com/utilitywarehouse/kube-applier),
+terraform-applier enables continuous deployment of Terraform code by applying
+modules from a Git repository.
 
 ## Usage
 
