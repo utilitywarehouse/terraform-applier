@@ -1,4 +1,4 @@
-FROM golang:1.15-alpine AS build
+FROM golang:1.16-alpine AS build
 
 WORKDIR /go/src/github.com/utilitywarehouse/terraform-applier
 COPY . /go/src/github.com/utilitywarehouse/terraform-applier
@@ -8,9 +8,9 @@ RUN apk --no-cache add git &&\
   go test ./... &&\
   go build -o /terraform-applier .
 
-FROM alpine:3.12
+FROM alpine:3.13
 
-ENV TERRAFORM_VERSION 0.13.5
+ENV TERRAFORM_VERSION 0.14.5
 COPY templates/ /templates/
 COPY static/ /static/
 RUN apk --no-cache add ca-certificates git tini &&\
