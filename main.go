@@ -19,20 +19,20 @@ import (
 )
 
 var (
-	diffURLFormat   = os.Getenv("DIFF_URL_FORMAT")
-	dryRun          = os.Getenv("DRY_RUN")
-	fullRunInterval = os.Getenv("FULL_RUN_INTERVAL_SECONDS")
-	initArgs        = os.Getenv("INIT_ARGS")
-	listenAddress   = os.Getenv("LISTEN_ADDRESS")
-	logLevel        = os.Getenv("LOG_LEVEL")
-	pollInterval    = os.Getenv("POLL_INTERVAL_SECONDS")
-	repoPath        = os.Getenv("REPO_PATH")
-	repoPathFilters = os.Getenv("REPO_PATH_FILTERS")
+	diffURLFormat      = os.Getenv("DIFF_URL_FORMAT")
+	dryRun             = os.Getenv("DRY_RUN")
+	fullRunInterval    = os.Getenv("FULL_RUN_INTERVAL_SECONDS")
+	initArgs           = os.Getenv("INIT_ARGS")
+	listenAddress      = os.Getenv("LISTEN_ADDRESS")
+	logLevel           = os.Getenv("LOG_LEVEL")
+	pollInterval       = os.Getenv("POLL_INTERVAL_SECONDS")
+	modulesPath        = os.Getenv("MODULES_PATH")
+	modulesPathFilters = os.Getenv("MODULES_PATH_FILTERS")
 )
 
 func validate() {
-	if repoPath == "" {
-		log.Fatal("Need to export REPO_PATH")
+	if modulesPath == "" {
+		log.Fatal("Need to export MODULES_PATH")
 	}
 
 	if listenAddress == "" {
@@ -113,35 +113,35 @@ func main() {
 	}
 
 	gitUtil := &git.Util{
-		RepoPath: repoPath,
+		Path: modulesPath,
 	}
 
-	var repoPathFiltersSlice []string
-	if repoPathFilters != "" {
-		repoPathFiltersSlice = strings.Split(repoPathFilters, ",")
+	var modulesPathFiltersSlice []string
+	if modulesPathFilters != "" {
+		modulesPathFiltersSlice = strings.Split(modulesPathFilters, ",")
 	}
 	runner := &run.Runner{
-		RepoPath:        repoPath,
-		RepoPathFilters: repoPathFiltersSlice,
-		Applier:         applier,
-		DiffURLFormat:   diffURLFormat,
-		GitUtil:         gitUtil,
-		Metrics:         metrics,
-		Clock:           clock,
-		RunQueue:        runQueue,
-		RunResults:      runResults,
-		Errors:          errors,
+		ModulesPath:        modulesPath,
+		ModulesPathFilters: modulesPathFiltersSlice,
+		Applier:            applier,
+		DiffURLFormat:      diffURLFormat,
+		GitUtil:            gitUtil,
+		Metrics:            metrics,
+		Clock:              clock,
+		RunQueue:           runQueue,
+		RunResults:         runResults,
+		Errors:             errors,
 	}
 
 	pi, _ := strconv.Atoi(pollInterval)
 	fi, _ := strconv.Atoi(fullRunInterval)
 	scheduler := &run.Scheduler{
-		FullRunInterval: time.Duration(fi) * time.Second,
-		GitUtil:         gitUtil,
-		PollInterval:    time.Duration(pi) * time.Second,
-		RepoPathFilters: repoPathFiltersSlice,
-		RunQueue:        runQueue,
-		Errors:          errors,
+		FullRunInterval:    time.Duration(fi) * time.Second,
+		GitUtil:            gitUtil,
+		PollInterval:       time.Duration(pi) * time.Second,
+		ModulesPathFilters: modulesPathFiltersSlice,
+		RunQueue:           runQueue,
+		Errors:             errors,
 	}
 
 	webserver := &webserver.WebServer{

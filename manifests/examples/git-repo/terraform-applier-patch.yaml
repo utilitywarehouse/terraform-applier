@@ -13,9 +13,9 @@ spec:
         - name: terraform-applier
           env:
             # terraform-applier vars
-            - name: REPO_PATH
+            - name: MODULES_PATH
               value: "/src/modules/example-env"
-            - name: REPO_PATH_FILTERS
+            - name: MODULES_PATH_FILTERS
               value: "my-module-1,my-module-2,env-*"
             - name: DIFF_URL_FORMAT
               value: "https://github.com/org/repo/commit/%s"

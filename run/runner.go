@@ -12,16 +12,16 @@ import (
 
 // Runner manages the full process of an apply run, including getting the appropriate files, running apply commands on them, and handling the results.
 type Runner struct {
-	Applier         ApplierInterface
-	Clock           sysutil.ClockInterface
-	DiffURLFormat   string
-	Errors          chan<- error
-	GitUtil         git.UtilInterface
-	Metrics         metrics.PrometheusInterface
-	RepoPath        string
-	RepoPathFilters []string
-	RunResults      chan<- Result
-	RunQueue        <-chan bool
+	Applier            ApplierInterface
+	Clock              sysutil.ClockInterface
+	DiffURLFormat      string
+	Errors             chan<- error
+	GitUtil            git.UtilInterface
+	Metrics            metrics.PrometheusInterface
+	ModulesPath        string
+	ModulesPathFilters []string
+	RunResults         chan<- Result
+	RunQueue           <-chan bool
 
 	applying bool
 }
@@ -51,25 +51,33 @@ func (r *Runner) run() (*Result, error) {
 		r.applying = false
 	}()
 
-	dirs, err := sysutil.ListDirs(r.RepoPath)
+	dirs, err := sysutil.ListDirs(r.ModulesPath)
 	if err != nil {
 		return nil, err
 	}
 
 	dirs = r.pruneDirs(dirs)
 
-	hash, err := r.GitUtil.HeadHashForPaths(r.RepoPathFilters...)
-	if err != nil {
-		return nil, err
-	}
-	commitLog, err := r.GitUtil.HeadCommitLogForPaths(r.RepoPathFilters...)
+	isRepo, err := r.GitUtil.IsRepo()
 	if err != nil {
 		return nil, err
 	}
 
-	log.Info("applying modules in %s", r.RepoPath)
+	var hash, commitLog string
+	if isRepo {
+		hash, err = r.GitUtil.HeadHashForPaths(r.ModulesPathFilters...)
+		if err != nil {
+			return nil, err
+		}
+		commitLog, err = r.GitUtil.HeadCommitLogForPaths(r.ModulesPathFilters...)
+		if err != nil {
+			return nil, err
+		}
+	}
 
-	successes, failures := r.Applier.Apply(r.RepoPath, dirs)
+	log.Info("applying modules in %s", r.ModulesPath)
+
+	successes, failures := r.Applier.Apply(r.ModulesPath, dirs)
 
 	log.Info("Finished apply run")
 
@@ -96,14 +104,14 @@ func (r *Runner) run() (*Result, error) {
 }
 
 func (r *Runner) pruneDirs(dirs []string) []string {
-	if len(r.RepoPathFilters) == 0 {
+	if len(r.ModulesPathFilters) == 0 {
 		return dirs
 	}
 
 	var prunedDirs []string
 	for _, dir := range dirs {
-		for _, repoPathFilter := range r.RepoPathFilters {
-			matched, err := filepath.Match(path.Join(r.RepoPath, repoPathFilter), dir)
+		for _, modulesPathFilter := range r.ModulesPathFilters {
+			matched, err := filepath.Match(path.Join(r.ModulesPath, modulesPathFilter), dir)
 			if err != nil {
 				log.Error("%v", err)
 			} else if matched {
