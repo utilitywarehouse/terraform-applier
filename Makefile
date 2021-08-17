@@ -8,9 +8,11 @@ update-jquery-js:
 	curl -o static/bootstrap/js/jquery.min.js https://code.jquery.com/jquery-3.6.0.min.js
 
 release:
-	@sd "latest" "$(VERSION)" manifests/base/terraform-applier.yaml
+	@sd "master" "$(VERSION)" manifests/base/terraform-applier.yaml
+	@sd "master" "$(VERSION)" manifests/git-sync/terraform-applier.yaml
 	@git add -- manifests/base/terraform-applier.yaml
 	@git commit -m "Release $(VERSION)"
-	@sd "$(VERSION)" "latest" manifests/base/terraform-applier.yaml
+	@sd "$(VERSION)" "master" manifests/base/terraform-applier.yaml
+	@sd "$(VERSION)" "master" manifests/git-sync/terraform-applier.yaml
 	@git add -- manifests/base/terraform-applier.yaml
 	@git commit -m "Clean up release $(VERSION)"

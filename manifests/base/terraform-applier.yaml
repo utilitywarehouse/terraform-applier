@@ -40,7 +40,7 @@ spec:
       serviceAccountName: terraform-applier
       containers:
         - name: terraform-applier
-          image: quay.io/utilitywarehouse/terraform-applier:latest
+          image: quay.io/utilitywarehouse/terraform-applier:master
           resources:
             requests:
               cpu: 10m
@@ -50,3 +50,6 @@ spec:
               memory: 200Mi
           ports:
             - containerPort: 8080
+          env:
+            - name: MODULES_PATH
+              value: /src
