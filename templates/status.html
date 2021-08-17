@@ -33,8 +33,8 @@
                     <strong>Started: {{ .FormattedStart }}</strong><br>
                     <strong>Finished: {{ .FormattedFinish }}</strong><br>
                     <strong>Duration: {{ .FormattedDuration }}</strong><br>
-                    <strong>Last Commit {{ if .LastCommitLink }}<a href="{{ .LastCommitLink }}">(see diff)</a>{{ end }}</strong>
-                    <p><pre class="commit">{{ .FullCommit }}</pre></p>
+                    {{ if .FullCommit }}<strong>Last Commit {{ if .LastCommitLink }}<a href="{{ .LastCommitLink }}">(see diff)</a>{{ end }}</strong>
+                    <p><pre class="commit">{{ .FullCommit }}</pre></p>{{ end }}
                 </div>
             </div>
         </div>

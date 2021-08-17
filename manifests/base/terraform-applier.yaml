@@ -39,38 +39,8 @@ spec:
     spec:
       serviceAccountName: terraform-applier
       containers:
-        - name: git-sync
-          image: k8s.gcr.io/git-sync/git-sync:v3.3.0
-          securityContext:
-            runAsUser: 65533 # git-sync user
-            runAsGroup: 0 # root group to read mounted Secrets
-          env:
-            - name: GIT_SYNC_DEST
-              value: "modules"
-            - name: GIT_SYNC_SSH
-              value: "true"
-            - name: GIT_SYNC_MAX_SYNC_FAILURES
-              value: "5"
-            - name: GIT_SYNC_WAIT
-              value: "30"
-          volumeMounts:
-            - name: git-repo
-              mountPath: /tmp/git
-            - name: git-secret
-              mountPath: /etc/git-secret
-          resources:
-            requests:
-              cpu: 40m
-              memory: 48Mi
-            limits:
-              cpu: 500m
-              memory: 512Mi
         - name: terraform-applier
           image: quay.io/utilitywarehouse/terraform-applier:latest
-          volumeMounts:
-            - name: git-repo
-              mountPath: /src
-              readOnly: true
           resources:
             requests:
               cpu: 10m
@@ -80,10 +50,3 @@ spec:
               memory: 200Mi
           ports:
             - containerPort: 8080
-      volumes:
-        - name: git-repo
-          emptyDir: {}
-        - name: git-secret
-          secret:
-            secretName: git-sync
-            defaultMode: 0440

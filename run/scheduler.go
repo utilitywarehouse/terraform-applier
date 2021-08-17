@@ -9,41 +9,53 @@ import (
 
 // Scheduler handles queueing apply runs at a given time interval and upon every new Git commit.
 type Scheduler struct {
-	Errors          chan<- error
-	FullRunInterval time.Duration
-	GitUtil         git.UtilInterface
-	PollInterval    time.Duration
-	RepoPathFilters []string
-	RunQueue        chan<- bool
+	Errors             chan<- error
+	FullRunInterval    time.Duration
+	GitUtil            git.UtilInterface
+	PollInterval       time.Duration
+	ModulesPathFilters []string
+	RunQueue           chan<- bool
 }
 
 // Start runs a continuous loop with two tickers for queueing runs.
 // One ticker queues a new run every X seconds, where X is the value from $FULL_RUN_INTERVAL_SECONDS.
 // The other ticker queues a new run upon every new Git commit, checking the repo every Y seconds where Y is the value from $POLL_INTERVAL_SECONDS.
 func (s *Scheduler) Start() {
+	var fullRunTickerChan, pollTickerChan <-chan time.Time
+
 	if s.FullRunInterval != 0 {
 		fullRunTicker := time.NewTicker(s.FullRunInterval)
 		defer fullRunTicker.Stop()
-		fullRunTickerChan := fullRunTicker.C
-		go func() {
-			for {
-				select {
-				case <-fullRunTickerChan:
-					log.Info("Full run interval reached, queueing run, interval=%v", s.FullRunInterval)
-					s.enqueue(s.RunQueue)
-				}
-			}
-		}()
+		fullRunTickerChan = fullRunTicker.C
 	}
 
-	pollTicker := time.NewTicker(s.PollInterval)
-	defer pollTicker.Stop()
-	pollTickerChan := pollTicker.C
-	lastCommitHash := ""
+	var lastCommitHash string
+	isRepo, err := s.GitUtil.IsRepo()
+	if err != nil {
+		s.Errors <- err
+		return
+	}
+	if isRepo {
+		pollTicker := time.NewTicker(s.PollInterval)
+		defer pollTicker.Stop()
+		pollTickerChan = pollTicker.C
+		lastCommitHash, err = s.GitUtil.HeadHashForPaths(s.ModulesPathFilters...)
+		if err != nil {
+			s.Errors <- err
+			return
+		}
+	}
+
+	log.Info("Queueing first run")
+	s.enqueue(s.RunQueue)
+
 	for {
 		select {
+		case <-fullRunTickerChan:
+			log.Info("Full run interval reached, queueing run, interval=%v", s.FullRunInterval)
+			s.enqueue(s.RunQueue)
 		case <-pollTickerChan:
-			newCommitHash, err := s.GitUtil.HeadHashForPaths(s.RepoPathFilters...)
+			newCommitHash, err := s.GitUtil.HeadHashForPaths(s.ModulesPathFilters...)
 			if err != nil {
 				s.Errors <- err
 				return

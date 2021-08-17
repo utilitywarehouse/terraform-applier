@@ -60,7 +60,7 @@ type Applier struct {
 }
 
 // Apply runs terraform for each of the modules and reports the successes and failures
-func (a *Applier) Apply(repoPath string, modules []string) ([]ApplyAttempt, []ApplyAttempt) {
+func (a *Applier) Apply(modulesPath string, modules []string) ([]ApplyAttempt, []ApplyAttempt) {
 	successes := []ApplyAttempt{}
 	failures := []ApplyAttempt{}
 
@@ -70,7 +70,7 @@ func (a *Applier) Apply(repoPath string, modules []string) ([]ApplyAttempt, []Ap
 	if err != nil {
 		return successes, failures
 	}
-	err = sysutil.CopyDir(repoPath, tmpDir)
+	err = sysutil.CopyDir(modulesPath, tmpDir)
 	if err != nil {
 		return successes, failures
 	}

@@ -3,7 +3,7 @@
 Heavily adapted from
 [kube-applier](https://github.com/utilitywarehouse/kube-applier),
 terraform-applier enables continuous deployment of Terraform code by applying
-modules from a Git repository.
+modules from a Git repository or local directory.
 
 ## Usage
 
@@ -11,8 +11,11 @@ modules from a Git repository.
 
 #### Required
 
-- `REPO_PATH` - (string) Absolute path to the directory containing the modules to be applied. It must be a Git repository or a path within
-  one. The immediate subdirectories of this directory should contain the root modules you wish to apply.
+- `MODULES_PATH` - (string) Absolute path to the directory containing the modules
+  to be applied. The immediate subdirectories of this directory should contain
+  the root modules you wish to apply.
+  - If this path is a git repository then the modules will be reapplied when
+    there is a change in the repo.
 
 #### Optional
 
@@ -29,7 +32,7 @@ modules from a Git repository.
 - `LISTEN_ADDRESS` - (string) (default: `:8080`) The address the applier webserver will listen on
 - `LOG_LEVEL` - (string) (default: `INFO`) `TRACE|DEBUG|INFO|WARN|ERROR|FATAL`, case insensitive
 - `POLL_INTERVAL_SECONDS` - (int) (default: `5`) Number of seconds to wait between each check for new commits to the repo
-- `REPO_PATH_FILTERS` - (string) (default: `""`) A comma separated list of sub directories to be applied. Supports [shell file name patterns](https://golang.org/pkg/path/filepath/#Match).
+- `MODULES_PATH_FILTERS` - (string) (default: `""`) A comma separated list of sub directories to be applied. Supports [shell file name patterns](https://golang.org/pkg/path/filepath/#Match).
 
 #### Variables used by terraform resources
 
