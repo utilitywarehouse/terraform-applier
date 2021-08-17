@@ -8,9 +8,7 @@ spec:
       containers:
         - name: terraform-applier
           env:
-            - name: MODULES_PATH
-              value: "/src/modules"
-            # Variables from now depend on what terraform providers and resources you use
+            # Variables depend on what terraform providers and resources you use
             #
             # For instance, the environment variables below configure the
             # Kubernetes secret backend to use the in cluster config and the
@@ -23,9 +21,9 @@ spec:
                   fieldPath: metadata.namespace
           volumeMounts:
             - name: module1
-              mountPath: "/src/modules/module1"
+              mountPath: "/src/module1"
             - name: module2
-              mountPath: "/src/modules/module2"
+              mountPath: "/src/module2"
       volumes:
         - name: module1
           configMap:
