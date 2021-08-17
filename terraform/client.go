@@ -26,7 +26,8 @@ type ClientInterface interface {
 
 // Client for terraform
 type Client struct {
-	Metrics metrics.PrometheusInterface
+	ExecPath string
+	Metrics  metrics.PrometheusInterface
 
 	workDir string
 }
@@ -84,11 +85,21 @@ func (c *Client) Apply(module, planFile string) (Output, error) {
 	return *out, nil
 }
 
+// Version returns version info for terraform
+func (c *Client) Version() (string, error) {
+	out, err := c.Exec("version", "-json")
+	if err != nil {
+		return "", err
+	}
+
+	return out.Output, nil
+}
+
 // Exec runs terraform
 func (c *Client) Exec(args ...string) (*Output, error) {
 	var err error
 
-	args = append([]string{"terraform"}, args...)
+	args = append([]string{c.ExecPath}, args...)
 
 	cmd := exec.Command(args[0], args[1:]...)
 	cmd.Dir = c.workDir

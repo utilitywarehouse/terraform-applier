@@ -33,6 +33,12 @@ modules from a Git repository or local directory.
 - `LOG_LEVEL` - (string) (default: `INFO`) `TRACE|DEBUG|INFO|WARN|ERROR|FATAL`, case insensitive
 - `POLL_INTERVAL_SECONDS` - (int) (default: `5`) Number of seconds to wait between each check for new commits to the repo
 - `MODULES_PATH_FILTERS` - (string) (default: `""`) A comma separated list of sub directories to be applied. Supports [shell file name patterns](https://golang.org/pkg/path/filepath/#Match).
+- `TERRAFORM_PATH` - (string) (default: `""`) The local path to a terraform
+  binary to use.
+- `TERRAFORM_VERSION` - (string) (default: `""`) The version of terraform to
+  use. The applier will install the requested release when it starts up. If you
+  don't specify an explicit version, it will choose the latest available
+  one. Ignored if `TERRAFORM_PATH` is set.
 
 #### Variables used by terraform resources
 
