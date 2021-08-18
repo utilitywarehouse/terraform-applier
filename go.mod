@@ -1,6 +1,6 @@
 module github.com/utilitywarehouse/terraform-applier
 
-go 1.16
+go 1.17
 
 require (
 	github.com/golang/mock v1.5.0
