@@ -1,6 +1,8 @@
 package main
 
 import (
+	"context"
+	"io/ioutil"
 	"os"
 	"os/signal"
 	"strconv"
@@ -8,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/hashicorp/terraform-exec/tfinstall"
 	"github.com/utilitywarehouse/terraform-applier/git"
 	"github.com/utilitywarehouse/terraform-applier/terraform"
 
@@ -28,6 +31,8 @@ var (
 	pollInterval       = os.Getenv("POLL_INTERVAL_SECONDS")
 	modulesPath        = os.Getenv("MODULES_PATH")
 	modulesPathFilters = os.Getenv("MODULES_PATH_FILTERS")
+	terraformPath      = os.Getenv("TERRAFORM_PATH")
+	terraformVersion   = os.Getenv("TERRAFORM_VERSION")
 )
 
 func validate() {
@@ -75,6 +80,42 @@ func validate() {
 	}
 }
 
+// findTerraformExecPath will find the terraform binary to use based on the
+// following strategy:
+//   - If 'path' is set, then use that
+//   - Otherwise, download the release indicated by 'version'
+//   - If the version isn't defined, download the latest release
+func findTerraformExecPath(ctx context.Context, path, version string) (string, func(), error) {
+	cleanup := func() {}
+
+	var execPathFinder tfinstall.ExecPathFinder
+	if path != "" {
+		log.Info("Using terraform version at %s", path)
+		execPathFinder = tfinstall.ExactPath(path)
+	} else {
+		tmpDir, err := ioutil.TempDir("", "tfinstall")
+		if err != nil {
+			return "", cleanup, err
+		}
+		cleanup = func() {
+			os.RemoveAll(tmpDir)
+		}
+		if version != "" {
+			log.Info("Installing terraform version %s", version)
+			execPathFinder = tfinstall.ExactVersion(version, tmpDir)
+		} else {
+			log.Info("Installing latest terraform version")
+			execPathFinder = tfinstall.LatestVersion(tmpDir, false)
+		}
+	}
+	execPath, err := tfinstall.Find(ctx, execPathFinder)
+	if err != nil {
+		return "", cleanup, err
+	}
+
+	return execPath, cleanup, nil
+}
+
 func main() {
 	log.Level = log.LevelFromString(logLevel)
 
@@ -98,9 +139,20 @@ func main() {
 	errors := make(chan error)
 
 	// Terraform client
-	client := &terraform.Client{
-		Metrics: metrics,
+	execPath, cleanup, err := findTerraformExecPath(context.Background(), terraformPath, terraformVersion)
+	defer cleanup()
+	if err != nil {
+		log.Fatal("error finding terraform: %s", err)
 	}
+	client := &terraform.Client{
+		ExecPath: execPath,
+		Metrics:  metrics,
+	}
+	versionOutput, err := client.Version()
+	if err != nil {
+		log.Fatal("error running `terraform version` version=%s error=%s", terraformVersion, err)
+	}
+	log.Info(versionOutput)
 
 	dr, _ := strconv.ParseBool(dryRun)
 	applier := &run.Applier{
@@ -179,6 +231,6 @@ func main() {
 		}
 	}()
 
-	err := <-errors
+	err = <-errors
 	log.Fatal("Fatal error, exiting: %v", err)
 }

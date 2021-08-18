@@ -10,14 +10,9 @@ RUN apk --no-cache add git \
 
 FROM alpine:3.14
 
-ENV TERRAFORM_VERSION 0.14.5
 COPY templates/ /templates/
 COPY static/ /static/
-RUN apk --no-cache add ca-certificates git tini \
-  && wget https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip -O terraform.zip \
-  && unzip terraform.zip \
-  && chmod +x terraform \
-  && mv terraform /usr/local/bin/terraform
+RUN apk --no-cache add ca-certificates git tini
 COPY --from=build /terraform-applier /terraform-applier
 
 ENTRYPOINT ["/sbin/tini", "--"]
