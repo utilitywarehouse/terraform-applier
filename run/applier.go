@@ -120,7 +120,7 @@ func (l *tfLogger) Printf(format string, v ...interface{}) {
 	log.Info("+ %s", msg)
 	// Write the command to the output with a faux shell prompt and a new
 	// line at the end. This aids readability.
-	fmt.Fprint(l.w, "$ "+msg+"\n")
+	fmt.Fprint(l.w, fmt.Sprintf("\n$ %s\n", msg))
 }
 
 func (a *Applier) applyModule(ctx context.Context, modulePath string) (string, error) {
