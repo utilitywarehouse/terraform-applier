@@ -23,12 +23,6 @@ modules from a Git repository or local directory.
   hash portion with `%s` so it can be filled in by terraform-applier (e.g. `https://github.com/kubernetes/kubernetes/commit/%s`) .
 - `DRY_RUN` - (bool) (default: `false`) If `true`, terraform-applier will stop after running `plan`, whether there are changes to be made or not
 - `FULL_RUN_INTERVAL_SECONDS` - (int) (default: `3600`) Number of seconds between automatic full runs . Set to `0` to disable
-- `INIT_ARGS` - (string) (default: `""`) A comma separated list of arguments to be passed to the `init` command. This is primarily useful for
-  configuring backend options that are omitted from the code. If you include a `%s` in the string, terraform-applier will replace
-  it with the basename of the module being applied. This can be used to configure the name of the state file
-  - For instance, for a module with the path `/src/modules/vpc`, an `INIT_ARGS` value of `-backend-config=key=prod-%s` would be
-    formatted as `-backend-config=key=prod-vpc` and could be used, in this example, to write state to an S3 object with the key
-    `prod-vpc`.
 - `LISTEN_ADDRESS` - (string) (default: `:8080`) The address the applier webserver will listen on
 - `LOG_LEVEL` - (string) (default: `INFO`) `TRACE|DEBUG|INFO|WARN|ERROR|FATAL`, case insensitive
 - `POLL_INTERVAL_SECONDS` - (int) (default: `5`) Number of seconds to wait between each check for new commits to the repo

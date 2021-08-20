@@ -59,11 +59,9 @@
                             </div>
                             <div id="failure-{{$i}}" class="panel-collapse collapse">
                                 <ul class="list-group">
-                                    {{ range $i, $out := $module.Output }}
                                     <li class="list-group-item">
-                                        <pre class="file-output">{{ printf "$ %s\n" $out.Command }}{{ $out.Output }}</pre>
+                                        <pre class="file-output">{{ $module.Output }}</pre>
                                     </li>
-                                    {{end}}
                                 </ul>
                             </div>
                         </div>
@@ -95,9 +93,7 @@
                             <div class="panel-collapse">
                                 <ul class="list-group">
                                     <li class="list-group-item">
-                                        {{ range $i, $out := $module.Output }}
-                                        <pre class="file-output">{{ printf "$ %s\n" $out.Command }}{{ $out.Output }}</pre>
-                                        {{end}}
+                                        <pre class="file-output">{{ $module.Output }}</pre>
                                     </li>
                                 </ul>
                             </div>

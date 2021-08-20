@@ -25,6 +25,7 @@ require (
 	github.com/hashicorp/go-uuid v1.0.0 // indirect
 	github.com/hashicorp/go-version v1.3.0 // indirect
 	github.com/hashicorp/golang-lru v0.5.1 // indirect
+	github.com/hashicorp/terraform-json v0.12.0 // indirect
 	github.com/jmespath/go-jmespath v0.0.0-20160202185014-0b12d6b521d8 // indirect
 	github.com/klauspost/compress v1.11.2 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.1 // indirect
@@ -34,6 +35,7 @@ require (
 	github.com/prometheus/common v0.26.0 // indirect
 	github.com/prometheus/procfs v0.6.0 // indirect
 	github.com/ulikunitz/xz v0.5.8 // indirect
+	github.com/zclconf/go-cty v1.8.4 // indirect
 	go.opencensus.io v0.22.0 // indirect
 	golang.org/x/crypto v0.0.0-20210421170649-83a5a9bb288b // indirect
 	golang.org/x/net v0.0.0-20210405180319-a5a99cb37ef4 // indirect

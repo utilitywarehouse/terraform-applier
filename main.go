@@ -10,9 +10,9 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/hashicorp/terraform-exec/tfexec"
 	"github.com/hashicorp/terraform-exec/tfinstall"
 	"github.com/utilitywarehouse/terraform-applier/git"
-	"github.com/utilitywarehouse/terraform-applier/terraform"
 
 	"github.com/utilitywarehouse/terraform-applier/log"
 	"github.com/utilitywarehouse/terraform-applier/metrics"
@@ -25,7 +25,6 @@ var (
 	diffURLFormat      = os.Getenv("DIFF_URL_FORMAT")
 	dryRun             = os.Getenv("DRY_RUN")
 	fullRunInterval    = os.Getenv("FULL_RUN_INTERVAL_SECONDS")
-	initArgs           = os.Getenv("INIT_ARGS")
 	listenAddress      = os.Getenv("LISTEN_ADDRESS")
 	logLevel           = os.Getenv("LOG_LEVEL")
 	pollInterval       = os.Getenv("POLL_INTERVAL_SECONDS")
@@ -116,6 +115,27 @@ func findTerraformExecPath(ctx context.Context, path, version string) (string, f
 	return execPath, cleanup, nil
 }
 
+// terraformVersionString returns the terraform version from the terraform binary
+// indicated by execPath
+func terraformVersionString(ctx context.Context, execPath string) (string, error) {
+	tmpDir, err := ioutil.TempDir("", "tfversion")
+	if err != nil {
+		return "", err
+	}
+	defer os.RemoveAll(tmpDir)
+
+	tf, err := tfexec.NewTerraform(tmpDir, execPath)
+	if err != nil {
+		return "", err
+	}
+	version, _, err := tf.Version(context.Background(), true)
+	if err != nil {
+		return "", err
+	}
+
+	return version.String(), nil
+}
+
 func main() {
 	log.Level = log.LevelFromString(logLevel)
 
@@ -138,30 +158,26 @@ func main() {
 	// No limit needed, as a single fatal error will exit the program anyway.
 	errors := make(chan error)
 
-	// Terraform client
+	// Find the requested version of terraform and log the version
+	// information
 	execPath, cleanup, err := findTerraformExecPath(context.Background(), terraformPath, terraformVersion)
 	defer cleanup()
 	if err != nil {
 		log.Fatal("error finding terraform: %s", err)
 	}
-	client := &terraform.Client{
-		ExecPath: execPath,
-		Metrics:  metrics,
-	}
-	versionOutput, err := client.Version()
+	version, err := terraformVersionString(context.Background(), execPath)
 	if err != nil {
-		log.Fatal("error running `terraform version` version=%s error=%s", terraformVersion, err)
+		log.Fatal("error running `terraform version`: %s", err)
 	}
-	log.Info(versionOutput)
+	log.Info("Using terraform version: %s", version)
 
 	dr, _ := strconv.ParseBool(dryRun)
 	applier := &run.Applier{
-		Clock:           clock,
-		DryRun:          dr,
-		Errors:          errors,
-		InitArgs:        initArgs,
-		Metrics:         metrics,
-		TerraformClient: client,
+		Clock:             clock,
+		DryRun:            dr,
+		Errors:            errors,
+		Metrics:           metrics,
+		TerraformExecPath: execPath,
 	}
 
 	gitUtil := &git.Util{
