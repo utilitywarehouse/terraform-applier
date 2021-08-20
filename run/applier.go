@@ -1,27 +1,29 @@
 package run
 
 import (
+	"bytes"
+	"context"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"strings"
+	"regexp"
 	"time"
 
+	"github.com/hashicorp/terraform-exec/tfexec"
 	"github.com/utilitywarehouse/terraform-applier/log"
 	"github.com/utilitywarehouse/terraform-applier/metrics"
 	"github.com/utilitywarehouse/terraform-applier/sysutil"
-	"github.com/utilitywarehouse/terraform-applier/terraform"
 )
 
 // ApplyAttempt stores the data from an attempt at applying a single module
 type ApplyAttempt struct {
-	DryRun       bool
-	ErrorMessage string
-	Finish       time.Time
-	Output       []terraform.Output
-	Module       string
-	Start        time.Time
+	DryRun bool
+	Finish time.Time
+	Output string
+	Module string
+	Start  time.Time
 }
 
 // FormattedStart returns the Start time in the format "YYYY-MM-DD hh:mm:ss -0000 GMT"
@@ -51,12 +53,11 @@ type ApplierInterface interface {
 
 // Applier inits, plans and applies terraform modules
 type Applier struct {
-	Clock           sysutil.ClockInterface
-	DryRun          bool
-	Errors          chan<- error
-	InitArgs        string
-	Metrics         metrics.PrometheusInterface
-	TerraformClient terraform.ClientInterface
+	Clock             sysutil.ClockInterface
+	DryRun            bool
+	Errors            chan<- error
+	Metrics           metrics.PrometheusInterface
+	TerraformExecPath string
 }
 
 // Apply runs terraform for each of the modules and reports the successes and failures
@@ -79,59 +80,90 @@ func (a *Applier) Apply(modulesPath string, modules []string) ([]ApplyAttempt, [
 		log.Info("-> %s", module)
 
 		appliedModule := ApplyAttempt{
-			DryRun:       a.DryRun,
-			ErrorMessage: "",
-			Finish:       time.Time{},
-			Output:       []terraform.Output{},
-			Module:       module,
-			Start:        a.Clock.Now(),
+			DryRun: a.DryRun,
+			Finish: time.Time{},
+			Output: "",
+			Module: module,
+			Start:  a.Clock.Now(),
 		}
 
-		// Run terraform from the module's counterpart in the temporary directory
-		a.TerraformClient.SetWorkingDir(filepath.Join(tmpDir, filepath.Base(module)))
+		tmpModulePath := filepath.Join(tmpDir, filepath.Base(module))
 
-		// Bool to track whether this was a successful run or not
-		success := true
-
-		var initArgs []string
-		if a.InitArgs != "" {
-			formattedInitArgs := fmt.Sprintf(a.InitArgs, filepath.Base(module))
-			initArgs = strings.Split(formattedInitArgs, ",")
-		}
-
-		// Init
-		initOut, err := a.TerraformClient.Init(module, initArgs)
-		appliedModule.Output = append(appliedModule.Output, initOut)
-		if err != nil {
-			appliedModule.ErrorMessage = err.Error()
-			success = false
-		} else {
-			// Plan
-			planOut, planFile, err := a.TerraformClient.Plan(module)
-			appliedModule.Output = append(appliedModule.Output, planOut)
-			if err != nil {
-				appliedModule.ErrorMessage = err.Error()
-				success = false
-			} else if len(planFile) > 0 && !a.DryRun {
-				// Apply (if there are changes to apply and dry run isn't set)
-				applyOut, err := a.TerraformClient.Apply(module, planFile)
-				appliedModule.Output = append(appliedModule.Output, applyOut)
-				if err != nil {
-					appliedModule.ErrorMessage = err.Error()
-					success = false
-				}
-			}
-		}
-
+		out, err := a.applyModule(context.Background(), tmpModulePath)
 		appliedModule.Finish = a.Clock.Now()
-
-		if success {
-			successes = append(successes, appliedModule)
-		} else {
-			log.Warn("%v\n%v", appliedModule.ErrorMessage, appliedModule.Output)
+		appliedModule.Output = out
+		if err != nil {
+			log.Warn("error applying %s: %s", module, err)
 			failures = append(failures, appliedModule)
+		} else {
+			successes = append(successes, appliedModule)
 		}
 	}
 
 	return successes, failures
+}
+
+// tfLogMessageRe matches `[LEVEL] running Terraform command:` at the start of a
+// line ($1) and the actual terraform command ($2)
+var tfLogMessageRe = regexp.MustCompile(`(^\[[A-Z]+\] running Terraform command: )(.+)`)
+
+// tfLogger implements tfexec.printfer. It logs messages from tfexec and also
+// writes them to the io.Writer w
+type tfLogger struct {
+	w io.Writer
+}
+
+// Printf logs the message and also writes it to the given io.Writer
+func (l *tfLogger) Printf(format string, v ...interface{}) {
+	// Extract the terraform command from the log line
+	msg := tfLogMessageRe.ReplaceAllString(fmt.Sprintf(format, v...), `$2`)
+	log.Info("+ %s", msg)
+	// Write the command to the output with a faux shell prompt and a new
+	// line at the end. This aids readability.
+	fmt.Fprint(l.w, "$ "+msg+"\n")
+}
+
+func (a *Applier) applyModule(ctx context.Context, modulePath string) (string, error) {
+	var out bytes.Buffer
+
+	tf, err := tfexec.NewTerraform(modulePath, a.TerraformExecPath)
+	if err != nil {
+		return "", err
+	}
+	tf.SetLogger(&tfLogger{w: &out})
+	tf.SetStdout(&out)
+	tf.SetStderr(&out)
+
+	// Sometimes the error text would be useful in the command output that's
+	// displayed in the UI. For this reason, we append the error to the
+	// output before we return it.
+	errReturn := func(out bytes.Buffer, err error) (string, error) {
+		if err != nil {
+			return fmt.Sprintf("%s\n%s", out.String(), err.Error()), err
+		}
+
+		return out.String(), nil
+	}
+
+	if err := tf.Init(ctx, tfexec.Upgrade(true)); err != nil {
+		return errReturn(out, err)
+	}
+	fmt.Fprint(&out, "\n")
+
+	planOut := filepath.Join(modulePath, "plan.out")
+
+	changes, err := tf.Plan(ctx, tfexec.Out(planOut))
+	if err != nil {
+		return errReturn(out, err)
+	}
+	fmt.Fprint(&out, "\n")
+
+	if changes && !a.DryRun {
+		if err := tf.Apply(ctx, tfexec.DirOrPlan(planOut)); err != nil {
+			return errReturn(out, err)
+		}
+		fmt.Fprint(&out, "\n")
+	}
+
+	return out.String(), nil
 }
