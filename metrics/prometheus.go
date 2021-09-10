@@ -96,8 +96,9 @@ func (p *Prometheus) UpdateTerraformExitCodeCount(module string, cmd string, cod
 
 // UpdateModuleSuccess increments the given module's Counter for either successful apply attempts or failed apply attempts.
 func (p *Prometheus) UpdateModuleSuccess(module string, success bool) {
+	module = filepath.Base(module)
 	p.moduleApplyCount.With(prometheus.Labels{
-		"module": filepath.Base(module), "success": strconv.FormatBool(success),
+		"module": module, "success": strconv.FormatBool(success),
 	}).Inc()
 	p.setApplySuccess(module, success)
 }
