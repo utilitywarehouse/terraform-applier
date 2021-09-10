@@ -11,8 +11,10 @@ release:
 	@sd "master" "$(VERSION)" manifests/base/terraform-applier.yaml
 	@sd "master" "$(VERSION)" manifests/git-sync/terraform-applier.yaml
 	@git add -- manifests/base/terraform-applier.yaml
+	@git add -- manifests/git-sync/terraform-applier.yaml
 	@git commit -m "Release $(VERSION)"
 	@sd "$(VERSION)" "master" manifests/base/terraform-applier.yaml
 	@sd "$(VERSION)" "master" manifests/git-sync/terraform-applier.yaml
 	@git add -- manifests/base/terraform-applier.yaml
+	@git add -- manifests/git-sync/terraform-applier.yaml
 	@git commit -m "Clean up release $(VERSION)"
