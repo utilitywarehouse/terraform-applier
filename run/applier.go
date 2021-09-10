@@ -3,10 +3,12 @@ package run
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"time"
@@ -146,22 +148,44 @@ func (a *Applier) applyModule(ctx context.Context, modulePath string) (string, e
 	}
 
 	if err := tf.Init(ctx, tfexec.Upgrade(true)); err != nil {
+		if uerr := errors.Unwrap(err); uerr != nil {
+			if e, ok := uerr.(*exec.ExitError); ok {
+				a.Metrics.UpdateTerraformExitCodeCount(modulePath, "init", e.ExitCode())
+			}
+		}
 		return errReturn(out, err)
 	}
+	a.Metrics.UpdateTerraformExitCodeCount(modulePath, "init", 0)
 	fmt.Fprint(&out, "\n")
 
 	planOut := filepath.Join(modulePath, "plan.out")
 
 	changes, err := tf.Plan(ctx, tfexec.Out(planOut))
 	if err != nil {
+		if uerr := errors.Unwrap(err); uerr != nil {
+			if e, ok := uerr.(*exec.ExitError); ok {
+				a.Metrics.UpdateTerraformExitCodeCount(modulePath, "plan", e.ExitCode())
+			}
+		}
 		return errReturn(out, err)
+	}
+	if changes {
+		a.Metrics.UpdateTerraformExitCodeCount(modulePath, "plan", 2)
+	} else {
+		a.Metrics.UpdateTerraformExitCodeCount(modulePath, "plan", 0)
 	}
 	fmt.Fprint(&out, "\n")
 
 	if changes && !a.DryRun {
 		if err := tf.Apply(ctx, tfexec.DirOrPlan(planOut)); err != nil {
+			if uerr := errors.Unwrap(err); uerr != nil {
+				if e, ok := uerr.(*exec.ExitError); ok {
+					a.Metrics.UpdateTerraformExitCodeCount(modulePath, "apply", e.ExitCode())
+				}
+			}
 			return errReturn(out, err)
 		}
+		a.Metrics.UpdateTerraformExitCodeCount(modulePath, "apply", 0)
 		fmt.Fprint(&out, "\n")
 	}
 
