@@ -7,6 +7,10 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
+const (
+	metricsNamespace = "terraform_applier"
+)
+
 // PrometheusInterface allows for mocking out the functionality of Prometheus when testing the full process of an apply run.
 type PrometheusInterface interface {
 	UpdateTerraformExitCodeCount(string, string, int)
@@ -28,8 +32,9 @@ type Prometheus struct {
 func (p *Prometheus) Init() {
 
 	p.moduleApplyCount = prometheus.NewCounterVec(prometheus.CounterOpts{
-		Name: "module_apply_count",
-		Help: "Success metric for every module applied",
+		Namespace: metricsNamespace,
+		Name:      "module_apply_count",
+		Help:      "Success metric for every module applied",
 	},
 		[]string{
 			// Path of the module that was applied
@@ -39,8 +44,9 @@ func (p *Prometheus) Init() {
 		},
 	)
 	p.moduleApplyDuration = prometheus.NewHistogramVec(prometheus.HistogramOpts{
-		Name: "module_apply_duration_seconds",
-		Help: "Duration of the apply runs",
+		Namespace: metricsNamespace,
+		Name:      "module_apply_duration_seconds",
+		Help:      "Duration of the apply runs",
 	},
 		[]string{
 			// Path of the module that was applied
@@ -50,8 +56,9 @@ func (p *Prometheus) Init() {
 		},
 	)
 	p.terraformExitCodeCount = prometheus.NewCounterVec(prometheus.CounterOpts{
-		Name: "terraform_exit_code_count",
-		Help: "Count of terraform exit codes",
+		Namespace: metricsNamespace,
+		Name:      "terraform_exit_code_count",
+		Help:      "Count of terraform exit codes",
 	},
 		[]string{
 			// Path of the module that was applied

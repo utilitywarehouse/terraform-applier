@@ -48,10 +48,10 @@ terraform-applier exports Prometheus metrics. The metrics are hosted on the webs
 
 In addition to the Prometheus default metrics, the following custom metrics are included:
 
-- `module_apply_count` - (tags: `module`, `success`) A Counter for each module that has had an apply attempt over the lifetime of
+- `terraform_applier_module_apply_count` - (tags: `module`, `success`) A Counter for each module that has had an apply attempt over the lifetime of
   the application, incremented with each apply attempt and tagged with the result of the run (`success=true|false`)
-- `module_apply_duration_seconds` - (tags: `module`, `success`) A Summary that keeps track of the durations of each apply run for
+- `terraform_applier_module_apply_duration_seconds` - (tags: `module`, `success`) A Summary that keeps track of the durations of each apply run for
   each module, tagged with the result of the run (`success=true|false`)
-- `terraform_exit_code_count` - (tags: `module`, `command`, `exit_code`) A `Counter` for each exit code returned by executions of
+- `terraform_applier_terraform_exit_code_count` - (tags: `module`, `command`, `exit_code`) A `Counter` for each exit code returned by executions of
   `terraform`, labelled with the command issued (`init`, `plan`,`apply`) and the exit code. It's worth noting that `plan` will
   return a code of `2` if there are changes to be made, which is not an error or a failure, so you may wish to account for this in your alerting.
