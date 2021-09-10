@@ -52,6 +52,8 @@ In addition to the Prometheus default metrics, the following custom metrics are 
   the application, incremented with each apply attempt and tagged with the result of the run (`success=true|false`)
 - `terraform_applier_module_apply_duration_seconds` - (tags: `module`, `success`) A Summary that keeps track of the durations of each apply run for
   each module, tagged with the result of the run (`success=true|false`)
+- `terraform_applier_module_apply_success` - (tags: `module`) A `Gauge` which
+  tracks whether the last apply run for a module was successful.
 - `terraform_applier_terraform_exit_code_count` - (tags: `module`, `command`, `exit_code`) A `Counter` for each exit code returned by executions of
   `terraform`, labelled with the command issued (`init`, `plan`,`apply`) and the exit code. It's worth noting that `plan` will
   return a code of `2` if there are changes to be made, which is not an error or a failure, so you may wish to account for this in your alerting.
