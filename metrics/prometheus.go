@@ -7,6 +7,10 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
+const (
+	metricsNamespace = "terraform_applier"
+)
+
 // PrometheusInterface allows for mocking out the functionality of Prometheus when testing the full process of an apply run.
 type PrometheusInterface interface {
 	UpdateTerraformExitCodeCount(string, string, int)
@@ -22,14 +26,15 @@ type Prometheus struct {
 	terraformExitCodeCount *prometheus.CounterVec
 	moduleApplyCount       *prometheus.CounterVec
 	moduleApplyDuration    *prometheus.HistogramVec
+	moduleApplySuccess     *prometheus.GaugeVec
 }
 
 // Init creates and registers the custom metrics for kube-applier.
 func (p *Prometheus) Init() {
-
 	p.moduleApplyCount = prometheus.NewCounterVec(prometheus.CounterOpts{
-		Name: "module_apply_count",
-		Help: "Success metric for every module applied",
+		Namespace: metricsNamespace,
+		Name:      "module_apply_count",
+		Help:      "Success metric for every module applied",
 	},
 		[]string{
 			// Path of the module that was applied
@@ -39,8 +44,9 @@ func (p *Prometheus) Init() {
 		},
 	)
 	p.moduleApplyDuration = prometheus.NewHistogramVec(prometheus.HistogramOpts{
-		Name: "module_apply_duration_seconds",
-		Help: "Duration of the apply runs",
+		Namespace: metricsNamespace,
+		Name:      "module_apply_duration_seconds",
+		Help:      "Duration of the apply runs",
 	},
 		[]string{
 			// Path of the module that was applied
@@ -49,9 +55,19 @@ func (p *Prometheus) Init() {
 			"success",
 		},
 	)
+	p.moduleApplySuccess = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Namespace: metricsNamespace,
+		Name:      "module_apply_success",
+		Help:      "Was the last apply run for this module successful?",
+	},
+		[]string{
+			"module",
+		},
+	)
 	p.terraformExitCodeCount = prometheus.NewCounterVec(prometheus.CounterOpts{
-		Name: "terraform_exit_code_count",
-		Help: "Count of terraform exit codes",
+		Namespace: metricsNamespace,
+		Name:      "terraform_exit_code_count",
+		Help:      "Count of terraform exit codes",
 	},
 		[]string{
 			// Path of the module that was applied
@@ -64,6 +80,7 @@ func (p *Prometheus) Init() {
 	)
 	prometheus.MustRegister(p.moduleApplyCount)
 	prometheus.MustRegister(p.moduleApplyDuration)
+	prometheus.MustRegister(p.moduleApplySuccess)
 	prometheus.MustRegister(p.terraformExitCodeCount)
 
 }
@@ -82,6 +99,7 @@ func (p *Prometheus) UpdateModuleSuccess(module string, success bool) {
 	p.moduleApplyCount.With(prometheus.Labels{
 		"module": filepath.Base(module), "success": strconv.FormatBool(success),
 	}).Inc()
+	p.setApplySuccess(module, success)
 }
 
 // UpdateModuleApplyDuration adds a data point (latency of the most recent run) to the module_apply_duration_seconds Summary metric, with a tag indicating whether or not the run was successful.
@@ -90,4 +108,14 @@ func (p *Prometheus) UpdateModuleApplyDuration(module string, runDuration float6
 		"module":  filepath.Base(module),
 		"success": strconv.FormatBool(success),
 	}).Observe(runDuration)
+}
+
+func (p *Prometheus) setApplySuccess(module string, success bool) {
+	as := float64(0)
+	if success {
+		as = 1
+	}
+	p.moduleApplySuccess.With(prometheus.Labels{
+		"module": module,
+	}).Set(as)
 }
