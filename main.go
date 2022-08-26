@@ -92,29 +92,32 @@ func validate() {
 func findTerraformExecPath(ctx context.Context, path, ver string) (string, func(), error) {
 	cleanup := func() {}
 	i := hcinstall.NewInstaller()
-
-	var release src.Source
-	if ver != "" {
-		tfver, _ := version.NewVersion(ver)
-		release = &releases.ExactVersion{
-			Product: product.Terraform,
-			Version: tfver,
-		}
-	} else {
-		release = &releases.LatestVersion{
-			Product: product.Terraform,
-		}
-	}
+	var execPath string
+	var err error
 
 	if path != "" {
-		log.Info("Path is set, will try to use it before installing a binary: path=%s", path)
+		log.Info("Using terraform version at %s", path)
+		execPath, err = i.Ensure(context.Background(), []src.Source{
+			&fs.AnyVersion{
+				ExactBinPath: path,
+			},
+		})
+	} else if ver != "" {
+		tfver := version.Must(version.NewVersion(ver))
+		execPath, err = i.Ensure(context.Background(), []src.Source{
+			&releases.ExactVersion{
+				Product: product.Terraform,
+				Version: tfver,
+			},
+		})
+	} else {
+		execPath, err = i.Ensure(context.Background(), []src.Source{
+			&releases.LatestVersion{
+				Product: product.Terraform,
+			},
+		})
 	}
-	execPath, err := i.Ensure(context.Background(), []src.Source{
-		&fs.AnyVersion{
-			ExactBinPath: path,
-		},
-		release,
-	})
+
 	if err != nil {
 		return "", cleanup, err
 	}
