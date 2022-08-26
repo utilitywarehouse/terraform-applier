@@ -91,11 +91,20 @@ func validate() {
 //   - If the version isn't defined, download the latest release
 func findTerraformExecPath(ctx context.Context, path, ver string) (string, func(), error) {
 	cleanup := func() {}
-
 	i := hcinstall.NewInstaller()
 
-	// If "ver" is empty, this will fail and return nil
-	tfver, _ := version.NewVersion(ver)
+	var release src.Source
+	if ver != "" {
+		tfver, _ := version.NewVersion(ver)
+		release = &releases.ExactVersion{
+			Product: product.Terraform,
+			Version: tfver,
+		}
+	} else {
+		release = &releases.LatestVersion{
+			Product: product.Terraform,
+		}
+	}
 
 	if path != "" {
 		log.Info("Path is set, will try to use it before installing a binary: path=%s", path)
@@ -104,13 +113,7 @@ func findTerraformExecPath(ctx context.Context, path, ver string) (string, func(
 		&fs.AnyVersion{
 			ExactBinPath: path,
 		},
-		&releases.ExactVersion{
-			Product: product.Terraform,
-			Version: tfver,
-		},
-		&releases.LatestVersion{
-			Product: product.Terraform,
-		},
+		release,
 	})
 	if err != nil {
 		return "", cleanup, err
