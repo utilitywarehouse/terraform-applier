@@ -93,7 +93,9 @@ func findTerraformExecPath(ctx context.Context, path, ver string) (string, func(
 	cleanup := func() {}
 
 	i := hcinstall.NewInstaller()
-	tfver := version.Must(version.NewVersion(ver))
+
+	// If "ver" is empty, this will fail and return nil
+	tfver, _ := version.NewVersion(ver)
 
 	if path != "" {
 		log.Info("Path is set, will try to use it before installing a binary: path=%s", path)
