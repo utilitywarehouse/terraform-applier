@@ -10,8 +10,13 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/hashicorp/go-version"
+	hcinstall "github.com/hashicorp/hc-install"
+	"github.com/hashicorp/hc-install/fs"
+	"github.com/hashicorp/hc-install/product"
+	"github.com/hashicorp/hc-install/releases"
+	"github.com/hashicorp/hc-install/src"
 	"github.com/hashicorp/terraform-exec/tfexec"
-	"github.com/hashicorp/terraform-exec/tfinstall"
 	"github.com/utilitywarehouse/terraform-applier/git"
 
 	"github.com/utilitywarehouse/terraform-applier/log"
@@ -81,33 +86,38 @@ func validate() {
 
 // findTerraformExecPath will find the terraform binary to use based on the
 // following strategy:
-//   - If 'path' is set, then use that
+//   - If 'path' is set, try to use that
 //   - Otherwise, download the release indicated by 'version'
 //   - If the version isn't defined, download the latest release
-func findTerraformExecPath(ctx context.Context, path, version string) (string, func(), error) {
+func findTerraformExecPath(ctx context.Context, path, ver string) (string, func(), error) {
 	cleanup := func() {}
+	i := hcinstall.NewInstaller()
+	var execPath string
+	var err error
 
-	var execPathFinder tfinstall.ExecPathFinder
 	if path != "" {
 		log.Info("Using terraform version at %s", path)
-		execPathFinder = tfinstall.ExactPath(path)
+		execPath, err = i.Ensure(context.Background(), []src.Source{
+			&fs.AnyVersion{
+				ExactBinPath: path,
+			},
+		})
+	} else if ver != "" {
+		tfver := version.Must(version.NewVersion(ver))
+		execPath, err = i.Ensure(context.Background(), []src.Source{
+			&releases.ExactVersion{
+				Product: product.Terraform,
+				Version: tfver,
+			},
+		})
 	} else {
-		tmpDir, err := ioutil.TempDir("", "tfinstall")
-		if err != nil {
-			return "", cleanup, err
-		}
-		cleanup = func() {
-			os.RemoveAll(tmpDir)
-		}
-		if version != "" {
-			log.Info("Installing terraform version %s", version)
-			execPathFinder = tfinstall.ExactVersion(version, tmpDir)
-		} else {
-			log.Info("Installing latest terraform version")
-			execPathFinder = tfinstall.LatestVersion(tmpDir, false)
-		}
+		execPath, err = i.Ensure(context.Background(), []src.Source{
+			&releases.LatestVersion{
+				Product: product.Terraform,
+			},
+		})
 	}
-	execPath, err := tfinstall.Find(ctx, execPathFinder)
+
 	if err != nil {
 		return "", cleanup, err
 	}
