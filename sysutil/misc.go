@@ -2,23 +2,19 @@ package sysutil
 
 import (
 	"fmt"
-	"os"
 	"strings"
 	"text/template"
 )
 
 // CreateTemplate takes in a path to a template file and parses the file to create a Template instance.
-func CreateTemplate(templatePath string) (*template.Template, error) {
-	if _, err := os.Stat(templatePath); err != nil {
-		return nil, fmt.Errorf("Error opening template file: %v", err)
-	}
+func CreateTemplate(status string) (*template.Template, error) {
 	tmpl, err := template.New("index").
 		Funcs(template.FuncMap{
 			"sanitizeString": sanitizeString,
 			"splitByNewline": splitByNewline,
 			"getOutputClass": getOutputClass,
 		}).
-		ParseFiles(templatePath)
+		Parse(status)
 	if err != nil {
 		return nil, fmt.Errorf("Error parsing template: %v", err)
 	}
