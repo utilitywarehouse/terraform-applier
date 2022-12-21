@@ -1,4 +1,5 @@
-<!doctype html>
+{{define "index"}}
+<!DOCTYPE html>
 <html>
 
 <head>
@@ -25,7 +26,7 @@
     <div class="row">
         <div class="col-md-2"></div>
         <div class="col-md-8">
-            <div class="panel panel-default {{ if .Failures }}panel-danger{{ else }}panel-success{{ end }}">
+            <div class="panel panel-default">
                 <div class="panel-heading">
                     <h3 class="panel-title">Last Run</h3>
                 </div>
@@ -39,71 +40,13 @@
             </div>
         </div>
     </div>
-    <div class="row">
-        <div class="col-md-2"></div>
-        <div class="col-md-8">
-            <div class="panel-group">
-                <div class="panel panel-default {{ if .Failures }}panel-danger{{ else }}panel-success{{ end }}">
-                    <div class="panel-heading">
-                        <h4 class="panel-title">
-                            <a data-toggle="collapse" href="#failures">Errors: {{ len .Failures }}</a>
-                        </h4>
-                    </div>
-                    <div id="failures" class="panel-group collapse {{ if .Failures }}in{{ end }}">
-                        {{ range $i, $module := .Failures }}
-                        <div class="panel">
-                            <div class="panel-heading">
-                                <div class="panel-title">
-                                    <a data-toggle="collapse" href="#failure-{{$i}}">{{ $module.Module }} (duration: {{ .FormattedDuration }})</a>
-                                </div>
-                            </div>
-                            <div id="failure-{{$i}}" class="panel-collapse collapse">
-                                <ul class="list-group">
-                                    <li class="list-group-item">
-                                        <pre class="file-output">{{ $module.Output }}</pre>
-                                    </li>
-                                </ul>
-                            </div>
-                        </div>
-                        {{ end }}
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="row">
-        <div class="col-md-2"></div>
-        <div class="col-md-8">
-            <div class="panel-group">
-                <div class="panel panel-default {{ if .Failures }}panel-warning{{ else }}panel-success{{ end }}">
-                    <div class="panel-heading">
-                        <h4 class="panel-title">
-                            <a data-toggle="collapse" href="#successes">Applied Modules: {{ len .Successes }} /
-                                {{ .TotalModules }}</a>
-                        </h4>
-                    </div>
-                    <div id="successes" class="panel-group collapse in">
-                        {{ range $i, $module := .Successes }}
-                        <div class="panel">
-                            <div class="panel-heading">
-                                <div class="panel-title">
-                                    {{ $module.Module }} (duration: {{ .FormattedDuration }})
-                                </div>
-                            </div>
-                            <div class="panel-collapse">
-                                <ul class="list-group">
-                                    <li class="list-group-item">
-                                        <pre class="file-output">{{ $module.Output }}</pre>
-                                    </li>
-                                </ul>
-                            </div>
-                        </div>
-                        {{ end }}
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
+
+    {{template "section" (.Filter "failure")}}
+
+    {{template "section" (.Filter "plan_only")}}
+
+    {{template "section" (.Filter "applied")}}
+
     {{ else }}
     <h3 class="text-center">Waiting for information about the first run...</h3>
     <h4 class="text-center">Refresh for updates and check the status and logs for the terraform-applier container to make
@@ -112,3 +55,59 @@
 </body>
 
 </html>
+{{ end }}
+
+<!-- Filtered Section -->
+{{define "section"}}
+<div class="row">
+    <div class="col-md-2"></div>
+    <div class="col-md-8">
+        <div class="panel-group">
+            <div class='panel panel-default {{if eq $.FilteredBy "applied"}}panel-success{{else if eq $.FilteredBy "failure"}}panel-danger{{else if eq $.FilteredBy "plan_only"}}panel-warning{{end}}'>
+                <div class="panel-heading">
+                    <h4 class="panel-title">
+                        <a data-toggle="collapse" href="#{{$.FilteredBy}}">
+                            {{if eq $.FilteredBy "failure"}}
+                                Errored Modules: {{ len .Modules }} / {{ .Total }}
+                            {{else if eq $.FilteredBy "plan_only"}}
+                                Plan Only Modules: {{ len .Modules }} / {{ .Total }}
+                            {{else if eq $.FilteredBy "applied"}}
+                                Applied Modules: {{ len .Modules }} / {{ .Total }}
+                            {{end}}
+                        </a>
+                    </h4>
+                </div>
+                <div id="failures" class="panel-group collapse {{ if .Modules }} in {{ end }}">
+                    {{ range $i, $module := .Modules }}
+                        {{template "module" $module}}
+                    {{ end }}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{{end}}
+
+<!-- Module Info -->
+{{define "module"}}
+<div class="panel">
+    <div class="panel-heading">
+        <div class="panel-title">
+            <a data-toggle="collapse" href="#{{ sanitizeString .Module }}">{{ .Module }} (duration: {{ .FormattedDuration }})</a>
+        </div>
+    </div>
+    <div id="{{ sanitizeString .Module }}" class="panel-collapse collapse">
+        <ul class="list-group">
+            <li class="list-group-item">
+                <!-- <pre class="file-output">{{ .Output }}</pre> -->
+<!-- since span is used inside pre make sure there is no extra tab/spaces -->
+                <pre class="file-output">
+                    {{- range  $l := splitByNewline .Output }}
+<span {{if getOutputClass $l}} class="{{getOutputClass $l}}"{{ end }}>{{$l}}</span>
+                    {{- end }}
+                </pre>
+            </li>
+        </ul>
+    </div>
+</div>
+{{ end }}

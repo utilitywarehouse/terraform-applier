@@ -78,3 +78,38 @@ func (r *Result) LastCommitLink() string {
 	}
 	return fmt.Sprintf(r.DiffURLFormat, r.CommitHash)
 }
+
+type Filtered struct {
+	FilteredBy string
+	Total      int
+	Modules    []ApplyAttempt
+}
+
+func (r *Result) Filter(filteredBy string) Filtered {
+	filtered := Filtered{
+		FilteredBy: filteredBy,
+		Total:      r.TotalModules(),
+	}
+
+	switch filteredBy {
+	case "failure":
+		filtered.Modules = r.Failures
+		return filtered
+	case "plan_only":
+		for _, a := range r.Successes {
+			if a.DryRun {
+				filtered.Modules = append(filtered.Modules, a)
+			}
+		}
+		return filtered
+	case "applied":
+		for _, a := range r.Successes {
+			if !a.DryRun {
+				filtered.Modules = append(filtered.Modules, a)
+			}
+		}
+		return filtered
+	}
+
+	return filtered
+}

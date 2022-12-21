@@ -38,9 +38,9 @@ func (s *StatusPageHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		log.Error("Request failed, no template found")
 		return
 	}
-	if err := s.Template.Execute(w, s.Data); err != nil {
+	if err := s.Template.ExecuteTemplate(w, "index", s.Data); err != nil {
 		http.Error(w, "Error: Unable to load HTML template", http.StatusInternalServerError)
-		log.Error("Request failed: %v", http.StatusInternalServerError)
+		log.Error("Request failed: %v", err)
 		return
 	}
 	log.Debug("Request completed successfully")
