@@ -1,18 +1,22 @@
 package webserver
 
 import (
+	"embed"
 	"encoding/json"
 	"net/http"
 	"text/template"
 
+	"github.com/gorilla/mux"
 	"github.com/utilitywarehouse/terraform-applier/log"
 	"github.com/utilitywarehouse/terraform-applier/run"
 	"github.com/utilitywarehouse/terraform-applier/sysutil"
-
-	"github.com/gorilla/mux"
 )
 
-const serverTemplatePath = "/templates/status.html"
+//go:embed static
+var staticFiles embed.FS
+
+//go:embed templates/status.html
+var statusHTML string
 
 // WebServer struct
 type WebServer struct {
@@ -38,9 +42,9 @@ func (s *StatusPageHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		log.Error("Request failed, no template found")
 		return
 	}
-	if err := s.Template.Execute(w, s.Data); err != nil {
+	if err := s.Template.ExecuteTemplate(w, "index", s.Data); err != nil {
 		http.Error(w, "Error: Unable to load HTML template", http.StatusInternalServerError)
-		log.Error("Request failed: %v", http.StatusInternalServerError)
+		log.Error("Request failed: %v", err)
 		return
 	}
 	log.Debug("Request completed successfully")
@@ -90,7 +94,7 @@ func (ws *WebServer) Start() {
 	log.Info("Launching webserver")
 	lastRun := &run.Result{}
 
-	template, err := sysutil.CreateTemplate(serverTemplatePath)
+	template, err := sysutil.CreateTemplate(statusHTML)
 	if err != nil {
 		ws.Errors <- err
 		return
@@ -103,8 +107,7 @@ func (ws *WebServer) Start() {
 		lastRun,
 		ws.Clock,
 	}
-	http.Handle("/", statusPageHandler)
-	m.PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(http.Dir("/static"))))
+	m.PathPrefix("/static/").Handler(http.FileServer(http.FS(staticFiles)))
 	forceRunHandler := &ForceRunHandler{
 		ws.RunQueue,
 	}

@@ -10,8 +10,6 @@ RUN apk --no-cache add git \
 
 FROM alpine:3.16
 
-COPY templates/ /templates/
-COPY static/ /static/
 RUN apk --no-cache add ca-certificates git tini
 COPY --from=build /terraform-applier /terraform-applier
 
