@@ -3,14 +3,14 @@ package main
 import (
 	"context"
 	"flag"
-	"io/ioutil"
+	"fmt"
 	"os"
 	"os/signal"
 	"strconv"
-	"strings"
 	"syscall"
 	"time"
 
+	"github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/go-version"
 	hcinstall "github.com/hashicorp/hc-install"
 	"github.com/hashicorp/hc-install/fs"
@@ -18,11 +18,17 @@ import (
 	"github.com/hashicorp/hc-install/releases"
 	"github.com/hashicorp/hc-install/src"
 	"github.com/hashicorp/terraform-exec/tfexec"
+
 	"github.com/utilitywarehouse/terraform-applier/git"
+	"github.com/utilitywarehouse/terraform-applier/metrics"
+	"github.com/utilitywarehouse/terraform-applier/runner"
+	"github.com/utilitywarehouse/terraform-applier/sysutil"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
+	"k8s.io/client-go/kubernetes"
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
+	"k8s.io/client-go/rest"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -31,86 +37,73 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	terraformapplierv1alpha1 "github.com/utilitywarehouse/terraform-applier/api/v1alpha1"
+	tfaplv1beta1 "github.com/utilitywarehouse/terraform-applier/api/v1beta1"
 	"github.com/utilitywarehouse/terraform-applier/controllers"
-
 	//+kubebuilder:scaffold:imports
-
-	"github.com/utilitywarehouse/terraform-applier/log"
-	"github.com/utilitywarehouse/terraform-applier/metrics"
-	"github.com/utilitywarehouse/terraform-applier/run"
-	"github.com/utilitywarehouse/terraform-applier/sysutil"
-	"github.com/utilitywarehouse/terraform-applier/webserver"
 )
 
 var (
-	scheme   = runtime.NewScheme()
-	setupLog = ctrl.Log.WithName("setup")
+	logger hclog.Logger
+
+	scheme = runtime.NewScheme()
+
+	terminationGracePeriodDuration time.Duration
+	minIntervalBetweenRunsDuration time.Duration
 )
 
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
-	utilruntime.Must(terraformapplierv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(tfaplv1beta1.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
+
+	logger = hclog.New(&hclog.LoggerOptions{
+		Name:            "terraform-applier",
+		Level:           hclog.LevelFromString("DEBUG"),
+		IncludeLocation: false,
+	})
 }
 
 var (
-	diffURLFormat      = os.Getenv("DIFF_URL_FORMAT")
-	dryRun             = os.Getenv("DRY_RUN")
-	fullRunInterval    = os.Getenv("FULL_RUN_INTERVAL_SECONDS")
-	listenAddress      = os.Getenv("LISTEN_ADDRESS")
-	logLevel           = os.Getenv("LOG_LEVEL")
-	pollInterval       = os.Getenv("POLL_INTERVAL_SECONDS")
-	modulesPath        = os.Getenv("MODULES_PATH")
-	modulesPathFilters = os.Getenv("MODULES_PATH_FILTERS")
-	terraformPath      = os.Getenv("TERRAFORM_PATH")
-	terraformVersion   = os.Getenv("TERRAFORM_VERSION")
+	logLevel                      = getEnv("LOG_LEVEL", "warn")
+	repoPath                      = getEnv("REPO_PATH", "/src")
+	terminationGracePeriodSeconds = getEnv("TERMINATION_GRACE_PERIOD", "60")
+	minIntervalBetweenRuns        = getEnv("MIN_INTERVAL_BETWEEN_RUNS", "60")
+	listenAddress                 = getEnv("LISTEN_ADDRESS", ":8080")
+
+	terraformPath    = os.Getenv("TERRAFORM_PATH")
+	terraformVersion = os.Getenv("TERRAFORM_VERSION")
 )
 
+func getEnv(key, fallback string) string {
+	value, ok := os.LookupEnv(key)
+	if ok {
+		return value
+	}
+	return fallback
+}
+
 func validate() {
-	if modulesPath == "" {
-		log.Fatal("Need to export MODULES_PATH")
+	tgp, err := strconv.Atoi(terminationGracePeriodSeconds)
+	if err != nil {
+		logger.Error("TERMINATION_GRACE_PERIOD must be an int")
+		os.Exit(1)
 	}
+	terminationGracePeriodDuration = time.Duration(tgp) * time.Second
 
-	if listenAddress == "" {
-		listenAddress = ":8080"
+	minInterval, err := strconv.Atoi(minIntervalBetweenRuns)
+	if err != nil {
+		logger.Error("MIN_INTERVAL_BETWEEN_RUNS must be an int")
+		os.Exit(1)
 	}
+	minIntervalBetweenRunsDuration = time.Duration(minInterval) * time.Second
 
-	if pollInterval == "" {
-		pollInterval = "5"
-	} else {
-		_, err := strconv.Atoi(pollInterval)
-		if err != nil {
-			log.Fatal("POLL_INTERVAL_SECONDS must be an int")
-		}
-	}
+	logger.Info("config",
+		"repoPath", repoPath,
+		"minIntervalBetweenRunsDuration", minIntervalBetweenRunsDuration,
+		"terminationGracePeriodDuration", terminationGracePeriodDuration,
+	)
 
-	if fullRunInterval == "" {
-		fullRunInterval = "3600"
-	} else {
-		_, err := strconv.Atoi(fullRunInterval)
-		if err != nil {
-			log.Fatal("FULL_RUN_INTERVAL_SECONDS must be an int")
-		}
-	}
-
-	if diffURLFormat != "" && !strings.Contains(diffURLFormat, "%s") {
-		log.Fatal("Invalid DIFF_URL_FORMAT, must contain %q: %v\n", "%s", diffURLFormat)
-	}
-
-	if dryRun == "" {
-		dryRun = "false"
-	} else {
-		_, err := strconv.ParseBool(dryRun)
-		if err != nil {
-			log.Fatal("DRY_RUN must be a boolean")
-		}
-	}
-
-	if logLevel == "" {
-		logLevel = "INFO"
-	}
 }
 
 // findTerraformExecPath will find the terraform binary to use based on the
@@ -125,7 +118,6 @@ func findTerraformExecPath(ctx context.Context, path, ver string) (string, func(
 	var err error
 
 	if path != "" {
-		log.Info("Using terraform version at %s", path)
 		execPath, err = i.Ensure(context.Background(), []src.Source{
 			&fs.AnyVersion{
 				ExactBinPath: path,
@@ -157,7 +149,7 @@ func findTerraformExecPath(ctx context.Context, path, ver string) (string, func(
 // terraformVersionString returns the terraform version from the terraform binary
 // indicated by execPath
 func terraformVersionString(ctx context.Context, execPath string) (string, error) {
-	tmpDir, err := ioutil.TempDir("", "tfversion")
+	tmpDir, err := os.MkdirTemp("", "tfversion")
 	if err != nil {
 		return "", err
 	}
@@ -175,7 +167,24 @@ func terraformVersionString(ctx context.Context, execPath string) (string, error
 	return version.String(), nil
 }
 
+func getKubeClient() (*kubernetes.Clientset, error) {
+	// creates the in-cluster config
+	config, err := rest.InClusterConfig()
+	if err != nil {
+		return nil, fmt.Errorf("unable to create in-cluster config err:%s", err)
+	}
+
+	// creates the clientset
+	return kubernetes.NewForConfig(config)
+}
+
 func main() {
+	ctx, cancel := context.WithCancel(context.Background())
+
+	validate()
+
+	setupLog := logger.Named("setup")
+
 	var metricsAddr string
 	var enableLeaderElection bool
 	var probeAddr string
@@ -191,6 +200,33 @@ func main() {
 	flag.Parse()
 
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
+
+	wsQueue := make(chan ctrl.Request)
+	done := make(chan bool, 1)
+
+	clock := &sysutil.Clock{}
+
+	metrics := &metrics.Prometheus{}
+	metrics.Init()
+
+	gitUtil := &git.Util{
+		Path: repoPath,
+	}
+
+	// Find the requested version of terraform and log the version
+	// information
+	execPath, cleanup, err := findTerraformExecPath(ctx, terraformPath, terraformVersion)
+	defer cleanup()
+	if err != nil {
+		setupLog.Error("error finding terraform", "err", err)
+		os.Exit(1)
+	}
+	version, err := terraformVersionString(ctx, execPath)
+	if err != nil {
+		setupLog.Error("error getting terraform version", "err", err)
+		os.Exit(1)
+	}
+	setupLog.Info("found terraform binary", "version", version)
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:                 scheme,
@@ -212,146 +248,84 @@ func main() {
 		// LeaderElectionReleaseOnCancel: true,
 	})
 	if err != nil {
-		setupLog.Error(err, "unable to start manager")
+		setupLog.Error("unable to start manager", "err", err)
 		os.Exit(1)
 	}
 
-	if err = (&controllers.WorkspaceReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
+	if err = (&controllers.ModuleReconciler{
+		Client:                 mgr.GetClient(),
+		Scheme:                 mgr.GetScheme(),
+		Clock:                  clock,
+		Queue:                  wsQueue,
+		GitUtil:                gitUtil,
+		Log:                    logger.Named("manager"),
+		MinIntervalBetweenRuns: minIntervalBetweenRunsDuration,
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "Workspace")
+		setupLog.Error("unable to create module controller", "err", err)
 		os.Exit(1)
 	}
 	//+kubebuilder:scaffold:builder
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
-		setupLog.Error(err, "unable to set up health check")
+		setupLog.Error("unable to set up health check", "err", err)
 		os.Exit(1)
 	}
 	if err := mgr.AddReadyzCheck("readyz", healthz.Ping); err != nil {
-		setupLog.Error(err, "unable to set up ready check")
+		setupLog.Error("unable to set up ready check", "err", err)
 		os.Exit(1)
 	}
 
-	log.Level = log.LevelFromString(logLevel)
-
-	validate()
-
-	clock := &sysutil.Clock{}
-
-	metrics := &metrics.Prometheus{}
-	metrics.Init()
-
-	// Webserver and scheduler send run requests to runQueue channel, runner receives the requests and initiates runs.
-	// Only 1 pending request may sit in the queue at a time.
-	runQueue := make(chan bool, 1)
-
-	// Runner sends run results to runResults channel, webserver receives the results and displays them.
-	// Limit of 5 is arbitrary - there is significant delay between sends, and receives are handled near instantaneously.
-	runResults := make(chan run.Result, 5)
-
-	// Runner, webserver, and scheduler all send fatal errors to errors channel, and main() exits upon receiving an error.
-	// No limit needed, as a single fatal error will exit the program anyway.
-	errors := make(chan error)
-
-	// Find the requested version of terraform and log the version
-	// information
-	execPath, cleanup, err := findTerraformExecPath(context.Background(), terraformPath, terraformVersion)
-	defer cleanup()
+	kubeClient, err := getKubeClient()
 	if err != nil {
-		log.Fatal("error finding terraform: %s", err)
+		setupLog.Error("unable to create kube client", "err", err)
+		os.Exit(1)
 	}
-	version, err := terraformVersionString(context.Background(), execPath)
-	if err != nil {
-		log.Fatal("error running `terraform version`: %s", err)
-	}
-	log.Info("Using terraform version: %s", version)
-
-	dr, _ := strconv.ParseBool(dryRun)
-	applier := &run.Applier{
-		Clock:             clock,
-		DryRun:            dr,
-		Errors:            errors,
-		Metrics:           metrics,
-		TerraformExecPath: execPath,
+	runner := runner.Runner{
+		ClusterClt:             mgr.GetClient(),
+		KubeClt:                kubeClient,
+		RepoPath:               repoPath,
+		Queue:                  wsQueue,
+		GitUtil:                gitUtil,
+		Log:                    logger.Named("runner"),
+		Metrics:                metrics,
+		TerraformExecPath:      execPath,
+		TerminationGracePeriod: terminationGracePeriodDuration,
 	}
 
-	gitUtil := &git.Util{
-		Path: modulesPath,
-	}
+	go runner.Start(ctx, done)
 
-	var modulesPathFiltersSlice []string
-	if modulesPathFilters != "" {
-		modulesPathFiltersSlice = strings.Split(modulesPathFilters, ",")
-	}
-	runner := &run.Runner{
-		ModulesPath:        modulesPath,
-		ModulesPathFilters: modulesPathFiltersSlice,
-		Applier:            applier,
-		DiffURLFormat:      diffURLFormat,
-		GitUtil:            gitUtil,
-		Metrics:            metrics,
-		Clock:              clock,
-		RunQueue:           runQueue,
-		RunResults:         runResults,
-		Errors:             errors,
-	}
-
-	pi, _ := strconv.Atoi(pollInterval)
-	fi, _ := strconv.Atoi(fullRunInterval)
-	scheduler := &run.Scheduler{
-		FullRunInterval:    time.Duration(fi) * time.Second,
-		GitUtil:            gitUtil,
-		PollInterval:       time.Duration(pi) * time.Second,
-		ModulesPathFilters: modulesPathFiltersSlice,
-		RunQueue:           runQueue,
-		Errors:             errors,
-	}
-
-	webserver := &webserver.WebServer{
-		ListenAddress: listenAddress,
-		Clock:         clock,
-		RunQueue:      runQueue,
-		RunResults:    runResults,
-		Errors:        errors,
-	}
-	_ = scheduler
-	_ = webserver
-	// go scheduler.Start()
-	// go runner.Start()
-	// go webserver.Start()
 	go func() {
 		setupLog.Info("starting manager")
-		if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
-			setupLog.Error(err, "problem running manager")
-			os.Exit(1)
+		if err := mgr.Start(ctx); err != nil {
+			setupLog.Error("problem running manager", "err", err)
 		}
 	}()
 
 	// Wait for apply runs to finish before exiting when a SIGINT or SIGTERM
 	// is received. This should prevent state locks being left behind by
 	// interrupted terraform commands.
-	go func() {
+	go func(cancel context.CancelFunc) {
 		sigCh := make(chan os.Signal, 1)
 		signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 
 		sig := <-sigCh
+		setupLog.Info("received Term signal, waiting for all running modules to finish before exiting", "signal", sig)
 
-		log.Info("Received signal: %s, waiting for apply runs to finish before exiting", sig)
+		// signal runner to start shutting down...
+		cancel()
 
 		for {
 			select {
 			case sig := <-sigCh:
-				log.Fatal("Received a second signal: %s, force exiting", sig)
-			default:
-				if !runner.Applying() {
-					os.Exit(0)
-				}
+				setupLog.Error("received a second signal, force exiting", "signal", sig)
+				os.Exit(1)
+
+			// wait for runner to finish
+			case <-done:
+				setupLog.Info("runner successfully shutdown")
 			}
 		}
-	}()
+	}(cancel)
 
-	err = <-errors
-	log.Fatal("Fatal error, exiting: %v", err)
+	<-done
 }

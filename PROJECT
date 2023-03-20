@@ -4,17 +4,16 @@
 # More info: https://book.kubebuilder.io/reference/project-config.html
 domain: uw.systems
 layout:
-- go.kubebuilder.io/v3
-projectName: tf-applier
+  - go.kubebuilder.io/v3
+projectName: terraform-applier
 repo: github.com/utilitywarehouse/terraform-applier
 resources:
-- api:
-    crdVersion: v1
-    namespaced: true
-  controller: true
-  domain: uw.systems
-  group: terraform-applier
-  kind: Workspace
-  path: github.com/utilitywarehouse/terraform-applier/api/v1alpha1
-  version: v1alpha1
+  - api:
+      crdVersion: v1
+      namespaced: true
+    domain: uw.systems
+    group: terraform-applier
+    kind: Module
+    path: github.com/utilitywarehouse/terraform-applier/api/v1beta1
+    version: v1beta1
 version: "3"
