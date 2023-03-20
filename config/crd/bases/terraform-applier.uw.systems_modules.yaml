@@ -1,0 +1,397 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.11.1
+  creationTimestamp: null
+  name: modules.terraform-applier.uw.systems
+spec:
+  group: terraform-applier.uw.systems
+  names:
+    kind: Module
+    listKind: ModuleList
+    plural: modules
+    singular: module
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .spec.schedule
+      name: Schedule
+      type: string
+    - jsonPath: .spec.suspend
+      name: Suspend
+      type: string
+    - jsonPath: .spec.planOnly
+      name: PlanOnly
+      type: string
+    - jsonPath: .status.currentState
+      name: State
+      type: string
+    - jsonPath: .status.runStartedAt
+      name: Started At
+      type: string
+    - jsonPath: .status.runFinishedAt
+      name: Finished At
+      type: string
+    - jsonPath: .status.runCommitHash
+      name: Commit
+      priority: 10
+      type: string
+    - jsonPath: .spec.path
+      name: Path
+      priority: 20
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      priority: 20
+      type: date
+    - jsonPath: .status.stateMessage
+      name: Last Message
+      type: string
+    name: v1beta1
+    schema:
+      openAPIV3Schema:
+        description: Module is the Schema for the modules API
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: ModuleSpec defines the desired state of Module
+            properties:
+              delegateServiceAccountSecretRef:
+                default: terraform-applier-delegate-token
+                description: DelegateServiceAccountSecretRef references a Secret of
+                  type kubernetes.io/service-account-token in the same namespace as
+                  the Module that will be used to fetch secrets from namespace runs.
+                minLength: 1
+                type: string
+              env:
+                description: List of environment variables passed to the Terraform
+                  execution.
+                items:
+                  description: EnvVar represents an environment variable present in
+                    a Container.
+                  properties:
+                    name:
+                      description: Name of the environment variable. Must be a C_IDENTIFIER.
+                      type: string
+                    value:
+                      description: 'Variable references $(VAR_NAME) are expanded using
+                        the previously defined environment variables in the container
+                        and any service environment variables. If a variable cannot
+                        be resolved, the reference in the input string will be unchanged.
+                        Double $$ are reduced to a single $, which allows for escaping
+                        the $(VAR_NAME) syntax: i.e. "$$(VAR_NAME)" will produce the
+                        string literal "$(VAR_NAME)". Escaped references will never
+                        be expanded, regardless of whether the variable exists or
+                        not. Defaults to "".'
+                      type: string
+                    valueFrom:
+                      description: Source for the environment variable's value. Cannot
+                        be used if value is not empty.
+                      properties:
+                        configMapKeyRef:
+                          description: Selects a key of a ConfigMap.
+                          properties:
+                            key:
+                              description: The key to select.
+                              type: string
+                            name:
+                              description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                TODO: Add other useful fields. apiVersion, kind, uid?'
+                              type: string
+                            optional:
+                              description: Specify whether the ConfigMap or its key
+                                must be defined
+                              type: boolean
+                          required:
+                          - key
+                          type: object
+                          x-kubernetes-map-type: atomic
+                        fieldRef:
+                          description: 'Selects a field of the pod: supports metadata.name,
+                            metadata.namespace, `metadata.labels[''<KEY>'']`, `metadata.annotations[''<KEY>'']`,
+                            spec.nodeName, spec.serviceAccountName, status.hostIP,
+                            status.podIP, status.podIPs.'
+                          properties:
+                            apiVersion:
+                              description: Version of the schema the FieldPath is
+                                written in terms of, defaults to "v1".
+                              type: string
+                            fieldPath:
+                              description: Path of the field to select in the specified
+                                API version.
+                              type: string
+                          required:
+                          - fieldPath
+                          type: object
+                          x-kubernetes-map-type: atomic
+                        resourceFieldRef:
+                          description: 'Selects a resource of the container: only
+                            resources limits and requests (limits.cpu, limits.memory,
+                            limits.ephemeral-storage, requests.cpu, requests.memory
+                            and requests.ephemeral-storage) are currently supported.'
+                          properties:
+                            containerName:
+                              description: 'Container name: required for volumes,
+                                optional for env vars'
+                              type: string
+                            divisor:
+                              anyOf:
+                              - type: integer
+                              - type: string
+                              description: Specifies the output format of the exposed
+                                resources, defaults to "1"
+                              pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                              x-kubernetes-int-or-string: true
+                            resource:
+                              description: 'Required: resource to select'
+                              type: string
+                          required:
+                          - resource
+                          type: object
+                          x-kubernetes-map-type: atomic
+                        secretKeyRef:
+                          description: Selects a key of a secret in the pod's namespace
+                          properties:
+                            key:
+                              description: The key of the secret to select from.  Must
+                                be a valid secret key.
+                              type: string
+                            name:
+                              description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                TODO: Add other useful fields. apiVersion, kind, uid?'
+                              type: string
+                            optional:
+                              description: Specify whether the Secret or its key must
+                                be defined
+                              type: boolean
+                          required:
+                          - key
+                          type: object
+                          x-kubernetes-map-type: atomic
+                      type: object
+                  required:
+                  - name
+                  type: object
+                type: array
+              path:
+                description: Path to the directory containing Terraform Root Module
+                  (.tf) files.
+                type: string
+              planOnly:
+                type: boolean
+              pollInterval:
+                default: 60
+                description: PollInterval specifies the interval at which the Git
+                  repository must be checked.
+                minimum: 60
+                type: integer
+              runTimeout:
+                default: 900
+                description: RunTimeout specifies the timeout in sec for performing
+                  a complete TF run (init,plan and apply if required).
+                maximum: 1800
+                type: integer
+              schedule:
+                description: The schedule in Cron format. Module will do periodic
+                  run for a given schedule if no schedule provided then module will
+                  only run if new PRs are added to given module path
+                type: string
+              suspend:
+                description: This flag tells the controller to suspend all subsequent
+                  runs, it does not apply to already started run. Defaults to false.
+                type: boolean
+              var:
+                description: List of input variables passed to the Terraform execution.
+                items:
+                  description: EnvVar represents an environment variable present in
+                    a Container.
+                  properties:
+                    name:
+                      description: Name of the environment variable. Must be a C_IDENTIFIER.
+                      type: string
+                    value:
+                      description: 'Variable references $(VAR_NAME) are expanded using
+                        the previously defined environment variables in the container
+                        and any service environment variables. If a variable cannot
+                        be resolved, the reference in the input string will be unchanged.
+                        Double $$ are reduced to a single $, which allows for escaping
+                        the $(VAR_NAME) syntax: i.e. "$$(VAR_NAME)" will produce the
+                        string literal "$(VAR_NAME)". Escaped references will never
+                        be expanded, regardless of whether the variable exists or
+                        not. Defaults to "".'
+                      type: string
+                    valueFrom:
+                      description: Source for the environment variable's value. Cannot
+                        be used if value is not empty.
+                      properties:
+                        configMapKeyRef:
+                          description: Selects a key of a ConfigMap.
+                          properties:
+                            key:
+                              description: The key to select.
+                              type: string
+                            name:
+                              description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                TODO: Add other useful fields. apiVersion, kind, uid?'
+                              type: string
+                            optional:
+                              description: Specify whether the ConfigMap or its key
+                                must be defined
+                              type: boolean
+                          required:
+                          - key
+                          type: object
+                          x-kubernetes-map-type: atomic
+                        fieldRef:
+                          description: 'Selects a field of the pod: supports metadata.name,
+                            metadata.namespace, `metadata.labels[''<KEY>'']`, `metadata.annotations[''<KEY>'']`,
+                            spec.nodeName, spec.serviceAccountName, status.hostIP,
+                            status.podIP, status.podIPs.'
+                          properties:
+                            apiVersion:
+                              description: Version of the schema the FieldPath is
+                                written in terms of, defaults to "v1".
+                              type: string
+                            fieldPath:
+                              description: Path of the field to select in the specified
+                                API version.
+                              type: string
+                          required:
+                          - fieldPath
+                          type: object
+                          x-kubernetes-map-type: atomic
+                        resourceFieldRef:
+                          description: 'Selects a resource of the container: only
+                            resources limits and requests (limits.cpu, limits.memory,
+                            limits.ephemeral-storage, requests.cpu, requests.memory
+                            and requests.ephemeral-storage) are currently supported.'
+                          properties:
+                            containerName:
+                              description: 'Container name: required for volumes,
+                                optional for env vars'
+                              type: string
+                            divisor:
+                              anyOf:
+                              - type: integer
+                              - type: string
+                              description: Specifies the output format of the exposed
+                                resources, defaults to "1"
+                              pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                              x-kubernetes-int-or-string: true
+                            resource:
+                              description: 'Required: resource to select'
+                              type: string
+                          required:
+                          - resource
+                          type: object
+                          x-kubernetes-map-type: atomic
+                        secretKeyRef:
+                          description: Selects a key of a secret in the pod's namespace
+                          properties:
+                            key:
+                              description: The key of the secret to select from.  Must
+                                be a valid secret key.
+                              type: string
+                            name:
+                              description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                TODO: Add other useful fields. apiVersion, kind, uid?'
+                              type: string
+                            optional:
+                              description: Specify whether the Secret or its key must
+                                be defined
+                              type: boolean
+                          required:
+                          - key
+                          type: object
+                          x-kubernetes-map-type: atomic
+                      type: object
+                  required:
+                  - name
+                  type: object
+                type: array
+            required:
+            - path
+            type: object
+          status:
+            description: ModuleStatus defines the observed state of Module
+            properties:
+              currentState:
+                description: CurrentState denotes current overall status of module
+                  run it will be either 'Running' -> Module is in running state 'Ready'
+                  -> last run finished successfully and its waiting for next run/event
+                  'Errored' -> last run finished with Error and its waiting for next
+                  run/event
+                type: string
+              lastApplyInfo:
+                description: LastApplyInfo is the stdout of apply command. it may
+                  contain error stream
+                properties:
+                  hash:
+                    description: Hash is the hash of git commit of this output.
+                    type: string
+                  output:
+                    description: Output is the stdout of terraform command. it may
+                      contain error stream
+                    type: string
+                  timestamp:
+                    description: Timestamp when logs was captured.
+                    format: date-time
+                    type: string
+                type: object
+              lastDriftInfo:
+                description: LastDriftInfo is the stdout of plan command.  it may
+                  contain error stream
+                properties:
+                  hash:
+                    description: Hash is the hash of git commit of this output.
+                    type: string
+                  output:
+                    description: Output is the stdout of terraform command. it may
+                      contain error stream
+                    type: string
+                  timestamp:
+                    description: Timestamp when logs was captured.
+                    format: date-time
+                    type: string
+                type: object
+              observedGeneration:
+                description: ObservedGeneration is the last reconciled generation.
+                format: int64
+                type: integer
+              runCommitHash:
+                description: RunCommitHash is the hash of git commit of last run.
+                type: string
+              runCommitMsg:
+                description: RunCommitMsg is the message of git commit of last run.
+                type: string
+              runFinishedAt:
+                description: Information when was the last time the run was finished.
+                format: date-time
+                type: string
+              runStartedAt:
+                description: Information when was the last time the run was started.
+                format: date-time
+                type: string
+              stateMessage:
+                description: StateMessage is a human readable message indicating details
+                  about current state.
+                type: string
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
