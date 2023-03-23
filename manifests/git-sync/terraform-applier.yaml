@@ -84,7 +84,7 @@ spec:
               mountPath: /src
               readOnly: true
         - name: git-sync
-          image: registry.k8s.io/git-sync/git-sync:v3.6.0
+          image: registry.k8s.io/git-sync/git-sync:v3.6.5
           securityContext:
             runAsUser: 65533 # git-sync user
             runAsGroup: 0 # root group to read mounted Secrets
