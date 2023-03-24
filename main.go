@@ -84,6 +84,8 @@ func getEnv(key, fallback string) string {
 }
 
 func validate() {
+	logger.SetLevel(hclog.LevelFromString(logLevel))
+
 	tgp, err := strconv.Atoi(terminationGracePeriodSeconds)
 	if err != nil {
 		logger.Error("TERMINATION_GRACE_PERIOD must be an int")
