@@ -10,6 +10,7 @@ import (
 	tfaplv1beta1 "github.com/utilitywarehouse/terraform-applier/api/v1beta1"
 	"github.com/utilitywarehouse/terraform-applier/git"
 	"github.com/utilitywarehouse/terraform-applier/metrics"
+	"github.com/utilitywarehouse/terraform-applier/sysutil"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
@@ -23,13 +24,14 @@ var (
 )
 
 type Runner struct {
-	ClusterClt client.Client
-	KubeClt    *kubernetes.Clientset
-	GitUtil    git.UtilInterface
-	RepoPath   string
-	Queue      <-chan ctrl.Request
-	Log        hclog.Logger
-
+	Clock                  sysutil.ClockInterface
+	ClusterClt             client.Client
+	KubeClt                kubernetes.Interface
+	GitUtil                git.UtilInterface
+	RepoPath               string
+	Queue                  <-chan ctrl.Request
+	Log                    hclog.Logger
+	Delegate               DelegateInterface
 	Metrics                metrics.PrometheusInterface
 	TerraformExecPath      string
 	TerminationGracePeriod time.Duration
@@ -38,6 +40,10 @@ type Runner struct {
 // Start runs a continuous loop that starts a new run when a request comes into the queue channel.
 func (r *Runner) Start(ctx context.Context, done chan bool) {
 	wg := &sync.WaitGroup{}
+
+	if r.Delegate == nil {
+		r.Delegate = &Delegate{}
+	}
 
 	cancelChan := make(chan struct{})
 
@@ -63,6 +69,8 @@ func (r *Runner) Start(ctx context.Context, done chan bool) {
 
 func (r *Runner) process(req ctrl.Request, cancelChan <-chan struct{}) {
 	log := r.Log.With("module", req)
+
+	log.Debug("starting run....")
 
 	// create new context
 	ctx, cancel := context.WithCancel(context.Background())
@@ -116,14 +124,14 @@ func (r *Runner) process(req ctrl.Request, cancelChan <-chan struct{}) {
 	}
 
 	// Update Status
-	tfaplv1beta1.SetModuleStatusRunStarted(module, "preparing for TF run", commitHash, commitLog)
+	tfaplv1beta1.SetModuleStatusRunStarted(module, "preparing for TF run", commitHash, commitLog, r.Clock.Now())
 	if err = r.patchStatus(ctx, req.NamespacedName, module.Status); err != nil {
 		log.Error("unable to set run starting status", "err", err)
 		return
 	}
 
 	// Setup Delegation and get vars and envs
-	delegatedClient, err := r.setupDelegation(ctx, req, module)
+	delegatedClient, err := r.Delegate.SetupDelegation(ctx, r.KubeClt, module)
 	if err != nil {
 		log.Error("unable to create kube client", "err", err)
 		r.updateFailedStatus(req, module, err.Error())
@@ -144,8 +152,16 @@ func (r *Runner) process(req ctrl.Request, cancelChan <-chan struct{}) {
 		return
 	}
 
+	te, err := r.NewTFRunner(ctx, module, envs, vars)
+	if err != nil {
+		log.Error("unable to create terraform executer", "err", err)
+		r.updateFailedStatus(req, module, err.Error())
+		return
+	}
+	defer te.cleanUp()
+
 	// Process RUN
-	r.runTF(ctx, req, module, commitHash, envs, vars, cancelChan)
+	r.runTF(ctx, req, module, te, commitHash, cancelChan)
 
 	log.Debug("terraform run completed")
 }
@@ -154,23 +170,14 @@ func (r *Runner) runTF(
 	ctx context.Context,
 	req ctrl.Request,
 	module *tfaplv1beta1.Module,
+	te TFExecuter,
 	commitHash string,
-	envs map[string]string,
-	vars map[string]string,
 	cancelChan <-chan struct{},
 ) {
 	log := r.Log.With("module", req)
 
-	te, err := r.NewTFExecuter(ctx, module, envs, vars)
-	if err != nil {
-		log.Error("unable to create terraform executer", "err", err)
-		r.updateFailedStatus(req, module, err.Error())
-		return
-	}
-	defer te.cleanUp()
-
 	tfaplv1beta1.SetModuleStatusProgressing(module, "Initialising")
-	if err = r.patchStatus(ctx, req.NamespacedName, module.Status); err != nil {
+	if err := r.patchStatus(ctx, req.NamespacedName, module.Status); err != nil {
 		log.Error("unable to set init status", "err", err)
 		return
 	}
@@ -201,7 +208,7 @@ func (r *Runner) runTF(
 	diffDetected, planOut, err := te.plan(ctx)
 	if err != nil {
 		log.Error("unable to plan module", "err", err)
-		module.Status.LastDriftInfo = tfaplv1beta1.OutputStats{Timestamp: &metav1.Time{Time: time.Now()}, Hash: commitHash, Output: planOut + "\n" + err.Error()}
+		module.Status.LastDriftInfo = tfaplv1beta1.OutputStats{Timestamp: &metav1.Time{Time: r.Clock.Now()}, CommitHash: commitHash, Output: planOut + "\n" + err.Error()}
 		r.updateFailedStatus(req, module, err.Error())
 		return
 	}
@@ -212,7 +219,7 @@ func (r *Runner) runTF(
 	log.Info("planed", "status", planStatus)
 
 	if !diffDetected {
-		tfaplv1beta1.SetModuleStatusRunFinished(module, planStatus)
+		tfaplv1beta1.SetModuleStatusRunFinished(module, planStatus, r.Clock.Now())
 		if err = r.patchStatus(ctx, req.NamespacedName, module.Status); err != nil {
 			log.Error("unable to set no drift status", "err", err)
 			return
@@ -220,10 +227,10 @@ func (r *Runner) runTF(
 		return
 	}
 
-	module.Status.LastDriftInfo = tfaplv1beta1.OutputStats{Timestamp: &metav1.Time{Time: time.Now()}, Hash: commitHash, Output: planOut}
+	module.Status.LastDriftInfo = tfaplv1beta1.OutputStats{Timestamp: &metav1.Time{Time: r.Clock.Now()}, CommitHash: commitHash, Output: planOut}
 
 	if module.Spec.PlanOnly != nil && *module.Spec.PlanOnly {
-		tfaplv1beta1.SetModuleStatusRunFinished(module, "PlanOnly/"+planStatus)
+		tfaplv1beta1.SetModuleStatusRunFinished(module, "PlanOnly/"+planStatus, r.Clock.Now())
 		if err = r.patchStatus(ctx, req.NamespacedName, module.Status); err != nil {
 			log.Error("unable to set drift status", "err", err)
 			return
@@ -248,19 +255,19 @@ func (r *Runner) runTF(
 	applyOut, err := te.apply(ctx)
 	if err != nil {
 		log.Error("unable to plan module", "err", err)
-		module.Status.LastApplyInfo = tfaplv1beta1.OutputStats{Timestamp: &metav1.Time{Time: time.Now()}, Hash: commitHash, Output: applyOut + "\n" + err.Error()}
+		module.Status.LastApplyInfo = tfaplv1beta1.OutputStats{Timestamp: &metav1.Time{Time: r.Clock.Now()}, CommitHash: commitHash, Output: applyOut + "\n" + err.Error()}
 		r.updateFailedStatus(req, module, err.Error())
 		return
 	}
 
-	module.Status.LastApplyInfo = tfaplv1beta1.OutputStats{Timestamp: &metav1.Time{Time: time.Now()}, Hash: commitHash, Output: applyOut}
+	module.Status.LastApplyInfo = tfaplv1beta1.OutputStats{Timestamp: &metav1.Time{Time: r.Clock.Now()}, CommitHash: commitHash, Output: applyOut}
 
 	// extract last line of output
 	// Apply complete! Resources: 1 added, 0 changed, 0 destroyed.
 	applyStatus := reApplyStatus.FindString(applyOut)
 	log.Info("applied", "status", applyStatus)
 
-	tfaplv1beta1.SetModuleStatusRunFinished(module, applyStatus)
+	tfaplv1beta1.SetModuleStatusRunFinished(module, applyStatus, r.Clock.Now())
 	if err = r.patchStatus(ctx, req.NamespacedName, module.Status); err != nil {
 		log.Error("unable to set finished status", "err", err)
 		return
@@ -268,7 +275,7 @@ func (r *Runner) runTF(
 }
 
 func (r *Runner) updateFailedStatus(req ctrl.Request, module *tfaplv1beta1.Module, msg string) {
-	tfaplv1beta1.SetModuleStatusFailed(module, msg)
+	tfaplv1beta1.SetModuleStatusFailed(module, msg, r.Clock.Now())
 	if err := r.patchStatus(context.Background(), req.NamespacedName, module.Status); err != nil {
 		r.Log.With("module", req).Error("unable to set failed status", "err", err)
 	}

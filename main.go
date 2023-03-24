@@ -281,6 +281,7 @@ func main() {
 		os.Exit(1)
 	}
 	runner := runner.Runner{
+		Clock:                  clock,
 		ClusterClt:             mgr.GetClient(),
 		KubeClt:                kubeClient,
 		RepoPath:               repoPath,

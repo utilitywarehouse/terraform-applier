@@ -340,7 +340,7 @@ spec:
                   contain error stream
                 properties:
                   hash:
-                    description: Hash is the hash of git commit of this output.
+                    description: CommitHash is the hash of git commit of this output.
                     type: string
                   output:
                     description: Output is the stdout of terraform command. it may
@@ -356,7 +356,7 @@ spec:
                   contain error stream
                 properties:
                   hash:
-                    description: Hash is the hash of git commit of this output.
+                    description: CommitHash is the hash of git commit of this output.
                     type: string
                   output:
                     description: Output is the stdout of terraform command. it may

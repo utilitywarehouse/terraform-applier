@@ -159,9 +159,9 @@ type OutputStats struct {
 	// +optional
 	Timestamp *metav1.Time `json:"timestamp,omitempty"`
 
-	// Hash is the hash of git commit of this output.
+	// CommitHash is the hash of git commit of this output.
 	// +optional
-	Hash string `json:"hash,omitempty"`
+	CommitHash string `json:"hash,omitempty"`
 
 	// Output is the stdout of terraform command. it may contain error stream
 	// +optional
@@ -185,9 +185,9 @@ func SetModuleStatusProgressing(m *Module, msg string) {
 	m.Status.StateMessage = msg
 }
 
-func SetModuleStatusRunStarted(m *Module, msg, commitHash, commitMsg string) {
+func SetModuleStatusRunStarted(m *Module, msg, commitHash, commitMsg string, now time.Time) {
 	m.Status.CurrentState = string(StatusRunning)
-	m.Status.RunStartedAt = &metav1.Time{Time: time.Now()}
+	m.Status.RunStartedAt = &metav1.Time{Time: now}
 	m.Status.RunFinishedAt = nil
 	m.Status.ObservedGeneration = m.Generation
 	m.Status.RunCommitHash = commitHash
@@ -196,14 +196,14 @@ func SetModuleStatusRunStarted(m *Module, msg, commitHash, commitMsg string) {
 	SetModuleStatusProgressing(m, msg)
 }
 
-func SetModuleStatusRunFinished(m *Module, msg string) {
+func SetModuleStatusRunFinished(m *Module, msg string, now time.Time) {
 	m.Status.CurrentState = string(StatusReady)
-	m.Status.RunFinishedAt = &metav1.Time{Time: time.Now()}
+	m.Status.RunFinishedAt = &metav1.Time{Time: now}
 	m.Status.StateMessage = msg
 }
 
-func SetModuleStatusFailed(m *Module, msg string) {
+func SetModuleStatusFailed(m *Module, msg string, now time.Time) {
 	m.Status.CurrentState = string(StatusErrored)
-	m.Status.RunFinishedAt = &metav1.Time{Time: time.Now()}
+	m.Status.RunFinishedAt = &metav1.Time{Time: now}
 	m.Status.StateMessage = msg
 }

@@ -12,11 +12,19 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/util/cert"
-	ctrl "sigs.k8s.io/controller-runtime"
 )
 
-func (r *Runner) setupDelegation(ctx context.Context, req ctrl.Request, module *tfaplv1beta1.Module) (*kubernetes.Clientset, error) {
-	delegateToken, err := r.getDelegateToken(ctx, module)
+//go:generate go run github.com/golang/mock/mockgen -package runner -destination delegation_mock.go github.com/utilitywarehouse/terraform-applier/runner DelegateInterface
+
+// this interface is for mock testing
+type DelegateInterface interface {
+	SetupDelegation(ctx context.Context, kubeClt kubernetes.Interface, module *tfaplv1beta1.Module) (kubernetes.Interface, error)
+}
+
+type Delegate struct{}
+
+func (d *Delegate) SetupDelegation(ctx context.Context, kubeClt kubernetes.Interface, module *tfaplv1beta1.Module) (kubernetes.Interface, error) {
+	delegateToken, err := getDelegateToken(ctx, kubeClt, module)
 	if err != nil {
 		return nil, fmt.Errorf("failed fetching delegate token err:%s", err)
 	}
@@ -29,8 +37,8 @@ func (r *Runner) setupDelegation(ctx context.Context, req ctrl.Request, module *
 	return kubernetes.NewForConfig(config)
 }
 
-func (r *Runner) getDelegateToken(ctx context.Context, module *tfaplv1beta1.Module) (string, error) {
-	secret, err := r.KubeClt.CoreV1().Secrets(module.Namespace).Get(ctx, module.Spec.DelegateServiceAccountSecretRef, metav1.GetOptions{})
+func getDelegateToken(ctx context.Context, kubeClt kubernetes.Interface, module *tfaplv1beta1.Module) (string, error) {
+	secret, err := kubeClt.CoreV1().Secrets(module.Namespace).Get(ctx, module.Spec.DelegateServiceAccountSecretRef, metav1.GetOptions{})
 	if err != nil {
 		return "", fmt.Errorf(`unable to get delegate token secret "%s/%s" err:%w`, module.Namespace, module.Spec.DelegateServiceAccountSecretRef, err)
 	}
@@ -42,10 +50,35 @@ func (r *Runner) getDelegateToken(ctx context.Context, module *tfaplv1beta1.Modu
 		return "", fmt.Errorf(`secret "%s/%s" does not contain key 'token'`, secret.Namespace, secret.Name)
 	}
 	return string(delegateToken), nil
-
 }
 
-func getEnvVars(ctx context.Context, client *kubernetes.Clientset, module *tfaplv1beta1.Module, envVars []corev1.EnvVar) (map[string]string, error) {
+// InClusterConfig returns a config object which uses the service account's token
+// modified version of https://pkg.go.dev/k8s.io/client-go@v0.26.1/rest#InClusterConfig
+func inClusterDelegatedConfig(token string) (*rest.Config, error) {
+	const (
+		rootCAFile = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
+	)
+	host, port := os.Getenv("KUBERNETES_SERVICE_HOST"), os.Getenv("KUBERNETES_SERVICE_PORT")
+	if len(host) == 0 || len(port) == 0 {
+		return nil, fmt.Errorf("KUBERNETES_SERVICE_HOST or KUBERNETES_SERVICE_PORT env not set")
+	}
+
+	tlsClientConfig := rest.TLSClientConfig{}
+
+	if _, err := cert.NewPool(rootCAFile); err != nil {
+		return nil, fmt.Errorf("expected to load root CA config from %s, but got err: %v", rootCAFile, err)
+	} else {
+		tlsClientConfig.CAFile = rootCAFile
+	}
+
+	return &rest.Config{
+		Host:            "https://" + net.JoinHostPort(host, port),
+		TLSClientConfig: tlsClientConfig,
+		BearerToken:     token,
+	}, nil
+}
+
+func getEnvVars(ctx context.Context, client kubernetes.Interface, module *tfaplv1beta1.Module, envVars []corev1.EnvVar) (map[string]string, error) {
 	kvPairs := make(map[string]string)
 	for _, env := range envVars {
 		// its ok to copy value from env.value if not set it will be overridden
@@ -75,30 +108,4 @@ func getEnvVars(ctx context.Context, client *kubernetes.Clientset, module *tfapl
 	}
 
 	return kvPairs, nil
-}
-
-// InClusterConfig returns a config object which uses the service account's token
-// modified version of https://pkg.go.dev/k8s.io/client-go@v0.26.1/rest#InClusterConfig
-func inClusterDelegatedConfig(token string) (*rest.Config, error) {
-	const (
-		rootCAFile = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
-	)
-	host, port := os.Getenv("KUBERNETES_SERVICE_HOST"), os.Getenv("KUBERNETES_SERVICE_PORT")
-	if len(host) == 0 || len(port) == 0 {
-		return nil, fmt.Errorf("KUBERNETES_SERVICE_HOST or KUBERNETES_SERVICE_PORT env not set")
-	}
-
-	tlsClientConfig := rest.TLSClientConfig{}
-
-	if _, err := cert.NewPool(rootCAFile); err != nil {
-		return nil, fmt.Errorf("expected to load root CA config from %s, but got err: %v", rootCAFile, err)
-	} else {
-		tlsClientConfig.CAFile = rootCAFile
-	}
-
-	return &rest.Config{
-		Host:            "https://" + net.JoinHostPort(host, port),
-		TLSClientConfig: tlsClientConfig,
-		BearerToken:     token,
-	}, nil
 }

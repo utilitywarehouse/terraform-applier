@@ -16,8 +16,17 @@ import (
 	"github.com/utilitywarehouse/terraform-applier/sysutil"
 )
 
-// tfExecuter inits, plans and applies terraform modules
-type tfExecuter struct {
+//go:generate go run github.com/golang/mock/mockgen -package runner -destination tfexec_mock.go github.com/utilitywarehouse/terraform-applier/runner TFExecuter
+
+type TFExecuter interface {
+	init(ctx context.Context) (string, error)
+	plan(ctx context.Context) (bool, string, error)
+	apply(ctx context.Context) (string, error)
+	cleanUp()
+}
+
+// tfRunner inits, plans and applies terraform modules
+type tfRunner struct {
 	wsNamespacedName string
 	workingDir       string
 	planFileName     string
@@ -26,12 +35,12 @@ type tfExecuter struct {
 	tf      *tfexec.Terraform
 }
 
-func (r *Runner) NewTFExecuter(
+func (r *Runner) NewTFRunner(
 	ctx context.Context,
 	module *tfaplv1beta1.Module,
 	envs map[string]string,
 	vars map[string]string,
-) (*tfExecuter, error) {
+) (TFExecuter, error) {
 	// Copy repo path to a temporary directory
 	tmpWSDir, err := os.MkdirTemp("", module.Namespace+"-"+module.Name+"-*")
 	if err != nil {
@@ -40,10 +49,10 @@ func (r *Runner) NewTFExecuter(
 
 	err = sysutil.CopyDir(filepath.Join(r.RepoPath, module.Spec.Path), tmpWSDir)
 	if err != nil {
-		return nil, fmt.Errorf("unable copy module's tf files to tmp dir %w", err)
+		return nil, fmt.Errorf("unable copy module's tf files to tmp dir err:%w", err)
 	}
 
-	tfExecuter := &tfExecuter{
+	tfr := &tfRunner{
 		wsNamespacedName: module.Namespace + "/" + module.Name,
 		metrics:          r.Metrics,
 		workingDir:       tmpWSDir,
@@ -68,15 +77,15 @@ func (r *Runner) NewTFExecuter(
 		return nil, fmt.Errorf("unable to write the data to file %s err:%s", tfvarFile, err)
 	}
 
-	tfExecuter.tf = tf
-	return tfExecuter, nil
+	tfr.tf = tf
+	return tfr, nil
 }
 
-func (te *tfExecuter) cleanUp() {
+func (te *tfRunner) cleanUp() {
 	os.RemoveAll(te.workingDir)
 }
 
-func (te *tfExecuter) init(ctx context.Context) (string, error) {
+func (te *tfRunner) init(ctx context.Context) (string, error) {
 	var out bytes.Buffer
 	te.tf.SetStdout(&out)
 	te.tf.SetStderr(&out)
@@ -94,7 +103,7 @@ func (te *tfExecuter) init(ctx context.Context) (string, error) {
 	return out.String(), nil
 }
 
-func (te *tfExecuter) plan(ctx context.Context) (bool, string, error) {
+func (te *tfRunner) plan(ctx context.Context) (bool, string, error) {
 	var out bytes.Buffer
 	te.tf.SetStdout(&out)
 	te.tf.SetStderr(&out)
@@ -119,7 +128,7 @@ func (te *tfExecuter) plan(ctx context.Context) (bool, string, error) {
 	return changes, out.String(), nil
 }
 
-func (te *tfExecuter) apply(ctx context.Context) (string, error) {
+func (te *tfRunner) apply(ctx context.Context) (string, error) {
 	var out bytes.Buffer
 	te.tf.SetStdout(&out)
 	te.tf.SetStderr(&out)
