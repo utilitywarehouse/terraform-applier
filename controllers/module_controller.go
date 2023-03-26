@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -30,12 +31,14 @@ import (
 	tfaplv1beta1 "github.com/utilitywarehouse/terraform-applier/api/v1beta1"
 	"github.com/utilitywarehouse/terraform-applier/git"
 	"github.com/utilitywarehouse/terraform-applier/sysutil"
+	corev1 "k8s.io/api/core/v1"
 )
 
 // ModuleReconciler reconciles a Module object
 type ModuleReconciler struct {
 	client.Client
 	Scheme                 *runtime.Scheme
+	Recorder               record.EventRecorder
 	Clock                  sysutil.ClockInterface
 	GitUtil                git.UtilInterface
 	Queue                  chan<- ctrl.Request
@@ -43,10 +46,11 @@ type ModuleReconciler struct {
 	MinIntervalBetweenRuns time.Duration
 }
 
+//+kubebuilder:rbac:groups="",resources=events,verbs=create;patch
+//+kubebuilder:rbac:groups="",resources=secrets,resourceNames=terraform-applier-delegate-token,verbs=get
 //+kubebuilder:rbac:groups=terraform-applier.uw.systems,resources=modules,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=terraform-applier.uw.systems,resources=modules/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=terraform-applier.uw.systems,resources=modules/finalizers,verbs=update
-//+kubebuilder:rbac:groups="",resources=secrets,resourceNames=terraform-applier-delegate-token,verbs=get
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -59,6 +63,8 @@ type ModuleReconciler struct {
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.14.1/pkg/reconcile
 func (r *ModuleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := r.Log.With("module", req.NamespacedName)
+
+	// TODO: On error it should change status to Error
 
 	var module tfaplv1beta1.Module
 	if err := r.Get(ctx, req.NamespacedName, &module); err != nil {
@@ -89,12 +95,14 @@ func (r *ModuleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	// check for new commit on modules path
 	commitHash, _, err := r.GitUtil.GetHeadCommitHashAndLogForPath(module.Spec.Path)
 	if err != nil {
+		r.Recorder.Event(&module, corev1.EventTypeWarning, tfaplv1beta1.ReasonGitFailure, err.Error())
 		log.Error("unable to get commit hash", "err", err)
 		// TODO: should we requeue here?
 		return ctrl.Result{}, nil
 	}
 
 	if module.Status.RunCommitHash != commitHash {
+		r.Recorder.Eventf(&module, corev1.EventTypeNormal, tfaplv1beta1.ReasonRunTriggered, "new commit is available %s", commitHash)
 		log.Info("new commit is available starting run", "RunCommitHash", module.Status.RunCommitHash, "currentHash", commitHash)
 		r.Queue <- req
 		// no need to add to queue as we will see this object again once status is updated
@@ -111,6 +119,7 @@ func (r *ModuleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	// figure out the next times that we need to run or last missed runs time if any.
 	numOfMissedRuns, nextRun, err := getNextSchedule(&module, r.Clock.Now(), r.MinIntervalBetweenRuns)
 	if err != nil {
+		r.Recorder.Event(&module, corev1.EventTypeWarning, tfaplv1beta1.ReasonSpecsParsingFailure, err.Error())
 		log.Error("unable to figure out CronJob schedule", "err", err)
 		// we don't really care about requeuing until we get an update that
 		// fixes the schedule, so don't return an error
@@ -118,6 +127,7 @@ func (r *ModuleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	}
 
 	if numOfMissedRuns > 0 {
+		r.Recorder.Event(&module, corev1.EventTypeNormal, tfaplv1beta1.ReasonRunTriggered, "scheduled run")
 		log.Info("starting scheduled run", "missed-runs", numOfMissedRuns)
 		r.Queue <- req
 

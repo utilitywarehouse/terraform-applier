@@ -155,6 +155,7 @@ var _ = BeforeSuite(func() {
 	testReconciler = &controllers.ModuleReconciler{
 		Client:                 k8sManager.GetClient(),
 		Scheme:                 k8sManager.GetScheme(),
+		Recorder:               k8sManager.GetEventRecorderFor("terraform-applier"),
 		Clock:                  fakeClock,
 		Queue:                  testControllerQueue,
 		GitUtil:                testGitUtil,
@@ -192,6 +193,7 @@ var _ = BeforeSuite(func() {
 	testRunner = runner.Runner{
 		Clock:                  fakeClock,
 		ClusterClt:             k8sManager.GetClient(),
+		Recorder:               k8sManager.GetEventRecorderFor("terraform-applier"),
 		KubeClt:                fakeClient,
 		RepoPath:               "modules",
 		Queue:                  testRunnerQueue,

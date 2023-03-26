@@ -7,6 +7,13 @@ metadata:
 rules:
 - apiGroups:
   - ""
+  resources:
+  - events
+  verbs:
+  - create
+  - patch
+- apiGroups:
+  - ""
   resourceNames:
   - terraform-applier-delegate-token
   resources:

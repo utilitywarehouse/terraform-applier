@@ -257,6 +257,7 @@ func main() {
 	if err = (&controllers.ModuleReconciler{
 		Client:                 mgr.GetClient(),
 		Scheme:                 mgr.GetScheme(),
+		Recorder:               mgr.GetEventRecorderFor("terraform-applier"),
 		Clock:                  clock,
 		Queue:                  wsQueue,
 		GitUtil:                gitUtil,
@@ -285,6 +286,7 @@ func main() {
 	runner := runner.Runner{
 		Clock:                  clock,
 		ClusterClt:             mgr.GetClient(),
+		Recorder:               mgr.GetEventRecorderFor("terraform-applier"),
 		KubeClt:                kubeClient,
 		RepoPath:               repoPath,
 		Queue:                  wsQueue,

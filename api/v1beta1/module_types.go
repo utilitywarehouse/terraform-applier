@@ -17,8 +17,6 @@ limitations under the License.
 package v1beta1
 
 import (
-	"time"
-
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -168,6 +166,25 @@ type OutputStats struct {
 	Output string `json:"output,omitempty"`
 }
 
+// The potential reasons for events
+const (
+	ReasonRunPreparationFailed = "RunPreparationFailed"
+	ReasonDelegationFailed     = "DelegationFailed"
+	ReasonControllerShutdown   = "ControllerShutdown"
+	ReasonRunTriggered         = "RunTriggered"
+	ReasonSpecsParsingFailure  = "SpecsParsingFailure"
+	ReasonGitFailure           = "GitFailure"
+
+	ReasonInitialiseFailed = "InitialiseFailed"
+	ReasonPlanFailed       = "PlanFailed"
+	ReasonApplyFailed      = "ApplyFailed"
+
+	ReasonInitialised           = "Initialised"
+	ReasonPlanedDriftDetected   = "PlanedDriftDetected"
+	ReasonPlanedNoDriftDetected = "PlanedNoDriftDetected"
+	ReasonApplied               = "Applied"
+)
+
 // Overall state of Module run
 type state string
 
@@ -179,31 +196,3 @@ const (
 	// 'Errored' -> last run finished with Error and its waiting on next run/event
 	StatusErrored state = "Errored"
 )
-
-func SetModuleStatusProgressing(m *Module, msg string) {
-	m.Status.CurrentState = string(StatusRunning)
-	m.Status.StateMessage = msg
-}
-
-func SetModuleStatusRunStarted(m *Module, msg, commitHash, commitMsg string, now time.Time) {
-	m.Status.CurrentState = string(StatusRunning)
-	m.Status.RunStartedAt = &metav1.Time{Time: now}
-	m.Status.RunFinishedAt = nil
-	m.Status.ObservedGeneration = m.Generation
-	m.Status.RunCommitHash = commitHash
-	m.Status.RunCommitMsg = commitMsg
-
-	SetModuleStatusProgressing(m, msg)
-}
-
-func SetModuleStatusRunFinished(m *Module, msg string, now time.Time) {
-	m.Status.CurrentState = string(StatusReady)
-	m.Status.RunFinishedAt = &metav1.Time{Time: now}
-	m.Status.StateMessage = msg
-}
-
-func SetModuleStatusFailed(m *Module, msg string, now time.Time) {
-	m.Status.CurrentState = string(StatusErrored)
-	m.Status.RunFinishedAt = &metav1.Time{Time: now}
-	m.Status.StateMessage = msg
-}
