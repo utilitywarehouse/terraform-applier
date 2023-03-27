@@ -127,7 +127,7 @@ func (r *Runner) process(req ctrl.Request, cancelChan <-chan struct{}) {
 	}
 
 	// Update Status
-	if err = r.SetRunStartedStatus(ctx, req.NamespacedName, module, "preparing for TF run", commitHash, commitLog, r.Clock.Now()); err != nil {
+	if err = r.SetRunStartedStatus(req.NamespacedName, module, "preparing for TF run", commitHash, commitLog, r.Clock.Now()); err != nil {
 		log.Error("unable to set run starting status", "err", err)
 		return
 	}
@@ -178,7 +178,7 @@ func (r *Runner) runTF(
 ) {
 	log := r.Log.With("module", req)
 
-	if err := r.SetProgressingStatus(ctx, req.NamespacedName, module, "Initialising"); err != nil {
+	if err := r.SetProgressingStatus(req.NamespacedName, module, "Initialising"); err != nil {
 		log.Error("unable to set init status", "err", err)
 		return
 	}
@@ -194,7 +194,7 @@ func (r *Runner) runTF(
 	r.Recorder.Event(module, corev1.EventTypeNormal, tfaplv1beta1.ReasonInitialised, "Initialised successfully")
 
 	// Start Planing
-	if err = r.SetProgressingStatus(ctx, req.NamespacedName, module, "Planning"); err != nil {
+	if err = r.SetProgressingStatus(req.NamespacedName, module, "Planning"); err != nil {
 		log.Error("unable to set planning status", "err", err)
 		return
 	}
@@ -221,7 +221,7 @@ func (r *Runner) runTF(
 	log.Info("planed", "status", planStatus)
 
 	if !diffDetected {
-		if err = r.SetRunFinishedStatus(ctx, req.NamespacedName, module, tfaplv1beta1.ReasonPlanedNoDriftDetected, planStatus, r.Clock.Now()); err != nil {
+		if err = r.SetRunFinishedStatus(req.NamespacedName, module, tfaplv1beta1.ReasonPlanedNoDriftDetected, planStatus, r.Clock.Now()); err != nil {
 			log.Error("unable to set no drift status", "err", err)
 			return
 		}
@@ -231,7 +231,7 @@ func (r *Runner) runTF(
 	module.Status.LastDriftInfo = tfaplv1beta1.OutputStats{Timestamp: &metav1.Time{Time: r.Clock.Now()}, CommitHash: commitHash, Output: planOut}
 
 	if module.Spec.PlanOnly != nil && *module.Spec.PlanOnly {
-		if err = r.SetRunFinishedStatus(ctx, req.NamespacedName, module, tfaplv1beta1.ReasonPlanedDriftDetected, "PlanOnly/"+planStatus, r.Clock.Now()); err != nil {
+		if err = r.SetRunFinishedStatus(req.NamespacedName, module, tfaplv1beta1.ReasonPlanedDriftDetected, "PlanOnly/"+planStatus, r.Clock.Now()); err != nil {
 			log.Error("unable to set drift status", "err", err)
 			return
 		}
@@ -246,7 +246,7 @@ func (r *Runner) runTF(
 	}
 
 	// Start Applying
-	if err = r.SetProgressingStatus(ctx, req.NamespacedName, module, "Applying/"+planStatus); err != nil {
+	if err = r.SetProgressingStatus(req.NamespacedName, module, "Applying/"+planStatus); err != nil {
 		log.Error("unable to set applying status", "err", err)
 		return
 	}
@@ -267,19 +267,19 @@ func (r *Runner) runTF(
 
 	log.Info("applied", "status", applyStatus)
 
-	if err = r.SetRunFinishedStatus(ctx, req.NamespacedName, module, tfaplv1beta1.ReasonApplied, applyStatus, r.Clock.Now()); err != nil {
+	if err = r.SetRunFinishedStatus(req.NamespacedName, module, tfaplv1beta1.ReasonApplied, applyStatus, r.Clock.Now()); err != nil {
 		log.Error("unable to set finished status", "err", err)
 		return
 	}
 }
 
-func (r *Runner) SetProgressingStatus(ctx context.Context, objectKey types.NamespacedName, m *tfaplv1beta1.Module, msg string) error {
+func (r *Runner) SetProgressingStatus(objectKey types.NamespacedName, m *tfaplv1beta1.Module, msg string) error {
 	m.Status.CurrentState = string(tfaplv1beta1.StatusRunning)
 	m.Status.StateMessage = msg
-	return r.patchStatus(ctx, objectKey, m.Status)
+	return r.patchStatus(context.Background(), objectKey, m.Status)
 }
 
-func (r *Runner) SetRunStartedStatus(ctx context.Context, objectKey types.NamespacedName, m *tfaplv1beta1.Module, msg, commitHash, commitMsg string, now time.Time) error {
+func (r *Runner) SetRunStartedStatus(objectKey types.NamespacedName, m *tfaplv1beta1.Module, msg, commitHash, commitMsg string, now time.Time) error {
 
 	m.Status.CurrentState = string(tfaplv1beta1.StatusRunning)
 	m.Status.RunStartedAt = &metav1.Time{Time: now}
@@ -289,17 +289,17 @@ func (r *Runner) SetRunStartedStatus(ctx context.Context, objectKey types.Namesp
 	m.Status.RunCommitMsg = commitMsg
 	m.Status.StateMessage = msg
 
-	return r.patchStatus(ctx, objectKey, m.Status)
+	return r.patchStatus(context.Background(), objectKey, m.Status)
 }
 
-func (r *Runner) SetRunFinishedStatus(ctx context.Context, objectKey types.NamespacedName, m *tfaplv1beta1.Module, reason, msg string, now time.Time) error {
+func (r *Runner) SetRunFinishedStatus(objectKey types.NamespacedName, m *tfaplv1beta1.Module, reason, msg string, now time.Time) error {
 	m.Status.CurrentState = string(tfaplv1beta1.StatusReady)
 	m.Status.RunFinishedAt = &metav1.Time{Time: now}
 	m.Status.StateMessage = msg
 
 	r.Recorder.Event(m, corev1.EventTypeNormal, reason, msg)
 
-	return r.patchStatus(ctx, objectKey, m.Status)
+	return r.patchStatus(context.Background(), objectKey, m.Status)
 }
 
 func (r *Runner) setFailedStatus(req ctrl.Request, module *tfaplv1beta1.Module, reason, msg string, now time.Time) {
