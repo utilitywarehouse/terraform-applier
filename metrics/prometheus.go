@@ -56,6 +56,9 @@ func (p *Prometheus) Init() {
 		Namespace: metricsNamespace,
 		Name:      "module_run_duration_seconds",
 		Help:      "Duration of the terraform run for a module",
+
+		// default Histogram bucket (.005s-10s) is not suitable for typical terraform run duration
+		Buckets: []float64{30, 60, 120, 180, 240, 300, 600, 900, 1200, 1500, 1800},
 	},
 		[]string{
 			// Name of the module that was ran
