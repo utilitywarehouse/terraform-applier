@@ -2,6 +2,7 @@ package integration_test
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -148,7 +149,7 @@ var _ = Describe("Module controller without runner", func() {
 			}, time.Second*70, interval).Should(Equal(moduleLookupKey))
 		})
 
-		It("Should not trigger run for errored schedule module", func() {
+		It("Should not trigger run for module with invalid schedule", func() {
 			const (
 				moduleName = "test-module3"
 				path       = "dev/" + moduleName
@@ -173,29 +174,60 @@ var _ = Describe("Module controller without runner", func() {
 			}
 			Expect(k8sClient.Create(ctx, module)).Should(Succeed())
 
-			// trick controller to accept mocked test time as earliestTime as we cannot control created time
-			module.Status.RunStartedAt = &metav1.Time{Time: time.Date(2022, 02, 01, 01, 00, 30, 0000, time.UTC)}
-			Expect(k8sClient.Status().Update(ctx, module)).Should(Succeed())
+			moduleLookupKey := types.NamespacedName{Name: moduleName, Namespace: moduleNamespace}
+			fetchedModule := &tfaplv1beta1.Module{}
 
-			// advance time
-			By("By making sure job was never sent to jobQueue after advancing time")
-			fakeClock.T = time.Date(2022, 02, 01, 01, 01, 00, 0000, time.UTC)
-			Consistently(func() types.NamespacedName {
-				timer := time.NewTimer(time.Second)
-				for {
-					select {
-					case req := <-testControllerQueue:
-						return req.NamespacedName
-					case <-timer.C:
-						return types.NamespacedName{}
-					}
+			By("By making sure modules status is changed to errored")
+			Eventually(func() string {
+				err := k8sClient.Get(ctx, moduleLookupKey, fetchedModule)
+				if err != nil {
+					return ""
 				}
-			}, time.Second*10, interval).Should(Equal(types.NamespacedName{}))
+				return fetchedModule.Status.CurrentState
+			}, time.Second*30, interval).Should(Equal("Errored"))
+		})
+
+		It("Should not trigger run for module with git error", func() {
+			const (
+				moduleName = "test-module4"
+				path       = "dev/" + moduleName
+			)
+			testGitUtil.EXPECT().GetHeadCommitHashAndLogForPath(path).Return("", "", fmt.Errorf("generating test error")).AnyTimes()
+
+			By("By creating a new Module")
+			ctx := context.Background()
+			module := &tfaplv1beta1.Module{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: "terraform-applier.uw.systems/v1beta1",
+					Kind:       "Module",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      moduleName,
+					Namespace: moduleNamespace,
+				},
+				Spec: tfaplv1beta1.ModuleSpec{
+					Schedule: "1 * * * *",
+					Path:     path,
+				},
+			}
+			Expect(k8sClient.Create(ctx, module)).Should(Succeed())
+
+			moduleLookupKey := types.NamespacedName{Name: moduleName, Namespace: moduleNamespace}
+			fetchedModule := &tfaplv1beta1.Module{}
+
+			By("By making sure modules status is changed to errored")
+			Eventually(func() string {
+				err := k8sClient.Get(ctx, moduleLookupKey, fetchedModule)
+				if err != nil {
+					return ""
+				}
+				return fetchedModule.Status.CurrentState
+			}, time.Second*30, interval).Should(Equal("Errored"))
 		})
 
 		It("Should not trigger run for suspended module", func() {
 			const (
-				moduleName = "test-module4"
+				moduleName = "test-module5"
 				path       = "dev/" + moduleName
 			)
 			var boolTrue = true
