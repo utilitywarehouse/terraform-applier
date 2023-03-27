@@ -16,7 +16,7 @@ vet: ## Run go vet against code.
 
 .PHONY: test
 test: generate fmt vet ## Run tests.
-	go test ./... -coverprofile cover.out
+	go test -v -cover ./...
 
 .PHONY: build
 build: generate fmt vet ## Build manager binary.
