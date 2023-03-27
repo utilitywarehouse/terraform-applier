@@ -34,7 +34,7 @@ var _ = Describe("Module controller with Runner", func() {
 			testReconciler.Queue = testRunnerQueue
 
 			// Trigger Job run as soon as module is created
-			testGitUtil.EXPECT().GetHeadCommitHashAndLogForPath("hello").
+			testGitUtil.EXPECT().HeadCommitHashAndLog("hello").
 				Return(commitHash, commitMsg, nil).AnyTimes()
 
 			testMetrics.EXPECT().UpdateModuleApplyDuration(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()

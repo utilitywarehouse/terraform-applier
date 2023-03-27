@@ -13,7 +13,7 @@ func getTime(h, m, s int) time.Time {
 	return time.Date(2022, 02, 01, h, m, s, 0000, time.UTC)
 }
 
-func Test_getNextSchedule(t *testing.T) {
+func Test_NextSchedule(t *testing.T) {
 	type args struct {
 		module                 *tfaplv1beta1.Module
 		now                    time.Time
@@ -149,16 +149,16 @@ func Test_getNextSchedule(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gotMissedCount, gotNextSchd, err := getNextSchedule(tt.args.module, tt.args.now, tt.args.minIntervalBetweenRuns)
+			gotMissedCount, gotNextSchd, err := NextSchedule(tt.args.module, tt.args.now, tt.args.minIntervalBetweenRuns)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("getNextSchedule() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("NextSchedule() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if gotMissedCount != tt.wantMissedCount {
-				t.Errorf("getNextSchedule() gotMissedCount = %v, wantMissedCount %v", gotMissedCount, tt.wantMissedCount)
+				t.Errorf("NextSchedule() gotMissedCount = %v, wantMissedCount %v", gotMissedCount, tt.wantMissedCount)
 			}
 			if !reflect.DeepEqual(gotNextSchd, tt.wantNextSchd) {
-				t.Errorf("getNextSchedule() gotNextSchd = %v, wantNextSchd %v", gotNextSchd, tt.wantNextSchd)
+				t.Errorf("NextSchedule() gotNextSchd = %v, wantNextSchd %v", gotNextSchd, tt.wantNextSchd)
 			}
 		})
 	}

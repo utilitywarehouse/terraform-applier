@@ -169,7 +169,7 @@ func terraformVersionString(ctx context.Context, execPath string) (string, error
 	return version.String(), nil
 }
 
-func getKubeClient() (*kubernetes.Clientset, error) {
+func kubeClient() (*kubernetes.Clientset, error) {
 	// creates the in-cluster config
 	config, err := rest.InClusterConfig()
 	if err != nil {
@@ -278,7 +278,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	kubeClient, err := getKubeClient()
+	kubeClient, err := kubeClient()
 	if err != nil {
 		setupLog.Error("unable to create kube client", "err", err)
 		os.Exit(1)

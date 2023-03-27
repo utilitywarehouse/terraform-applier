@@ -35,7 +35,7 @@ var _ = Describe("Module controller without runner", func() {
 
 			testGitUtil.
 				EXPECT().
-				GetHeadCommitHashAndLogForPath(path).
+				HeadCommitHashAndLog(path).
 				Return("", "", nil).MinTimes(1)
 
 			By("By creating a new Module")
@@ -111,7 +111,7 @@ var _ = Describe("Module controller without runner", func() {
 				moduleName = "test-module2"
 				path       = "dev/" + moduleName
 			)
-			testGitUtil.EXPECT().GetHeadCommitHashAndLogForPath(path).Return("", "", nil)
+			testGitUtil.EXPECT().HeadCommitHashAndLog(path).Return("", "", nil)
 
 			By("By creating a new Module")
 			ctx := context.Background()
@@ -134,7 +134,7 @@ var _ = Describe("Module controller without runner", func() {
 			moduleLookupKey := types.NamespacedName{Name: moduleName, Namespace: moduleNamespace}
 
 			By("By making sure job was sent to jobQueue when commit hash is changed")
-			testGitUtil.EXPECT().GetHeadCommitHashAndLogForPath(path).Return("1234abcd", "test commit", nil)
+			testGitUtil.EXPECT().HeadCommitHashAndLog(path).Return("1234abcd", "test commit", nil)
 			// wait for just about 60 sec default poll interval
 			Eventually(func() types.NamespacedName {
 				timer := time.NewTimer(time.Second)
@@ -154,7 +154,7 @@ var _ = Describe("Module controller without runner", func() {
 				moduleName = "test-module3"
 				path       = "dev/" + moduleName
 			)
-			testGitUtil.EXPECT().GetHeadCommitHashAndLogForPath(path).Return("", "", nil).AnyTimes()
+			testGitUtil.EXPECT().HeadCommitHashAndLog(path).Return("", "", nil).AnyTimes()
 
 			By("By creating a new Module")
 			ctx := context.Background()
@@ -192,7 +192,7 @@ var _ = Describe("Module controller without runner", func() {
 				moduleName = "test-module4"
 				path       = "dev/" + moduleName
 			)
-			testGitUtil.EXPECT().GetHeadCommitHashAndLogForPath(path).Return("", "", fmt.Errorf("generating test error")).AnyTimes()
+			testGitUtil.EXPECT().HeadCommitHashAndLog(path).Return("", "", fmt.Errorf("generating test error")).AnyTimes()
 
 			By("By creating a new Module")
 			ctx := context.Background()
@@ -231,7 +231,7 @@ var _ = Describe("Module controller without runner", func() {
 				path       = "dev/" + moduleName
 			)
 			var boolTrue = true
-			testGitUtil.EXPECT().GetHeadCommitHashAndLogForPath(path).Return("", "", nil).AnyTimes()
+			testGitUtil.EXPECT().HeadCommitHashAndLog(path).Return("", "", nil).AnyTimes()
 
 			By("By creating a new Module")
 			ctx := context.Background()

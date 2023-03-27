@@ -24,7 +24,7 @@ type DelegateInterface interface {
 type Delegate struct{}
 
 func (d *Delegate) SetupDelegation(ctx context.Context, kubeClt kubernetes.Interface, module *tfaplv1beta1.Module) (kubernetes.Interface, error) {
-	delegateToken, err := getDelegateToken(ctx, kubeClt, module)
+	delegateToken, err := delegateToken(ctx, kubeClt, module)
 	if err != nil {
 		return nil, fmt.Errorf("failed fetching delegate token err:%s", err)
 	}
@@ -37,7 +37,7 @@ func (d *Delegate) SetupDelegation(ctx context.Context, kubeClt kubernetes.Inter
 	return kubernetes.NewForConfig(config)
 }
 
-func getDelegateToken(ctx context.Context, kubeClt kubernetes.Interface, module *tfaplv1beta1.Module) (string, error) {
+func delegateToken(ctx context.Context, kubeClt kubernetes.Interface, module *tfaplv1beta1.Module) (string, error) {
 	secret, err := kubeClt.CoreV1().Secrets(module.Namespace).Get(ctx, module.Spec.DelegateServiceAccountSecretRef, metav1.GetOptions{})
 	if err != nil {
 		return "", fmt.Errorf(`unable to get delegate token secret "%s/%s" err:%w`, module.Namespace, module.Spec.DelegateServiceAccountSecretRef, err)
@@ -78,7 +78,7 @@ func inClusterDelegatedConfig(token string) (*rest.Config, error) {
 	}, nil
 }
 
-func getEnvVars(ctx context.Context, client kubernetes.Interface, module *tfaplv1beta1.Module, envVars []corev1.EnvVar) (map[string]string, error) {
+func fetchEnvVars(ctx context.Context, client kubernetes.Interface, module *tfaplv1beta1.Module, envVars []corev1.EnvVar) (map[string]string, error) {
 	kvPairs := make(map[string]string)
 	for _, env := range envVars {
 		// its ok to copy value from env.value if not set it will be overridden

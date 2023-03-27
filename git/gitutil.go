@@ -10,7 +10,7 @@ import (
 // UtilInterface allows for mocking out the functionality of GitUtil when
 // testing the full process of an apply run.
 type UtilInterface interface {
-	GetHeadCommitHashAndLogForPath(path string) (string, string, error)
+	HeadCommitHashAndLog(path string) (string, string, error)
 	IsRepo() (bool, error)
 }
 
@@ -20,8 +20,8 @@ type Util struct {
 	Path string
 }
 
-// GetHeadCommitHashAndLogForPath returns the hash and the log of the current HEAD commit for the given path
-func (g *Util) GetHeadCommitHashAndLogForPath(path string) (string, string, error) {
+// HeadCommitHashAndLog returns the hash and the log of the current HEAD commit for the given path
+func (g *Util) HeadCommitHashAndLog(path string) (string, string, error) {
 	// get commit hash
 	cmd := []string{"log", "--pretty=format:'%H'", "-n", "1", "--", path}
 	hash, err := runGitCmd(g.Path, cmd...)

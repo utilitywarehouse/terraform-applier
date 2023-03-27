@@ -112,7 +112,7 @@ func (r *Runner) process(req ctrl.Request, cancelChan <-chan struct{}) {
 		}
 	}()
 
-	commitHash, commitLog, err := r.GitUtil.GetHeadCommitHashAndLogForPath(module.Spec.Path)
+	commitHash, commitLog, err := r.GitUtil.HeadCommitHashAndLog(module.Spec.Path)
 	if err != nil {
 		log.Error("unable to get commit hash and log", "err", err)
 		return
@@ -140,14 +140,14 @@ func (r *Runner) process(req ctrl.Request, cancelChan <-chan struct{}) {
 		return
 	}
 
-	envs, err := getEnvVars(ctx, delegatedClient, module, module.Spec.Env)
+	envs, err := fetchEnvVars(ctx, delegatedClient, module, module.Spec.Env)
 	if err != nil {
 		log.Error("unable to get envs", "err", err)
 		r.setFailedStatus(req, module, tfaplv1beta1.ReasonRunPreparationFailed, err.Error(), r.Clock.Now())
 		return
 	}
 
-	vars, err := getEnvVars(ctx, delegatedClient, module, module.Spec.Var)
+	vars, err := fetchEnvVars(ctx, delegatedClient, module, module.Spec.Var)
 	if err != nil {
 		log.Error("unable to get vars", "err", err)
 		r.setFailedStatus(req, module, tfaplv1beta1.ReasonRunPreparationFailed, err.Error(), r.Clock.Now())

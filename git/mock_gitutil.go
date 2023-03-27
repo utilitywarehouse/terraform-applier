@@ -33,20 +33,20 @@ func (m *MockUtilInterface) EXPECT() *MockUtilInterfaceMockRecorder {
 	return m.recorder
 }
 
-// GetHeadCommitHashAndLogForPath mocks base method.
-func (m *MockUtilInterface) GetHeadCommitHashAndLogForPath(arg0 string) (string, string, error) {
+// HeadCommitHashAndLog mocks base method.
+func (m *MockUtilInterface) HeadCommitHashAndLog(arg0 string) (string, string, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetHeadCommitHashAndLogForPath", arg0)
+	ret := m.ctrl.Call(m, "HeadCommitHashAndLog", arg0)
 	ret0, _ := ret[0].(string)
 	ret1, _ := ret[1].(string)
 	ret2, _ := ret[2].(error)
 	return ret0, ret1, ret2
 }
 
-// GetHeadCommitHashAndLogForPath indicates an expected call of GetHeadCommitHashAndLogForPath.
-func (mr *MockUtilInterfaceMockRecorder) GetHeadCommitHashAndLogForPath(arg0 interface{}) *gomock.Call {
+// HeadCommitHashAndLog indicates an expected call of HeadCommitHashAndLog.
+func (mr *MockUtilInterfaceMockRecorder) HeadCommitHashAndLog(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetHeadCommitHashAndLogForPath", reflect.TypeOf((*MockUtilInterface)(nil).GetHeadCommitHashAndLogForPath), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HeadCommitHashAndLog", reflect.TypeOf((*MockUtilInterface)(nil).HeadCommitHashAndLog), arg0)
 }
 
 // IsRepo mocks base method.

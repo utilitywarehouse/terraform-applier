@@ -92,7 +92,7 @@ func (r *ModuleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	}
 
 	// check for new commit on modules path
-	commitHash, _, err := r.GitUtil.GetHeadCommitHashAndLogForPath(module.Spec.Path)
+	commitHash, _, err := r.GitUtil.HeadCommitHashAndLog(module.Spec.Path)
 	if err != nil {
 		r.setFailedStatus(req, &module, tfaplv1beta1.ReasonGitFailure, err.Error(), r.Clock.Now())
 		log.Error("unable to get commit hash", "err", err)
@@ -116,7 +116,7 @@ func (r *ModuleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	}
 
 	// figure out the next times that we need to run or last missed runs time if any.
-	numOfMissedRuns, nextRun, err := getNextSchedule(&module, r.Clock.Now(), r.MinIntervalBetweenRuns)
+	numOfMissedRuns, nextRun, err := NextSchedule(&module, r.Clock.Now(), r.MinIntervalBetweenRuns)
 	if err != nil {
 		r.setFailedStatus(req, &module, tfaplv1beta1.ReasonSpecsParsingFailure, err.Error(), r.Clock.Now())
 		log.Error("unable to figure out CronJob schedule", "err", err)
@@ -158,8 +158,8 @@ func (r *ModuleReconciler) SetupWithManager(mgr ctrl.Manager) error {
 }
 
 // https://book.kubebuilder.io/cronjob-tutorial/controller-implementation.html
-// getNextSchedule returns the number of missed runs if any, time of the next schedule and error
-func getNextSchedule(module *tfaplv1beta1.Module, now time.Time, minIntervalBetweenRuns time.Duration) (int, time.Time, error) {
+// NextSchedule returns the number of missed runs if any, time of the next schedule and error
+func NextSchedule(module *tfaplv1beta1.Module, now time.Time, minIntervalBetweenRuns time.Duration) (int, time.Time, error) {
 	sched, err := cron.ParseStandard(module.Spec.Schedule)
 	if err != nil {
 		return 0, time.Time{}, fmt.Errorf("unparseable schedule %q: %v", module.Spec.Schedule, err)
