@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -64,8 +65,6 @@ type ModuleReconciler struct {
 func (r *ModuleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := r.Log.With("module", req.NamespacedName)
 
-	// TODO: On error it should change status to Error
-
 	var module tfaplv1beta1.Module
 	if err := r.Get(ctx, req.NamespacedName, &module); err != nil {
 		log.Error("unable to fetch terraform module", "err", err)
@@ -95,7 +94,7 @@ func (r *ModuleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	// check for new commit on modules path
 	commitHash, _, err := r.GitUtil.GetHeadCommitHashAndLogForPath(module.Spec.Path)
 	if err != nil {
-		r.Recorder.Event(&module, corev1.EventTypeWarning, tfaplv1beta1.ReasonGitFailure, err.Error())
+		r.setFailedStatus(req, &module, tfaplv1beta1.ReasonGitFailure, err.Error(), r.Clock.Now())
 		log.Error("unable to get commit hash", "err", err)
 		// TODO: should we requeue here?
 		return ctrl.Result{}, nil
@@ -119,7 +118,7 @@ func (r *ModuleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	// figure out the next times that we need to run or last missed runs time if any.
 	numOfMissedRuns, nextRun, err := getNextSchedule(&module, r.Clock.Now(), r.MinIntervalBetweenRuns)
 	if err != nil {
-		r.Recorder.Event(&module, corev1.EventTypeWarning, tfaplv1beta1.ReasonSpecsParsingFailure, err.Error())
+		r.setFailedStatus(req, &module, tfaplv1beta1.ReasonSpecsParsingFailure, err.Error(), r.Clock.Now())
 		log.Error("unable to figure out CronJob schedule", "err", err)
 		// we don't really care about requeuing until we get an update that
 		// fixes the schedule, so don't return an error
@@ -219,4 +218,31 @@ func getNextSchedule(module *tfaplv1beta1.Module, now time.Time, minIntervalBetw
 	}
 
 	return numOfMissedRuns, sched.Next(now), nil
+}
+
+func (r *ModuleReconciler) setFailedStatus(req ctrl.Request, module *tfaplv1beta1.Module, reason, msg string, now time.Time) {
+
+	module.Status.CurrentState = string(tfaplv1beta1.StatusErrored)
+	module.Status.StateMessage = msg
+	module.Status.RunStartedAt = nil
+	module.Status.RunFinishedAt = nil
+	module.Status.ObservedGeneration = module.Generation
+
+	r.Recorder.Event(module, corev1.EventTypeWarning, reason, msg)
+
+	if err := r.patchStatus(context.Background(), req.NamespacedName, module.Status); err != nil {
+		r.Log.With("module", req).Error("unable to set failed status", "err", err)
+	}
+}
+
+func (r *ModuleReconciler) patchStatus(ctx context.Context, objectKey types.NamespacedName, newStatus tfaplv1beta1.ModuleStatus) error {
+	module := new(tfaplv1beta1.Module)
+	if err := r.Get(ctx, objectKey, module); err != nil {
+		return err
+	}
+
+	patch := client.MergeFrom(module.DeepCopy())
+	module.Status = newStatus
+
+	return r.Status().Patch(ctx, module, patch, client.FieldOwner("terraform-applier"))
 }
