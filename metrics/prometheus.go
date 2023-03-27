@@ -33,7 +33,7 @@ type Prometheus struct {
 	moduleRunCount         *prometheus.CounterVec
 	moduleRunDuration      *prometheus.HistogramVec
 	moduleRunSuccess       *prometheus.GaugeVec
-	moduleRunning          *prometheus.GaugeVec
+	runningModuleCount     *prometheus.GaugeVec
 }
 
 // Init creates and registers the custom metrics for terraform-applier.
@@ -97,10 +97,10 @@ func (p *Prometheus) Init() {
 		},
 	)
 
-	p.moduleRunning = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+	p.runningModuleCount = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: metricsNamespace,
-		Name:      "module_running",
-		Help:      "The number of modules currently running",
+		Name:      "running_module_count",
+		Help:      "The total number of modules in running state",
 	},
 		[]string{
 			// Namespace name of the module that was ran
@@ -114,7 +114,7 @@ func (p *Prometheus) Init() {
 		p.moduleRunDuration,
 		p.moduleRunSuccess,
 		p.terraformExitCodeCount,
-		p.moduleRunning,
+		p.runningModuleCount,
 	)
 
 }
@@ -161,13 +161,13 @@ func (p *Prometheus) setApplySuccess(module, namespace string, success bool) {
 }
 
 func (p *Prometheus) IncRunningModuleCount(namespace string) {
-	p.moduleRunning.With(prometheus.Labels{
+	p.runningModuleCount.With(prometheus.Labels{
 		"namespace": namespace,
 	}).Inc()
 }
 
 func (p *Prometheus) DecRunningModuleCount(namespace string) {
-	p.moduleRunning.With(prometheus.Labels{
+	p.runningModuleCount.With(prometheus.Labels{
 		"namespace": namespace,
 	}).Dec()
 }
