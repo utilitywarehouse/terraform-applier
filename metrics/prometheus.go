@@ -5,6 +5,7 @@ import (
 	"strconv"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"sigs.k8s.io/controller-runtime/pkg/metrics"
 )
 
 const (
@@ -29,7 +30,7 @@ type Prometheus struct {
 	moduleApplySuccess     *prometheus.GaugeVec
 }
 
-// Init creates and registers the custom metrics for kube-applier.
+// Init creates and registers the custom metrics for terraform-applier.
 func (p *Prometheus) Init() {
 	p.moduleApplyCount = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Namespace: metricsNamespace,
@@ -78,10 +79,13 @@ func (p *Prometheus) Init() {
 			"exit_code",
 		},
 	)
-	prometheus.MustRegister(p.moduleApplyCount)
-	prometheus.MustRegister(p.moduleApplyDuration)
-	prometheus.MustRegister(p.moduleApplySuccess)
-	prometheus.MustRegister(p.terraformExitCodeCount)
+	// Register custom metrics with the global prometheus registry
+	metrics.Registry.MustRegister(
+		p.moduleApplyCount,
+		p.moduleApplyDuration,
+		p.moduleApplySuccess,
+		p.terraformExitCodeCount,
+	)
 
 }
 
