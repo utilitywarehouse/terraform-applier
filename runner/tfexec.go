@@ -27,9 +27,10 @@ type TFExecuter interface {
 
 // tfRunner inits, plans and applies terraform modules
 type tfRunner struct {
-	wsNamespacedName string
-	workingDir       string
-	planFileName     string
+	moduleName      string
+	moduleNamespace string
+	workingDir      string
+	planFileName    string
 
 	metrics metrics.PrometheusInterface
 	tf      *tfexec.Terraform
@@ -53,10 +54,11 @@ func (r *Runner) NewTFRunner(
 	}
 
 	tfr := &tfRunner{
-		wsNamespacedName: module.Namespace + "/" + module.Name,
-		metrics:          r.Metrics,
-		workingDir:       tmpWSDir,
-		planFileName:     "plan.out",
+		moduleName:      module.Name,
+		moduleNamespace: module.Namespace,
+		metrics:         r.Metrics,
+		workingDir:      tmpWSDir,
+		planFileName:    "plan.out",
 	}
 
 	tf, err := tfexec.NewTerraform(tmpWSDir, r.TerraformExecPath)
@@ -93,12 +95,12 @@ func (te *tfRunner) init(ctx context.Context) (string, error) {
 	if err := te.tf.Init(ctx, tfexec.Upgrade(true)); err != nil {
 		if uerr := errors.Unwrap(err); uerr != nil {
 			if e, ok := uerr.(*exec.ExitError); ok {
-				te.metrics.UpdateTerraformExitCodeCount(te.wsNamespacedName, "init", e.ExitCode())
+				te.metrics.UpdateTerraformExitCodeCount(te.moduleName, te.moduleNamespace, "init", e.ExitCode())
 			}
 		}
 		return out.String(), err
 	}
-	te.metrics.UpdateTerraformExitCodeCount(te.wsNamespacedName, "init", 0)
+	te.metrics.UpdateTerraformExitCodeCount(te.moduleName, te.moduleNamespace, "init", 0)
 
 	return out.String(), nil
 }
@@ -114,15 +116,15 @@ func (te *tfRunner) plan(ctx context.Context) (bool, string, error) {
 	if err != nil {
 		if uerr := errors.Unwrap(err); uerr != nil {
 			if e, ok := uerr.(*exec.ExitError); ok {
-				te.metrics.UpdateTerraformExitCodeCount(te.wsNamespacedName, "plan", e.ExitCode())
+				te.metrics.UpdateTerraformExitCodeCount(te.moduleName, te.moduleNamespace, "plan", e.ExitCode())
 			}
 		}
 		return changes, out.String(), err
 	}
 	if changes {
-		te.metrics.UpdateTerraformExitCodeCount(te.wsNamespacedName, "plan", 2)
+		te.metrics.UpdateTerraformExitCodeCount(te.moduleName, te.moduleNamespace, "plan", 2)
 	} else {
-		te.metrics.UpdateTerraformExitCodeCount(te.wsNamespacedName, "plan", 0)
+		te.metrics.UpdateTerraformExitCodeCount(te.moduleName, te.moduleNamespace, "plan", 0)
 	}
 
 	return changes, out.String(), nil
@@ -143,13 +145,13 @@ func (te *tfRunner) apply(ctx context.Context) (string, error) {
 	if err := te.tf.Apply(ctx, tfexec.DirOrPlan(planOut)); err != nil {
 		if uerr := errors.Unwrap(err); uerr != nil {
 			if e, ok := uerr.(*exec.ExitError); ok {
-				te.metrics.UpdateTerraformExitCodeCount(te.wsNamespacedName, "apply", e.ExitCode())
+				te.metrics.UpdateTerraformExitCodeCount(te.moduleName, te.moduleNamespace, "apply", e.ExitCode())
 			}
 		}
 		return out.String(), err
 	}
 
-	te.metrics.UpdateTerraformExitCodeCount(te.wsNamespacedName, "apply", 0)
+	te.metrics.UpdateTerraformExitCodeCount(te.moduleName, te.moduleNamespace, "apply", 0)
 
 	return out.String(), nil
 }

@@ -37,9 +37,11 @@ var _ = Describe("Module controller with Runner", func() {
 			testGitUtil.EXPECT().HeadCommitHashAndLog("hello").
 				Return(commitHash, commitMsg, nil).AnyTimes()
 
-			testMetrics.EXPECT().UpdateModuleApplyDuration(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-			testMetrics.EXPECT().UpdateModuleSuccess(gomock.Any(), gomock.Any()).AnyTimes()
-			testMetrics.EXPECT().UpdateTerraformExitCodeCount(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
+			testMetrics.EXPECT().UpdateModuleRunDuration(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
+			testMetrics.EXPECT().UpdateModuleSuccess(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
+			testMetrics.EXPECT().UpdateTerraformExitCodeCount(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
+			testMetrics.EXPECT().IncRunningModuleCount(gomock.Any()).AnyTimes()
+			testMetrics.EXPECT().DecRunningModuleCount(gomock.Any()).AnyTimes()
 		})
 
 		It("Should send module to job queue on commit change and runner should do plan & apply", func() {

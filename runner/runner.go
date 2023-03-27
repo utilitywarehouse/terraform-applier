@@ -64,13 +64,22 @@ func (r *Runner) Start(ctx context.Context, done chan bool) {
 			wg.Add(1)
 			go func(req ctrl.Request) {
 				defer wg.Done()
-				r.process(req, cancelChan)
+				defer r.Metrics.DecRunningModuleCount(req.Namespace)
+
+				r.Metrics.IncRunningModuleCount(req.Namespace)
+				start := time.Now()
+
+				success := r.process(req, cancelChan)
+
+				r.Metrics.UpdateModuleSuccess(req.Name, req.Namespace, success)
+				r.Metrics.UpdateModuleRunDuration(req.Name, req.Namespace, time.Since(start).Seconds(), success)
 			}(req)
 		}
 	}
 }
 
-func (r *Runner) process(req ctrl.Request, cancelChan <-chan struct{}) {
+// process will prepare and run module it returns bool indicating failed run
+func (r *Runner) process(req ctrl.Request, cancelChan <-chan struct{}) bool {
 	log := r.Log.With("module", req)
 
 	log.Debug("starting run....")
@@ -83,7 +92,7 @@ func (r *Runner) process(req ctrl.Request, cancelChan <-chan struct{}) {
 	module := new(tfaplv1beta1.Module)
 	if err := r.ClusterClt.Get(ctx, req.NamespacedName, module); err != nil {
 		log.Error("unable to fetch terraform module", "err", err)
-		return
+		return false
 	}
 
 	// setup go routine for graceful shutdown of current run
@@ -115,7 +124,7 @@ func (r *Runner) process(req ctrl.Request, cancelChan <-chan struct{}) {
 	commitHash, commitLog, err := r.GitUtil.HeadCommitHashAndLog(module.Spec.Path)
 	if err != nil {
 		log.Error("unable to get commit hash and log", "err", err)
-		return
+		return false
 	}
 
 	// if termination signal received its safe to return here
@@ -123,13 +132,13 @@ func (r *Runner) process(req ctrl.Request, cancelChan <-chan struct{}) {
 		msg := "terraform run interrupted as runner is shutting down"
 		log.Error(msg)
 		r.setFailedStatus(req, module, tfaplv1beta1.ReasonControllerShutdown, msg, r.Clock.Now())
-		return
+		return false
 	}
 
 	// Update Status
 	if err = r.SetRunStartedStatus(req.NamespacedName, module, "preparing for TF run", commitHash, commitLog, r.Clock.Now()); err != nil {
 		log.Error("unable to set run starting status", "err", err)
-		return
+		return false
 	}
 
 	// Setup Delegation and get vars and envs
@@ -137,37 +146,37 @@ func (r *Runner) process(req ctrl.Request, cancelChan <-chan struct{}) {
 	if err != nil {
 		log.Error("unable to create kube client", "err", err)
 		r.setFailedStatus(req, module, tfaplv1beta1.ReasonDelegationFailed, err.Error(), r.Clock.Now())
-		return
+		return false
 	}
 
 	envs, err := fetchEnvVars(ctx, delegatedClient, module, module.Spec.Env)
 	if err != nil {
 		log.Error("unable to get envs", "err", err)
 		r.setFailedStatus(req, module, tfaplv1beta1.ReasonRunPreparationFailed, err.Error(), r.Clock.Now())
-		return
+		return false
 	}
 
 	vars, err := fetchEnvVars(ctx, delegatedClient, module, module.Spec.Var)
 	if err != nil {
 		log.Error("unable to get vars", "err", err)
 		r.setFailedStatus(req, module, tfaplv1beta1.ReasonRunPreparationFailed, err.Error(), r.Clock.Now())
-		return
+		return false
 	}
 
 	te, err := r.NewTFRunner(ctx, module, envs, vars)
 	if err != nil {
 		log.Error("unable to create terraform executer", "err", err)
 		r.setFailedStatus(req, module, tfaplv1beta1.ReasonRunPreparationFailed, err.Error(), r.Clock.Now())
-		return
+		return false
 	}
 	defer te.cleanUp()
 
 	// Process RUN
-	r.runTF(ctx, req, module, te, commitHash, cancelChan)
-
-	log.Debug("terraform run completed")
+	return r.runTF(ctx, req, module, te, commitHash, cancelChan)
 }
 
+// runTF executes terraform commands and updates module status when required.
+// it returns bool indicating success or failure
 func (r *Runner) runTF(
 	ctx context.Context,
 	req ctrl.Request,
@@ -175,19 +184,19 @@ func (r *Runner) runTF(
 	te TFExecuter,
 	commitHash string,
 	cancelChan <-chan struct{},
-) {
+) bool {
 	log := r.Log.With("module", req)
 
 	if err := r.SetProgressingStatus(req.NamespacedName, module, "Initialising"); err != nil {
 		log.Error("unable to set init status", "err", err)
-		return
+		return false
 	}
 
 	initOut, err := te.init(ctx)
 	if err != nil {
 		log.Error("unable to init module", "err", err)
 		r.setFailedStatus(req, module, tfaplv1beta1.ReasonInitialiseFailed, err.Error(), r.Clock.Now())
-		return
+		return false
 	}
 
 	log.Info("initialised", "output", initOut)
@@ -196,14 +205,14 @@ func (r *Runner) runTF(
 	// Start Planing
 	if err = r.SetProgressingStatus(req.NamespacedName, module, "Planning"); err != nil {
 		log.Error("unable to set planning status", "err", err)
-		return
+		return false
 	}
 
 	// if termination signal received its safe to return here
 	if isChannelClosed(cancelChan) {
 		log.Error("terraform run interrupted as runner is shutting down")
 		r.setFailedStatus(req, module, tfaplv1beta1.ReasonControllerShutdown, "terraform run interrupted as runner is shutting down", r.Clock.Now())
-		return
+		return false
 	}
 
 	diffDetected, planOut, err := te.plan(ctx)
@@ -211,7 +220,7 @@ func (r *Runner) runTF(
 		log.Error("unable to plan module", "err", err)
 		module.Status.LastDriftInfo = tfaplv1beta1.OutputStats{Timestamp: &metav1.Time{Time: r.Clock.Now()}, CommitHash: commitHash, Output: planOut + "\n" + err.Error()}
 		r.setFailedStatus(req, module, tfaplv1beta1.ReasonPlanFailed, err.Error(), r.Clock.Now())
-		return
+		return false
 	}
 
 	// extract last line of output
@@ -223,9 +232,9 @@ func (r *Runner) runTF(
 	if !diffDetected {
 		if err = r.SetRunFinishedStatus(req.NamespacedName, module, tfaplv1beta1.ReasonPlanedNoDriftDetected, planStatus, r.Clock.Now()); err != nil {
 			log.Error("unable to set no drift status", "err", err)
-			return
+			return false
 		}
-		return
+		return true
 	}
 
 	module.Status.LastDriftInfo = tfaplv1beta1.OutputStats{Timestamp: &metav1.Time{Time: r.Clock.Now()}, CommitHash: commitHash, Output: planOut}
@@ -233,22 +242,22 @@ func (r *Runner) runTF(
 	if module.Spec.PlanOnly != nil && *module.Spec.PlanOnly {
 		if err = r.SetRunFinishedStatus(req.NamespacedName, module, tfaplv1beta1.ReasonPlanedDriftDetected, "PlanOnly/"+planStatus, r.Clock.Now()); err != nil {
 			log.Error("unable to set drift status", "err", err)
-			return
+			return false
 		}
-		return
+		return true
 	}
 
 	// if termination signal received its safe to return here
 	if isChannelClosed(cancelChan) {
 		log.Error("terraform run interrupted as runner is shutting down")
 		r.setFailedStatus(req, module, tfaplv1beta1.ReasonControllerShutdown, "terraform run interrupted as runner is shutting down", r.Clock.Now())
-		return
+		return false
 	}
 
 	// Start Applying
 	if err = r.SetProgressingStatus(req.NamespacedName, module, "Applying/"+planStatus); err != nil {
 		log.Error("unable to set applying status", "err", err)
-		return
+		return false
 	}
 
 	applyOut, err := te.apply(ctx)
@@ -256,7 +265,7 @@ func (r *Runner) runTF(
 		log.Error("unable to plan module", "err", err)
 		module.Status.LastApplyInfo = tfaplv1beta1.OutputStats{Timestamp: &metav1.Time{Time: r.Clock.Now()}, CommitHash: commitHash, Output: applyOut + "\n" + err.Error()}
 		r.setFailedStatus(req, module, tfaplv1beta1.ReasonApplyFailed, err.Error(), r.Clock.Now())
-		return
+		return false
 	}
 
 	module.Status.LastApplyInfo = tfaplv1beta1.OutputStats{Timestamp: &metav1.Time{Time: r.Clock.Now()}, CommitHash: commitHash, Output: applyOut}
@@ -269,8 +278,10 @@ func (r *Runner) runTF(
 
 	if err = r.SetRunFinishedStatus(req.NamespacedName, module, tfaplv1beta1.ReasonApplied, applyStatus, r.Clock.Now()); err != nil {
 		log.Error("unable to set finished status", "err", err)
-		return
+		return false
 	}
+
+	return true
 }
 
 func (r *Runner) SetProgressingStatus(objectKey types.NamespacedName, m *tfaplv1beta1.Module, msg string) error {
