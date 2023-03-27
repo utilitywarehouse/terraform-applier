@@ -59,7 +59,7 @@ func init() {
 
 	logger = hclog.New(&hclog.LoggerOptions{
 		Name:            "terraform-applier",
-		Level:           hclog.LevelFromString("DEBUG"),
+		Level:           hclog.LevelFromString("warn"),
 		IncludeLocation: false,
 	})
 }
