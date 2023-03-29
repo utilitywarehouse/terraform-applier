@@ -7,9 +7,9 @@ import (
 	"text/template"
 
 	"github.com/gorilla/mux"
-	"github.com/utilitywarehouse/terraform-applier/log"
-	"github.com/utilitywarehouse/terraform-applier/run"
+	"github.com/hashicorp/go-hclog"
 	"github.com/utilitywarehouse/terraform-applier/sysutil"
+	ctrl "sigs.k8s.io/controller-runtime"
 )
 
 //go:embed static
@@ -18,13 +18,15 @@ var staticFiles embed.FS
 //go:embed templates/status.html
 var statusHTML string
 
+var log hclog.Logger
+
 // WebServer struct
 type WebServer struct {
 	ListenAddress string
 	Clock         sysutil.ClockInterface
-	RunQueue      chan<- bool
-	RunResults    <-chan run.Result
+	RunQueue      chan<- ctrl.Request
 	Errors        chan<- error
+	Log           hclog.Logger
 }
 
 // StatusPageHandler implements the http.Handler interface and serves a status page with info about the most recent applier run.
@@ -52,7 +54,7 @@ func (s *StatusPageHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 // ForceRunHandler implements the http.Handle interface and serves an API endpoint for forcing a new run.
 type ForceRunHandler struct {
-	RunQueue chan<- bool
+	RunQueue chan<- ctrl.Request
 }
 
 // ServeHTTP handles requests for forcing a run by attempting to add to the runQueue, and writes a response including the result and a relevant message.
@@ -66,7 +68,9 @@ func (f *ForceRunHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case "POST":
 		select {
-		case f.RunQueue <- true:
+		case f.RunQueue <- ctrl.Request{
+			// TODO: FIX ME
+		}:
 			log.Info("Run queued")
 		default:
 			log.Info("Run queue is already full")
@@ -92,7 +96,7 @@ func (f *ForceRunHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 // 4. Endpoint for forcing a run
 func (ws *WebServer) Start() {
 	log.Info("Launching webserver")
-	lastRun := &run.Result{}
+	// lastRun := &run.Result{}
 
 	template, err := sysutil.CreateTemplate(statusHTML)
 	if err != nil {
@@ -104,7 +108,8 @@ func (ws *WebServer) Start() {
 	addStatusEndpoints(m)
 	statusPageHandler := &StatusPageHandler{
 		template,
-		lastRun,
+		// lastRun,
+		nil,
 		ws.Clock,
 	}
 	m.PathPrefix("/static/").Handler(http.FileServer(http.FS(staticFiles)))
@@ -114,11 +119,11 @@ func (ws *WebServer) Start() {
 	m.PathPrefix("/api/v1/forceRun").Handler(forceRunHandler)
 	m.PathPrefix("/").Handler(statusPageHandler)
 
-	go func() {
-		for result := range ws.RunResults {
-			*lastRun = result
-		}
-	}()
+	// go func() {
+	// 	for result := range ws.RunResults {
+	// 		*lastRun = result
+	// 	}
+	// }()
 
 	err = http.ListenAndServe(ws.ListenAddress, m)
 	ws.Errors <- err

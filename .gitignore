@@ -1,1 +1,6 @@
 terraform-applier
+
+# Binaries for programs and plugins
+bin
+
+
