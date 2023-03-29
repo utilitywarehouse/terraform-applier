@@ -223,19 +223,19 @@ func (r *Runner) runTF(
 		return false
 	}
 
-	// extract last line of output
-	// Plan: X to add, 0 to change, 0 to destroy.
-	planStatus := rePlanStatus.FindString(planOut)
-
-	log.Info("planed", "status", planStatus)
-
 	if !diffDetected {
-		if err = r.SetRunFinishedStatus(req.NamespacedName, module, tfaplv1beta1.ReasonPlanedNoDriftDetected, planStatus, r.Clock.Now()); err != nil {
+		if err = r.SetRunFinishedStatus(req.NamespacedName, module, tfaplv1beta1.ReasonPlanedNoDriftDetected, "No changes. Your infrastructure matches the configuration.", r.Clock.Now()); err != nil {
 			log.Error("unable to set no drift status", "err", err)
 			return false
 		}
 		return true
 	}
+
+	// extract last line of output
+	// Plan: X to add, 0 to change, 0 to destroy.
+	planStatus := rePlanStatus.FindString(planOut)
+
+	log.Info("planed", "status", planStatus)
 
 	module.Status.LastDriftInfo = tfaplv1beta1.OutputStats{Timestamp: &metav1.Time{Time: r.Clock.Now()}, CommitHash: commitHash, Output: planOut}
 
