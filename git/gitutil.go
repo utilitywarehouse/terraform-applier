@@ -44,6 +44,7 @@ func (g *Util) RemoteURL() (string, error) {
 	}
 
 	rURL = strings.TrimSpace(rURL)
+	rURL = strings.TrimPrefix(rURL, "https://")
 	rURL = strings.TrimPrefix(rURL, "git@")
 	rURL = strings.TrimSuffix(rURL, ".git")
 	rURL = strings.ReplaceAll(rURL, ":", "/")
