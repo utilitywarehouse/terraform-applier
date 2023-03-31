@@ -3,27 +3,15 @@ package webserver
 import (
 	"bytes"
 	"os"
-	"regexp"
-	"strings"
 	"testing"
 	"time"
 
-	"github.com/google/go-cmp/cmp"
 	tfaplv1beta1 "github.com/utilitywarehouse/terraform-applier/api/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 var (
-	diffURL      = "https://github.com/org/repo/commit/%s"
-	fixedTime    = time.Date(2022, time.April, 26, 13, 36, 05, 0, time.UTC)
-	emptyLineReg = regexp.MustCompile(`[\t\r\n]+`)
-
 	boolTrue = true
-
-	removeSpaceEmptyLine = cmp.Transformer("RemoveSpace", func(in string) string {
-		t := strings.ReplaceAll(in, "  ", "")
-		return emptyLineReg.ReplaceAllString(strings.TrimSpace(t), "\n")
-	})
 )
 
 func getMetaTime(h, m, s int) *metav1.Time {
@@ -36,9 +24,8 @@ func Test_ExecuteTemplate(t *testing.T) {
 			TypeMeta:   metav1.TypeMeta{APIVersion: "terraform-applier.uw.systems/v1beta1", Kind: "Module"},
 			ObjectMeta: metav1.ObjectMeta{Name: "admins", Namespace: "foo"},
 			Spec: tfaplv1beta1.ModuleSpec{
-				Schedule: "1 * * * *",
+				Schedule: "00 */1 * * *",
 				Path:     "foo/admins",
-				Suspend:  &boolTrue,
 			},
 			Status: tfaplv1beta1.ModuleStatus{
 				CurrentState: "Running",
@@ -50,8 +37,9 @@ func Test_ExecuteTemplate(t *testing.T) {
 			TypeMeta:   metav1.TypeMeta{APIVersion: "terraform-applier.uw.systems/v1beta1", Kind: "Module"},
 			ObjectMeta: metav1.ObjectMeta{Name: "users", Namespace: "foo"},
 			Spec: tfaplv1beta1.ModuleSpec{
-				Schedule: "*/04 * * * *",
+				Schedule: "*/30 * * * *",
 				Path:     "foo/users",
+				PlanOnly: &boolTrue,
 			},
 			Status: tfaplv1beta1.ModuleStatus{
 				CurrentState:  "Errored",
@@ -62,9 +50,18 @@ func Test_ExecuteTemplate(t *testing.T) {
 		},
 		{
 			TypeMeta:   metav1.TypeMeta{APIVersion: "terraform-applier.uw.systems/v1beta1", Kind: "Module"},
+			ObjectMeta: metav1.ObjectMeta{Name: "application", Namespace: "bar"},
+			Spec: tfaplv1beta1.ModuleSpec{
+				Schedule: "00 06 * * *",
+				Path:     "dev/application",
+				Suspend:  &boolTrue,
+			},
+		},
+		{
+			TypeMeta:   metav1.TypeMeta{APIVersion: "terraform-applier.uw.systems/v1beta1", Kind: "Module"},
 			ObjectMeta: metav1.ObjectMeta{Name: "groups", Namespace: "bar"},
 			Spec: tfaplv1beta1.ModuleSpec{
-				Schedule: "1 * * * *",
+				Schedule: "00 */2 * * *",
 				Path:     "dev/groups",
 			},
 			Status: tfaplv1beta1.ModuleStatus{
@@ -128,7 +125,7 @@ Apply complete! Resources: 7 added, 0 changed, 0 destroyed.`,
 			TypeMeta:   metav1.TypeMeta{APIVersion: "terraform-applier.uw.systems/v1beta1", Kind: "Module"},
 			ObjectMeta: metav1.ObjectMeta{Name: "users", Namespace: "bar"},
 			Spec: tfaplv1beta1.ModuleSpec{
-				Schedule: "*/04 * * * ",
+				Schedule: "*/15 * * * ",
 				Path:     "dev/users",
 			},
 			Status: tfaplv1beta1.ModuleStatus{
@@ -163,8 +160,8 @@ Apply complete! Resources: 7 added, 0 changed, 0 destroyed.`,
 	}
 
 	// uncomment to load index.html file locally after running test
-	// if err := os.WriteFile("index.html", rendered.Bytes(), 0666); err != nil {
-	// 	t.Errorf("error reading test file:  %v\n", err)
-	// 	return
-	// }
+	if err := os.WriteFile("index.html", rendered.Bytes(), 0666); err != nil {
+		t.Errorf("error reading test file:  %v\n", err)
+		return
+	}
 }

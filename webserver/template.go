@@ -5,6 +5,7 @@ import (
 	"html/template"
 	"time"
 
+	tfaplv1beta1 "github.com/utilitywarehouse/terraform-applier/api/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -12,15 +13,21 @@ import (
 func createTemplate(statusHTML string) (*template.Template, error) {
 	tmpl, err := template.New("index").
 		Funcs(template.FuncMap{
-			"commitURL":     commitURL,
-			"formattedTime": formattedTime,
-			"latency":       latency,
+			"sanitizedUniqueName": sanitizedUniqueName,
+			"commitURL":           commitURL,
+			"formattedTime":       formattedTime,
+			"latency":             latency,
 		}).
 		Parse(statusHTML)
 	if err != nil {
 		return nil, fmt.Errorf("error parsing template: %w", err)
 	}
 	return tmpl, nil
+}
+
+// sanitizedUniqueName will return namespaceName with - instead of /
+func sanitizedUniqueName(m tfaplv1beta1.Module) string {
+	return m.Namespace + "-" + m.Name
 }
 
 // FormattedTime returns the Time in the format "YYYY-MM-DD hh:mm:ss -0000 GMT"

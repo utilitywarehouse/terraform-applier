@@ -59,12 +59,12 @@
 {{define "module"}}
 <li class="list-group-item">
     <div
-        class='card {{if eq .Status.CurrentState "Errored"}}border-danger{{else if eq .Status.CurrentState "Running"}}border-info{{end}}'>
+        class='card {{if .Spec.Suspend}}border-warning{{else if eq .Status.CurrentState "Errored"}}border-danger{{else if eq .Status.CurrentState "Running"}}border-info{{end}}'>
         <div class="card-header bg-transparent">
-            <div href="#{{.Name}}-info" data-bs-toggle="collapse" role="button">
+            <div href="#{{ sanitizedUniqueName .}}-info" data-bs-toggle="collapse" role="button">
                 <div class="d-flex w-100 justify-content-between">
-                    <h5 class="fw-normal">{{.Name}}</h5>
-                    <p class="fw-light">{{.Status.CurrentState}}</p>
+                    <h5 class="fw-normal">{{.Name}} {{ if .Spec.PlanOnly}}(plan only){{end}}</h5>
+                    <p class="fw-light">{{ if .Spec.Suspend}}Suspended{{else}}{{.Status.CurrentState}}{{end}}</p>
                 </div>
                 <div class="d-flex flex-row">
                     <div class="">Path: {{ .Spec.Path }}</div>
@@ -73,7 +73,7 @@
                 Message: <small class="text-muted">{{.Status.StateMessage}}</small>
             </div>
         </div>
-        <div id="{{.Name}}-info" class="collapse" aria-labelledby="heading-example">
+        <div id="{{sanitizedUniqueName .}}-info" class="collapse" aria-labelledby="heading-example">
             <div class="card-body">
                 <div>
                     <div class="d-flex flex-row justify-content-between">
