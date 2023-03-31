@@ -127,6 +127,11 @@ func (r *Runner) process(req ctrl.Request, cancelChan <-chan struct{}) bool {
 		return false
 	}
 
+	remoteURL, err := r.GitUtil.RemoteURL()
+	if err != nil {
+		log.Error("unable to get repo's remote url", "err", err)
+	}
+
 	// if termination signal received its safe to return here
 	if isChannelClosed(cancelChan) {
 		msg := "terraform run interrupted as runner is shutting down"
@@ -136,7 +141,7 @@ func (r *Runner) process(req ctrl.Request, cancelChan <-chan struct{}) bool {
 	}
 
 	// Update Status
-	if err = r.SetRunStartedStatus(req.NamespacedName, module, "preparing for TF run", commitHash, commitLog, r.Clock.Now()); err != nil {
+	if err = r.SetRunStartedStatus(req.NamespacedName, module, "preparing for TF run", commitHash, commitLog, remoteURL, r.Clock.Now()); err != nil {
 		log.Error("unable to set run starting status", "err", err)
 		return false
 	}
@@ -290,7 +295,7 @@ func (r *Runner) SetProgressingStatus(objectKey types.NamespacedName, m *tfaplv1
 	return r.patchStatus(context.Background(), objectKey, m.Status)
 }
 
-func (r *Runner) SetRunStartedStatus(objectKey types.NamespacedName, m *tfaplv1beta1.Module, msg, commitHash, commitMsg string, now time.Time) error {
+func (r *Runner) SetRunStartedStatus(objectKey types.NamespacedName, m *tfaplv1beta1.Module, msg, commitHash, commitMsg, remoteURL string, now time.Time) error {
 
 	m.Status.CurrentState = string(tfaplv1beta1.StatusRunning)
 	m.Status.RunStartedAt = &metav1.Time{Time: now}
@@ -298,6 +303,7 @@ func (r *Runner) SetRunStartedStatus(objectKey types.NamespacedName, m *tfaplv1b
 	m.Status.ObservedGeneration = m.Generation
 	m.Status.RunCommitHash = commitHash
 	m.Status.RunCommitMsg = commitMsg
+	m.Status.RemoteURL = remoteURL
 	m.Status.StateMessage = msg
 
 	return r.patchStatus(context.Background(), objectKey, m.Status)

@@ -4,47 +4,48 @@
 <head>
     <meta charset="utf-8">
     <title>terraform-applier</title>
-    <script src="/static/bootstrap/js/jquery.min.js"></script>
-    <script src="/static/js/main.js"></script>
-    <link rel="stylesheet" href="/static/stylesheets/main.css">
-    <link rel="stylesheet" href="/static/bootstrap/css/bootstrap.min.css">
-    <script src="/static/bootstrap/js/bootstrap.min.js"></script>
+    <link rel="icon" type="image/x-icon" href="static/img/favicon.ico">
+    <script src="static/bootstrap/js/jquery.min.js"></script>
+    <script src="static/js/main.js"></script>
+    <link rel="stylesheet" href="static/stylesheets/main.css">
+    <link rel="stylesheet" href="static/bootstrap/css/bootstrap.min.css">
+    <script src="static/bootstrap/js/bootstrap.min.js"></script>
 </head>
 
 <body>
     <h1 class="text-center">Terraform Applier</h1>
-    {{ if .TotalModules }}
-    <div class="row">
-        <div class="text-center"><button id="force-button" class="btn btn-warning btn-s"><strong>Force
-                    Run</strong></button></div>
-    </div>
+
+    {{ if . }}
     <div class="row">
         <div class="col-md-4"></div>
         <div id="force-alert-container" class="col-md-4"></div>
     </div>
+
     <div class="row">
-        <div class="col-md-2"></div>
-        <div class="col-md-8">
-            <div class="panel panel-default">
-                <div class="panel-heading">
-                    <h3 class="panel-title">Last Run</h3>
-                </div>
-                <div class="panel-body">
-                    <strong>Started: {{ .FormattedStart }}</strong><br>
-                    <strong>Finished: {{ .FormattedFinish }}</strong><br>
-                    <strong>Duration: {{ .FormattedDuration }}</strong><br>
-                    {{ if .FullCommit }}<strong>Last Commit {{ if .LastCommitLink }}<a href="{{ .LastCommitLink }}">(see diff)</a>{{ end }}</strong>
-                    <p><pre class="commit">{{ .FullCommit }}</pre></p>{{ end }}
+        <div class="col-md-1"></div>
+        <div class="col-md-9">
+            <div class="card">
+                <h5 class="card-header">Namespaces</h5>
+                <div class="list-group list-group-flush">
+                    {{range $k, $v := . }}
+                    <div class="list-group-item">
+                        <a href="#{{$k}}" class="list-group-item-action text-decoration-none" data-bs-toggle="collapse" role="button">
+                            <div class="d-flex w-100 justify-content-between">
+                                <h4 class="mb-1">{{$k}}</h4>
+                                <small>{{len $v.Modules}}</small>
+                            </div>
+                        </a>
+                        <ul id="{{$k}}" class="list-group list-group-flush collapse">
+                            {{ range $i, $m := $v.Modules }}
+                                {{template "module" $m}}
+                            {{end}}
+                        </ul>
+                    </div>
+                    {{end}}
                 </div>
             </div>
         </div>
     </div>
-
-    {{template "section" (.Filter "failure")}}
-
-    {{template "section" (.Filter "plan_only")}}
-
-    {{template "section" (.Filter "applied")}}
 
     {{ else }}
     <h3 class="text-center">Waiting for information about the first run...</h3>
@@ -54,57 +55,81 @@
 </body>
 </html>
 
-<!-- Filtered Section -->
-{{define "section"}}
-<div class="row">
-    <div class="col-md-2"></div>
-    <div class="col-md-8">
-        <div class="panel-group">
-            <div class='panel panel-default {{if eq $.FilteredBy "applied"}}panel-success{{else if eq $.FilteredBy "failure"}}panel-danger{{else if eq $.FilteredBy "plan_only"}}panel-warning{{end}}'>
-                <div class="panel-heading">
-                    <h4 class="panel-title">
-                        <a data-toggle="collapse" href="#{{$.FilteredBy}}">
-                            {{if eq $.FilteredBy "failure"}}
-                                Errored Modules: {{ len .Modules }} / {{ .Total }}
-                            {{else if eq $.FilteredBy "plan_only"}}
-                                Plan Only Modules: {{ len .Modules }} / {{ .Total }}
-                            {{else if eq $.FilteredBy "applied"}}
-                                Applied Modules: {{ len .Modules }} / {{ .Total }}
-                            {{end}}
-                        </a>
-                    </h4>
+<!-- modules -->
+{{define "module"}}
+<li class="list-group-item">
+    <div
+        class='card {{if eq .Status.CurrentState "Errored"}}border-danger{{else if eq .Status.CurrentState "Running"}}border-info{{end}}'>
+        <div class="card-header bg-transparent">
+            <div href="#{{.Name}}-info" data-bs-toggle="collapse" role="button">
+                <div class="d-flex w-100 justify-content-between">
+                    <h5 class="fw-normal">{{.Name}}</h5>
+                    <p class="fw-light">{{.Status.CurrentState}}</p>
                 </div>
-                <div id="failures" class="panel-group collapse {{ if .Modules }} in {{ end }}">
-                    {{ range $i, $module := .Modules }}
-                        {{template "module" $module}}
-                    {{ end }}
+                <div class="d-flex flex-row">
+                    <div class="">Path: {{ .Spec.Path }}</div>
+                    <div class="ps-5">Schedule: {{ .Spec.Schedule }}</div>
+                </div>
+                Message: <small class="text-muted">{{.Status.StateMessage}}</small>
+            </div>
+        </div>
+        <div id="{{.Name}}-info" class="collapse" aria-labelledby="heading-example">
+            <div class="card-body">
+                <div>
+                    <div class="d-flex flex-row justify-content-between">
+                        <div class="d-flex flex-column mb-3">
+                            <div class="">Started: 
+                                <small>{{ formattedTime .Status.RunStartedAt }} (took {{ latency .Status.RunStartedAt .Status.RunFinishedAt }})</small>
+                            </div>
+                            
+                            <div class="">Commit Hash: 
+                                <a href="{{ commitURL .Status.RemoteURL .Status.RunCommitHash}}">{{.Status.RunCommitHash}}</a>
+                            </div>
+                            <div class="">Commit Message: <small>{{.Status.RunCommitMsg}}</small></div>
+                        </div>
+                        <div class="">
+                            <button data-namespace="{{ .Namespace }}"
+                                class="force-button force-namespace-button btn btn-warning btn-s" disabled>
+                                <strong>Force Run</strong>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div>
+                    <nav>
+                        <div class="nav nav-tabs" id="nav-tab" role="tablist">
+                            <a class="nav-link active" href="#nav-plan" data-bs-toggle="tab" role="tab">Plan</a>
+                            <a class="nav-link" href="#nav-apply" data-bs-toggle="tab" role="tab">Apply</a>
+                        </div>
+                    </nav>
+                    <div class="tab-content" id="nav-tabContent">
+                        <div class="tab-pane fade show active" id="nav-plan" role="tabpanel">
+                            <div class="d-flex flex-row mb-3">
+                                <div class="p-2">Commit: 
+                                    <small><a href="{{ commitURL .Status.RemoteURL .Status.LastDriftInfo.CommitHash}}">{{.Status.LastDriftInfo.CommitHash}}</a></small>
+                                </div>
+                                <div class="p-2">At: <small>{{ formattedTime .Status.LastDriftInfo.Timestamp }}</small></div>
+                            </div>
+                            <pre class="file-output font-monospace p-3" style="background-color: #f5f5f5;">
+                                <small>{{.Status.LastDriftInfo.Output}}</small>
+                            </pre>
+                        </div>
+                        <div class="tab-pane fade" id="nav-apply" role="tabpanel">
+                            <div class="d-flex flex-row mb-3">
+                                <div class="p-2">Commit: 
+                                    <small><a href="{{ commitURL .Status.RemoteURL .Status.LastApplyInfo.CommitHash}}">{{.Status.LastApplyInfo.CommitHash}}</a></small>
+                                </div>
+                                <div class="p-2">At: <small>{{ formattedTime .Status.LastApplyInfo.Timestamp }}</small></div>
+                            </div>
+                            <pre class="file-output font-monospace p-3" style="background-color: #f5f5f5;">
+                                <small>{{.Status.LastApplyInfo.Output}}</small>
+                            </pre>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
-</div>
+</li>
 {{end}}
 
-<!-- Module Info -->
-{{define "module"}}
-<div class="panel">
-    <div class="panel-heading">
-        <div class="panel-title">
-            <a data-toggle="collapse" href="#{{ sanitizeString .Module }}">{{ .Module }} (duration: {{ .FormattedDuration }})</a>
-        </div>
-    </div>
-    <div id="{{ sanitizeString .Module }}" class="panel-collapse collapse">
-        <ul class="list-group">
-            <li class="list-group-item">
-                <!-- <pre class="file-output">{{ .Output }}</pre> -->
-<!-- since span is used inside pre make sure there is no extra tab/spaces -->
-                <pre class="file-output">
-                    {{- range  $l := splitByNewline .Output }}
-<span {{if getOutputClass $l}} class="{{getOutputClass $l}}"{{ end }}>{{$l}}</span>
-                    {{- end }}
-                </pre>
-            </li>
-        </ul>
-    </div>
-</div>
-{{ end }}

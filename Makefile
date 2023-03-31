@@ -34,11 +34,16 @@ docker-build: test ## Build docker image with the manager.
 	docker build -t ${IMG} .
 
 
-BJS_VERSION="5.1.0"
+BJS_VERSION="5.2.3"
 update-bootstrap-js:
 	(cd /tmp/ && curl -L -O https://github.com/twbs/bootstrap/releases/download/v$(BJS_VERSION)/bootstrap-$(BJS_VERSION)-dist.zip)
 	(cd /tmp/ && unzip bootstrap-$(BJS_VERSION)-dist.zip)
 	cp /tmp/bootstrap-$(BJS_VERSION)-dist/js/bootstrap.js webserver/static/bootstrap/js/bootstrap.js
+	cp /tmp/bootstrap-$(BJS_VERSION)-dist/js/bootstrap.min.js webserver/static/bootstrap/js/bootstrap.min.js
+	cp /tmp/bootstrap-$(BJS_VERSION)-dist/js/bootstrap.min.js.map webserver/static/bootstrap/js/bootstrap.min.js.map
+	cp /tmp/bootstrap-$(BJS_VERSION)-dist/css/bootstrap.css webserver/static/bootstrap/css/bootstrap.css
+	cp /tmp/bootstrap-$(BJS_VERSION)-dist/css/bootstrap.min.css webserver/static/bootstrap/css/bootstrap.min.css
+	cp /tmp/bootstrap-$(BJS_VERSION)-dist/css/bootstrap.min.css.map webserver/static/bootstrap/css/bootstrap.min.css.map
 
 update-jquery-js:
 	curl -o webserver/static/bootstrap/js/jquery.min.js https://code.jquery.com/jquery-3.6.0.min.js

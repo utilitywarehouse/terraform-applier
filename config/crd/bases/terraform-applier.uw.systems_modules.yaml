@@ -371,6 +371,9 @@ spec:
                 description: ObservedGeneration is the last reconciled generation.
                 format: int64
                 type: integer
+              remoteURL:
+                description: RemoteURL is the URL of the modules git repo
+                type: string
               runCommitHash:
                 description: RunCommitHash is the hash of git commit of last run.
                 type: string

@@ -102,6 +102,10 @@ type ModuleStatus struct {
 	// +optional
 	RunFinishedAt *metav1.Time `json:"runFinishedAt,omitempty"`
 
+	// RemoteURL is the URL of the modules git repo
+	// +optional
+	RemoteURL string `json:"remoteURL,omitempty"`
+
 	// RunCommitHash is the hash of git commit of last run.
 	// +optional
 	RunCommitHash string `json:"runCommitHash,omitempty"`
