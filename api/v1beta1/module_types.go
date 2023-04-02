@@ -200,3 +200,11 @@ const (
 	// 'Errored' -> last run finished with Error and its waiting on next run/event
 	StatusErrored state = "Errored"
 )
+
+func (m *Module) IsSuspended() bool {
+	return m.Spec.Suspend != nil && *m.Spec.Suspend
+}
+
+func (m *Module) IsPlanOnly() bool {
+	return m.Spec.PlanOnly != nil && *m.Spec.PlanOnly
+}

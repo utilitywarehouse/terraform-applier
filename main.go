@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/signal"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
@@ -24,6 +25,7 @@ import (
 	"github.com/utilitywarehouse/terraform-applier/runner"
 	"github.com/utilitywarehouse/terraform-applier/sysutil"
 	"github.com/utilitywarehouse/terraform-applier/webserver"
+	"github.com/utilitywarehouse/terraform-applier/webserver/oidc"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
@@ -44,7 +46,8 @@ import (
 )
 
 var (
-	logger hclog.Logger
+	logger            hclog.Logger
+	oidcAuthenticator *oidc.Authenticator
 
 	scheme = runtime.NewScheme()
 
@@ -71,6 +74,10 @@ var (
 	terminationGracePeriodSeconds = getEnv("TERMINATION_GRACE_PERIOD", "60")
 	minIntervalBetweenRuns        = getEnv("MIN_INTERVAL_BETWEEN_RUNS", "60")
 	listenAddress                 = getEnv("LISTEN_ADDRESS", ":8080")
+	oidcCallbackURL               = os.Getenv("OIDC_CALLBACK_URL")
+	oidcClientID                  = os.Getenv("OIDC_CLIENT_ID")
+	oidcClientSecret              = os.Getenv("OIDC_CLIENT_SECRET")
+	oidcIssuer                    = os.Getenv("OIDC_ISSUER")
 
 	terraformPath    = os.Getenv("TERRAFORM_PATH")
 	terraformVersion = os.Getenv("TERRAFORM_VERSION")
@@ -298,10 +305,20 @@ func main() {
 		TerminationGracePeriod: terminationGracePeriodDuration,
 	}
 
+	// try to setup oidc if any of the oidc ENVs set
+	if strings.Join([]string{oidcIssuer, oidcClientID, oidcClientSecret, oidcCallbackURL}, "") != "" {
+		oidcAuthenticator, err = oidc.NewAuthenticator(oidcIssuer, oidcClientID, oidcClientSecret, oidcCallbackURL)
+		if err != nil {
+			setupLog.Error("could not setup oidc authenticator", "error", err)
+			os.Exit(1)
+		}
+		setupLog.Info("OIDC authentication configured", "issuer", oidcIssuer, "clientID", oidcClientID)
+	}
+
 	webserver := &webserver.WebServer{
+		Authenticator: oidcAuthenticator,
 		ListenAddress: listenAddress,
 		ClusterClt:    mgr.GetClient(),
-		Clock:         clock,
 		RunQueue:      wsQueue,
 		Log:           logger.Named("webserver"),
 	}
