@@ -95,6 +95,10 @@ type ModuleStatus struct {
 	// +optional
 	StateMessage string `json:"stateMessage,omitempty"`
 
+	// Type is a short description of the kind of terraform run that was attempted.
+	// +optional
+	Type string `json:"type"`
+
 	// Information when was the last time the run was started.
 	// +optional
 	RunStartedAt *metav1.Time `json:"runStartedAt,omitempty"`
@@ -187,6 +191,15 @@ const (
 	ReasonPlanedDriftDetected   = "PlanedDriftDetected"
 	ReasonPlanedNoDriftDetected = "PlanedNoDriftDetected"
 	ReasonApplied               = "Applied"
+)
+
+const (
+	// ScheduledRun indicates a scheduled, regular terraform run.
+	ScheduledRun = "ScheduledRun"
+	// PollingRun indicated a run triggered by changes in the git repository.
+	PollingRun = "PollingRun"
+	// ForcedRun indicates a forced (triggered on the UI) terraform run.
+	ForcedRun = "ForcedRun"
 )
 
 // Overall state of Module run

@@ -13,12 +13,11 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/hashicorp/go-hclog"
 	tfaplv1beta1 "github.com/utilitywarehouse/terraform-applier/api/v1beta1"
+	"github.com/utilitywarehouse/terraform-applier/runner"
 	"github.com/utilitywarehouse/terraform-applier/webserver/oidc"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
-	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
 //go:embed static
@@ -35,7 +34,7 @@ type WebServer struct {
 	Authenticator *oidc.Authenticator
 	ClusterClt    client.Client
 	KubeClient    kubernetes.Interface
-	RunQueue      chan<- ctrl.Request
+	RunQueue      chan<- runner.Request
 	Log           hclog.Logger
 }
 
@@ -92,7 +91,7 @@ type ForceRunHandler struct {
 	Authenticator *oidc.Authenticator
 	ClusterClt    client.Client
 	KubeClt       kubernetes.Interface
-	RunQueue      chan<- ctrl.Request
+	RunQueue      chan<- runner.Request
 	Log           hclog.Logger
 }
 
@@ -186,7 +185,7 @@ func (f *ForceRunHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	f.RunQueue <- reconcile.Request{namespacedName}
+	f.RunQueue <- runner.Request{NamespacedName: namespacedName, Type: tfaplv1beta1.ForcedRun}
 
 	data.Result = "success"
 	data.Message = "Run queued"

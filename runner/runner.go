@@ -16,7 +16,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/record"
-	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -25,6 +24,11 @@ var (
 	reApplyStatus = regexp.MustCompile(`.*(Apply complete! .* destroyed)`)
 )
 
+type Request struct {
+	types.NamespacedName
+	Type string
+}
+
 type Runner struct {
 	Clock                  sysutil.ClockInterface
 	ClusterClt             client.Client
@@ -32,7 +36,7 @@ type Runner struct {
 	KubeClt                kubernetes.Interface
 	GitUtil                git.UtilInterface
 	RepoPath               string
-	Queue                  <-chan ctrl.Request
+	Queue                  <-chan Request
 	Log                    hclog.Logger
 	Delegate               DelegateInterface
 	Metrics                metrics.PrometheusInterface
@@ -62,7 +66,7 @@ func (r *Runner) Start(ctx context.Context, done chan bool) {
 
 		case req := <-r.Queue:
 			wg.Add(1)
-			go func(req ctrl.Request) {
+			go func(req Request) {
 				defer wg.Done()
 				defer r.Metrics.DecRunningModuleCount(req.Namespace)
 
@@ -79,8 +83,8 @@ func (r *Runner) Start(ctx context.Context, done chan bool) {
 }
 
 // process will prepare and run module it returns bool indicating failed run
-func (r *Runner) process(req ctrl.Request, cancelChan <-chan struct{}) bool {
-	log := r.Log.With("module", req)
+func (r *Runner) process(req Request, cancelChan <-chan struct{}) bool {
+	log := r.Log.With("module", req.NamespacedName)
 
 	log.Debug("starting run....")
 
@@ -141,7 +145,7 @@ func (r *Runner) process(req ctrl.Request, cancelChan <-chan struct{}) bool {
 	}
 
 	// Update Status
-	if err = r.SetRunStartedStatus(req.NamespacedName, module, "preparing for TF run", commitHash, commitLog, remoteURL, r.Clock.Now()); err != nil {
+	if err = r.SetRunStartedStatus(req, module, "preparing for TF run", commitHash, commitLog, remoteURL, r.Clock.Now()); err != nil {
 		log.Error("unable to set run starting status", "err", err)
 		return false
 	}
@@ -184,13 +188,13 @@ func (r *Runner) process(req ctrl.Request, cancelChan <-chan struct{}) bool {
 // it returns bool indicating success or failure
 func (r *Runner) runTF(
 	ctx context.Context,
-	req ctrl.Request,
+	req Request,
 	module *tfaplv1beta1.Module,
 	te TFExecuter,
 	commitHash string,
 	cancelChan <-chan struct{},
 ) bool {
-	log := r.Log.With("module", req)
+	log := r.Log.With("module", req.NamespacedName)
 
 	if err := r.SetProgressingStatus(req.NamespacedName, module, "Initialising"); err != nil {
 		log.Error("unable to set init status", "err", err)
@@ -295,9 +299,10 @@ func (r *Runner) SetProgressingStatus(objectKey types.NamespacedName, m *tfaplv1
 	return r.patchStatus(context.Background(), objectKey, m.Status)
 }
 
-func (r *Runner) SetRunStartedStatus(objectKey types.NamespacedName, m *tfaplv1beta1.Module, msg, commitHash, commitMsg, remoteURL string, now time.Time) error {
+func (r *Runner) SetRunStartedStatus(req Request, m *tfaplv1beta1.Module, msg, commitHash, commitMsg, remoteURL string, now time.Time) error {
 
 	m.Status.CurrentState = string(tfaplv1beta1.StatusRunning)
+	m.Status.Type = req.Type
 	m.Status.RunStartedAt = &metav1.Time{Time: now}
 	m.Status.RunFinishedAt = nil
 	m.Status.ObservedGeneration = m.Generation
@@ -306,7 +311,9 @@ func (r *Runner) SetRunStartedStatus(objectKey types.NamespacedName, m *tfaplv1b
 	m.Status.RemoteURL = remoteURL
 	m.Status.StateMessage = msg
 
-	return r.patchStatus(context.Background(), objectKey, m.Status)
+	r.Recorder.Eventf(m, corev1.EventTypeNormal, tfaplv1beta1.ReasonRunTriggered, "%s: type:%s, commit:%s", msg, req.Type, commitHash)
+
+	return r.patchStatus(context.Background(), req.NamespacedName, m.Status)
 }
 
 func (r *Runner) SetRunFinishedStatus(objectKey types.NamespacedName, m *tfaplv1beta1.Module, reason, msg string, now time.Time) error {
@@ -319,7 +326,7 @@ func (r *Runner) SetRunFinishedStatus(objectKey types.NamespacedName, m *tfaplv1
 	return r.patchStatus(context.Background(), objectKey, m.Status)
 }
 
-func (r *Runner) setFailedStatus(req ctrl.Request, module *tfaplv1beta1.Module, reason, msg string, now time.Time) {
+func (r *Runner) setFailedStatus(req Request, module *tfaplv1beta1.Module, reason, msg string, now time.Time) {
 
 	module.Status.CurrentState = string(tfaplv1beta1.StatusErrored)
 	module.Status.RunFinishedAt = &metav1.Time{Time: now}
@@ -328,7 +335,7 @@ func (r *Runner) setFailedStatus(req ctrl.Request, module *tfaplv1beta1.Module, 
 	r.Recorder.Event(module, corev1.EventTypeWarning, reason, msg)
 
 	if err := r.patchStatus(context.Background(), req.NamespacedName, module.Status); err != nil {
-		r.Log.With("module", req).Error("unable to set failed status", "err", err)
+		r.Log.With("module", req.NamespacedName).Error("unable to set failed status", "err", err)
 	}
 }
 

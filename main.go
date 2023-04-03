@@ -211,7 +211,7 @@ func main() {
 
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
-	wsQueue := make(chan ctrl.Request)
+	wsQueue := make(chan runner.Request)
 	done := make(chan bool, 1)
 
 	clock := &sysutil.Clock{}

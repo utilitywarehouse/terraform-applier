@@ -44,7 +44,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
-	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	tfaplv1beta1 "github.com/utilitywarehouse/terraform-applier/api/v1beta1"
 	"github.com/utilitywarehouse/terraform-applier/controllers"
@@ -73,10 +72,10 @@ var (
 	goMockCtrl *gomock.Controller
 	testLogger hclog.Logger
 	// testControllerQueue only used for controller behaviour testing
-	testControllerQueue chan reconcile.Request
+	testControllerQueue chan runner.Request
 
 	// testRunnerQueue only used for send job to runner of runner testing
-	testRunnerQueue chan reconcile.Request
+	testRunnerQueue chan runner.Request
 	testGitUtil     *git.MockUtilInterface
 	testMetrics     *metrics.MockPrometheusInterface
 	testDelegate    *runner.MockDelegateInterface
@@ -143,8 +142,8 @@ var _ = BeforeSuite(func() {
 	}
 
 	minIntervalBetweenRunsDuration := 1 * time.Minute
-	testControllerQueue = make(chan ctrl.Request)
-	testRunnerQueue = make(chan ctrl.Request)
+	testControllerQueue = make(chan runner.Request)
+	testRunnerQueue = make(chan runner.Request)
 
 	goMockCtrl = gomock.NewController(RecoveringGinkgoT())
 

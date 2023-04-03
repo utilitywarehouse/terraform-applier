@@ -43,6 +43,7 @@ func Test_ExecuteTemplate(t *testing.T) {
 			},
 			Status: tfaplv1beta1.ModuleStatus{
 				CurrentState:  "Errored",
+				Type:          tfaplv1beta1.PollingRun,
 				RunStartedAt:  getMetaTime(10, 30, 1),
 				RunFinishedAt: getMetaTime(10, 35, 30),
 				StateMessage:  `some very long error message with \n  Terraform has created a lock file .terraform.lock.hcl to record the provider selections it made above. Include this file in your version control repository so that Terraform can guarantee to make the same selections by default when you run "terraform init" in the future`,
@@ -73,6 +74,7 @@ func Test_ExecuteTemplate(t *testing.T) {
 				RemoteURL:     "github.com/org/repo",
 				RunCommitHash: "abcccf2a0f758ba0d8e88a834a2acdba5885577c",
 				RunCommitMsg:  `initial commit (john)`,
+				Type:          tfaplv1beta1.ScheduledRun,
 				LastDriftInfo: tfaplv1beta1.OutputStats{
 					CommitHash: "abcccf2a0f758ba0d8e88a834a2acdba5885577c",
 					Timestamp:  getMetaTime(2, 15, 19),

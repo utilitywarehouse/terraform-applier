@@ -392,6 +392,10 @@ spec:
                 description: StateMessage is a human readable message indicating details
                   about current state.
                 type: string
+              type:
+                description: Type is a short description of the kind of terraform
+                  run that was attempted.
+                type: string
             type: object
         type: object
     served: true
