@@ -45,9 +45,6 @@ update-bootstrap-js:
 	cp /tmp/bootstrap-$(BJS_VERSION)-dist/css/bootstrap.min.css webserver/static/bootstrap/css/bootstrap.min.css
 	cp /tmp/bootstrap-$(BJS_VERSION)-dist/css/bootstrap.min.css.map webserver/static/bootstrap/css/bootstrap.min.css.map
 
-update-jquery-js:
-	curl -o webserver/static/bootstrap/js/jquery.min.js https://code.jquery.com/jquery-3.6.0.min.js
-
 release:
 	@sd "master" "$(VERSION)" ./manifests/base/namespaced/kustomization.yaml
 	@git add -- manifests/base/terraform-applier.yaml
