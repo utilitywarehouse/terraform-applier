@@ -26,11 +26,13 @@ import (
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	"github.com/hashicorp/go-hclog"
 	"github.com/robfig/cron/v3"
 	tfaplv1beta1 "github.com/utilitywarehouse/terraform-applier/api/v1beta1"
 	"github.com/utilitywarehouse/terraform-applier/git"
+	"github.com/utilitywarehouse/terraform-applier/runner"
 	"github.com/utilitywarehouse/terraform-applier/sysutil"
 	corev1 "k8s.io/api/core/v1"
 )
@@ -42,7 +44,7 @@ type ModuleReconciler struct {
 	Recorder               record.EventRecorder
 	Clock                  sysutil.ClockInterface
 	GitUtil                git.UtilInterface
-	Queue                  chan<- ctrl.Request
+	Queue                  chan<- runner.Request
 	Log                    hclog.Logger
 	MinIntervalBetweenRuns time.Duration
 }
@@ -62,7 +64,7 @@ type ModuleReconciler struct {
 //
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.14.1/pkg/reconcile
-func (r *ModuleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *ModuleReconciler) Reconcile(ctx context.Context, req reconcile.Request) (ctrl.Result, error) {
 	log := r.Log.With("module", req.NamespacedName)
 
 	var module tfaplv1beta1.Module
@@ -101,9 +103,8 @@ func (r *ModuleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	}
 
 	if module.Status.RunCommitHash != commitHash {
-		r.Recorder.Eventf(&module, corev1.EventTypeNormal, tfaplv1beta1.ReasonRunTriggered, "new commit is available %s", commitHash)
 		log.Info("new commit is available starting run", "RunCommitHash", module.Status.RunCommitHash, "currentHash", commitHash)
-		r.Queue <- req
+		r.Queue <- runner.Request{NamespacedName: req.NamespacedName, Type: tfaplv1beta1.PollingRun}
 		// no need to add to queue as we will see this object again once status is updated
 		return ctrl.Result{}, nil
 	}
@@ -126,9 +127,8 @@ func (r *ModuleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	}
 
 	if numOfMissedRuns > 0 {
-		r.Recorder.Event(&module, corev1.EventTypeNormal, tfaplv1beta1.ReasonRunTriggered, "scheduled run")
 		log.Info("starting scheduled run", "missed-runs", numOfMissedRuns)
-		r.Queue <- req
+		r.Queue <- runner.Request{NamespacedName: req.NamespacedName, Type: tfaplv1beta1.ScheduledRun}
 
 		// no need to add to queue as we will see this object again once status is updated
 		return ctrl.Result{}, nil

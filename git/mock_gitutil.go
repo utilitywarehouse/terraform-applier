@@ -63,3 +63,18 @@ func (mr *MockUtilInterfaceMockRecorder) IsRepo() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IsRepo", reflect.TypeOf((*MockUtilInterface)(nil).IsRepo))
 }
+
+// RemoteURL mocks base method.
+func (m *MockUtilInterface) RemoteURL() (string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "RemoteURL")
+	ret0, _ := ret[0].(string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// RemoteURL indicates an expected call of RemoteURL.
+func (mr *MockUtilInterfaceMockRecorder) RemoteURL() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RemoteURL", reflect.TypeOf((*MockUtilInterface)(nil).RemoteURL))
+}

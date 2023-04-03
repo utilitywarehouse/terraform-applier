@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/signal"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
@@ -23,6 +24,8 @@ import (
 	"github.com/utilitywarehouse/terraform-applier/metrics"
 	"github.com/utilitywarehouse/terraform-applier/runner"
 	"github.com/utilitywarehouse/terraform-applier/sysutil"
+	"github.com/utilitywarehouse/terraform-applier/webserver"
+	"github.com/utilitywarehouse/terraform-applier/webserver/oidc"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
@@ -43,7 +46,8 @@ import (
 )
 
 var (
-	logger hclog.Logger
+	logger            hclog.Logger
+	oidcAuthenticator *oidc.Authenticator
 
 	scheme = runtime.NewScheme()
 
@@ -70,6 +74,10 @@ var (
 	terminationGracePeriodSeconds = getEnv("TERMINATION_GRACE_PERIOD", "60")
 	minIntervalBetweenRuns        = getEnv("MIN_INTERVAL_BETWEEN_RUNS", "60")
 	listenAddress                 = getEnv("LISTEN_ADDRESS", ":8080")
+	oidcCallbackURL               = os.Getenv("OIDC_CALLBACK_URL")
+	oidcClientID                  = os.Getenv("OIDC_CLIENT_ID")
+	oidcClientSecret              = os.Getenv("OIDC_CLIENT_SECRET")
+	oidcIssuer                    = os.Getenv("OIDC_ISSUER")
 
 	terraformPath    = os.Getenv("TERRAFORM_PATH")
 	terraformVersion = os.Getenv("TERRAFORM_VERSION")
@@ -190,8 +198,8 @@ func main() {
 	var metricsAddr string
 	var enableLeaderElection bool
 	var probeAddr string
-	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
-	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
+	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8081", "The address the metric endpoint binds to.")
+	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8082", "The address the probe endpoint binds to.")
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
@@ -203,7 +211,7 @@ func main() {
 
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
-	wsQueue := make(chan ctrl.Request)
+	wsQueue := make(chan runner.Request)
 	done := make(chan bool, 1)
 
 	clock := &sysutil.Clock{}
@@ -297,7 +305,31 @@ func main() {
 		TerminationGracePeriod: terminationGracePeriodDuration,
 	}
 
+	// try to setup oidc if any of the oidc ENVs set
+	if strings.Join([]string{oidcIssuer, oidcClientID, oidcClientSecret, oidcCallbackURL}, "") != "" {
+		oidcAuthenticator, err = oidc.NewAuthenticator(oidcIssuer, oidcClientID, oidcClientSecret, oidcCallbackURL)
+		if err != nil {
+			setupLog.Error("could not setup oidc authenticator", "error", err)
+			os.Exit(1)
+		}
+		setupLog.Info("OIDC authentication configured", "issuer", oidcIssuer, "clientID", oidcClientID)
+	}
+
+	webserver := &webserver.WebServer{
+		Authenticator: oidcAuthenticator,
+		ListenAddress: listenAddress,
+		ClusterClt:    mgr.GetClient(),
+		RunQueue:      wsQueue,
+		Log:           logger.Named("webserver"),
+	}
+
 	go runner.Start(ctx, done)
+	go func() {
+		err := webserver.Start(ctx)
+		if err != nil {
+			setupLog.Error("unable to start webserver", "err", err)
+		}
+	}()
 
 	go func() {
 		setupLog.Info("starting manager")

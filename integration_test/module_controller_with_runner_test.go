@@ -36,6 +36,7 @@ var _ = Describe("Module controller with Runner", func() {
 			// Trigger Job run as soon as module is created
 			testGitUtil.EXPECT().HeadCommitHashAndLog("hello").
 				Return(commitHash, commitMsg, nil).AnyTimes()
+			testGitUtil.EXPECT().RemoteURL().Return("github.com/org/repo", nil).AnyTimes()
 
 			testMetrics.EXPECT().UpdateModuleRunDuration(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 			testMetrics.EXPECT().UpdateModuleSuccess(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()

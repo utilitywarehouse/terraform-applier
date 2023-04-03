@@ -95,12 +95,20 @@ type ModuleStatus struct {
 	// +optional
 	StateMessage string `json:"stateMessage,omitempty"`
 
+	// Type is a short description of the kind of terraform run that was attempted.
+	// +optional
+	Type string `json:"type"`
+
 	// Information when was the last time the run was started.
 	// +optional
 	RunStartedAt *metav1.Time `json:"runStartedAt,omitempty"`
 	// Information when was the last time the run was finished.
 	// +optional
 	RunFinishedAt *metav1.Time `json:"runFinishedAt,omitempty"`
+
+	// RemoteURL is the URL of the modules git repo
+	// +optional
+	RemoteURL string `json:"remoteURL,omitempty"`
 
 	// RunCommitHash is the hash of git commit of last run.
 	// +optional
@@ -185,6 +193,15 @@ const (
 	ReasonApplied               = "Applied"
 )
 
+const (
+	// ScheduledRun indicates a scheduled, regular terraform run.
+	ScheduledRun = "ScheduledRun"
+	// PollingRun indicated a run triggered by changes in the git repository.
+	PollingRun = "PollingRun"
+	// ForcedRun indicates a forced (triggered on the UI) terraform run.
+	ForcedRun = "ForcedRun"
+)
+
 // Overall state of Module run
 type state string
 
@@ -196,3 +213,11 @@ const (
 	// 'Errored' -> last run finished with Error and its waiting on next run/event
 	StatusErrored state = "Errored"
 )
+
+func (m *Module) IsSuspended() bool {
+	return m.Spec.Suspend != nil && *m.Spec.Suspend
+}
+
+func (m *Module) IsPlanOnly() bool {
+	return m.Spec.PlanOnly != nil && *m.Spec.PlanOnly
+}

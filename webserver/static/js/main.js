@@ -1,36 +1,64 @@
-// On button click, sends empty POST request to API endpoint for forcing a run and shows a relevant alert when a response is received.
-$(document).ready(function() {
-    $('#force-button').bind('click', function(){
-        // Disable the button and close existing alert
-        $('#force-button').prop('disabled', true);
-        $('#force-alert').alert('close')
+function init() {
+  document.querySelectorAll(".force-module-button").forEach(function (button) {
+    button.addEventListener("click", function () {
+      // Disable the buttons and close existing alert
+      setForcedButtonDisabled(true)
 
-        url =  window.location.href + 'api/v1/forceRun';
-        $.ajax({
-            type: 'POST',
-            url: url,
-            data: {},
-            dataType: "json",
-            success:function(data) {
-                showForceAlert(true, data.message)
-                $('#force-button').prop('disabled', false);
-            },
-            error:function() {
-                showForceAlert(false, 'Server error attempting to force a run. See container logs for more info.')
-                $('#force-button').prop('disabled', false);
-            }
-        });
-    });
-});
+      if (document.querySelector("#force-alert")) {
+        document.querySelector("#force-alert").alert("close")
+      }
 
-// Show a relevant alert message, styled based on the "success" of the associated response.
+      forceRun(button.dataset.namespace, button.dataset.name)
+    })
+  })
+}
+
+// Send an XHR request to the server to force a run.
+function forceRun(namespace, module) {
+  console.log(namespace, module)
+  url = window.location.href + "api/v1/forceRun"
+
+  fetch(url, {
+    method: "post",
+    headers: { "Content-Type": "application/json" },
+
+    body: JSON.stringify({
+      namespace: namespace,
+      module: module,
+    }),
+  })
+    .then((response) => response.json())
+    .then((data) => {
+      showForceAlert(true, data.message)
+
+      setForcedButtonDisabled(false)
+    })
+    .catch((err) => {
+      showForceAlert(
+        false,
+        "Error: " + err + "<br/>See container logs for more info."
+      )
+
+      setForcedButtonDisabled(true)
+    })
+}
+
 function showForceAlert(success, message) {
-    alertClass = success ? 'success' : 'warning';
-    $('#force-alert-container').empty();
-    $('#force-alert-container').append(
-        '<div id="force-alert" class="alert alert-' + alertClass + ' alert-dismissible show" role="alert">' +
-            '<button type="button" class="close" data-dismiss="alert" aria-label="Close">' +
-                '<span aria-hidden="true">×</span>' +
-            '</button>' + message +
-        '</div>');
+  type = success ? "success" : "warning"
+  const alertPlaceholder = document.getElementById("force-alert-container")
+  const wrapper = document.createElement("div")
+  wrapper.innerHTML = [
+    `<div class="alert alert-${type} alert-dismissible" role="alert">`,
+    `   <div>${message}</div>`,
+    '   <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>',
+    "</div>",
+  ].join("")
+
+  alertPlaceholder.append(wrapper)
+}
+
+function setForcedButtonDisabled(disabled) {
+  document.querySelectorAll(".force-button").forEach(function (btn) {
+    btn.disabled = disabled
+  })
 }

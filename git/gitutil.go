@@ -11,6 +11,7 @@ import (
 // testing the full process of an apply run.
 type UtilInterface interface {
 	HeadCommitHashAndLog(path string) (string, string, error)
+	RemoteURL() (string, error)
 	IsRepo() (bool, error)
 }
 
@@ -30,9 +31,25 @@ func (g *Util) HeadCommitHashAndLog(path string) (string, string, error) {
 	}
 
 	// get commit message
-	cmd = []string{"log", "-1", "--name-status", "--", path}
+	cmd = []string{"log", "--pretty=format:'%s (%an)'", "-n", "1", "--", path}
 	log, err := runGitCmd(g.Path, cmd...)
-	return strings.Trim(hash, "'\n"), log, err
+	return strings.Trim(hash, "'\n"), strings.Trim(log, "'\n"), err
+}
+
+func (g *Util) RemoteURL() (string, error) {
+	cmd := []string{"remote", "get-url", "origin"}
+	rURL, err := runGitCmd(g.Path, cmd...)
+	if err != nil {
+		return "", err
+	}
+
+	rURL = strings.TrimSpace(rURL)
+	rURL = strings.TrimPrefix(rURL, "https://")
+	rURL = strings.TrimPrefix(rURL, "git@")
+	rURL = strings.TrimSuffix(rURL, ".git")
+	rURL = strings.ReplaceAll(rURL, ":", "/")
+
+	return rURL, nil
 }
 
 func (g *Util) IsRepo() (bool, error) {
