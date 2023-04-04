@@ -1,5 +1,5 @@
 # Build the manager binary
-FROM golang:1.20 as builder
+FROM golang:1.20-alpine as builder
 ARG TARGETOS
 ARG TARGETARCH
 
@@ -29,6 +29,7 @@ RUN apk --no-cache add ca-certificates git
 
 WORKDIR /
 COPY --from=builder /workspace/manager .
-USER 65532:65532
+# match git-sync user
+USER 65533
 
 ENTRYPOINT ["/manager"]
