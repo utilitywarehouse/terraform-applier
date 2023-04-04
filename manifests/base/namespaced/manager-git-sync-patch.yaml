@@ -14,8 +14,6 @@ spec:
               value: /src/modules
             - name: TERMINATION_GRACE_PERIOD
               value: "240"
-          securityContext:
-            runAsUser: 65533 # git-sync user
           volumeMounts:
             - name: git-repo
               mountPath: /src
