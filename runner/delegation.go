@@ -18,26 +18,22 @@ import (
 
 // this interface is for mock testing
 type DelegateInterface interface {
-	SetupDelegation(ctx context.Context, kubeClt kubernetes.Interface, module *tfaplv1beta1.Module) (kubernetes.Interface, error)
+	DelegateToken(ctx context.Context, kubeClt kubernetes.Interface, module *tfaplv1beta1.Module) (string, error)
+	SetupDelegation(ctx context.Context, jwt string) (kubernetes.Interface, error)
 }
 
 type Delegate struct{}
 
-func (d *Delegate) SetupDelegation(ctx context.Context, kubeClt kubernetes.Interface, module *tfaplv1beta1.Module) (kubernetes.Interface, error) {
-	delegateToken, err := delegateToken(ctx, kubeClt, module)
-	if err != nil {
-		return nil, fmt.Errorf("failed fetching delegate token err:%s", err)
-	}
-
+func (d *Delegate) SetupDelegation(ctx context.Context, jwt string) (kubernetes.Interface, error) {
 	// creates the in-cluster config
-	config, err := inClusterDelegatedConfig(delegateToken)
+	config, err := inClusterDelegatedConfig(jwt)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create in-cluster config err:%s", err)
 	}
 	return kubernetes.NewForConfig(config)
 }
 
-func delegateToken(ctx context.Context, kubeClt kubernetes.Interface, module *tfaplv1beta1.Module) (string, error) {
+func (d *Delegate) DelegateToken(ctx context.Context, kubeClt kubernetes.Interface, module *tfaplv1beta1.Module) (string, error) {
 	secret, err := kubeClt.CoreV1().Secrets(module.Namespace).Get(ctx, module.Spec.DelegateServiceAccountSecretRef, metav1.GetOptions{})
 	if err != nil {
 		return "", fmt.Errorf(`unable to get delegate token secret "%s/%s" err:%w`, module.Namespace, module.Spec.DelegateServiceAccountSecretRef, err)
@@ -108,4 +104,16 @@ func fetchEnvVars(ctx context.Context, client kubernetes.Interface, module *tfap
 	}
 
 	return kvPairs, nil
+}
+
+func (r *Runner) generateVaultAWSCreds(ctx context.Context, module *tfaplv1beta1.Module, jwt string, envs map[string]string) error {
+
+	creds, err := r.AWSSecretsEngineConfig.GenerateCreds(jwt, module.Spec.VaultRequests.AWS)
+	if err != nil {
+		return err
+	}
+	envs["AWS_ACCESS_KEY_ID"] = creds.AccessKeyID
+	envs["AWS_SECRET_ACCESS_KEY"] = creds.SecretAccessKey
+	envs["AWS_SESSION_TOKEN"] = creds.Token
+	return nil
 }

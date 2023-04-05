@@ -53,6 +53,11 @@ type ModuleSpec struct {
 	// +optional
 	Var []corev1.EnvVar `json:"var,omitempty"`
 
+	// VaultRequests specifies credential generate requests from the vault
+	// configured on the controller
+	// +optional
+	VaultRequests *VaultRequests `json:"vaultRequests,omitempty"`
+
 	// PollInterval specifies the interval at which the Git repository must be checked.
 	// +optional
 	// +kubebuilder:default=60
@@ -61,8 +66,8 @@ type ModuleSpec struct {
 
 	// DelegateServiceAccountSecretRef references a Secret of type
 	// kubernetes.io/service-account-token in the same namespace as the Module
-	// that will be used to fetch secrets from namespace
-	// runs.
+	// that will be used to fetch secrets, configmaps from modules' namespace.
+	// if vaultRequests are specified, the service account's jwt will be used for vault authentication.
 	// +optional
 	// +kubebuilder:default=terraform-applier-delegate-token
 	// +kubebuilder:validation:MinLength=1
@@ -172,6 +177,34 @@ type OutputStats struct {
 	// Output is the stdout of terraform command. it may contain error stream
 	// +optional
 	Output string `json:"output,omitempty"`
+}
+
+type VaultRequests struct {
+	// aws specifies vault credential generation request for AWS secrets engine
+	// If specified, controller will request AWS creds from vault and set
+	// AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY and AWS_SESSION_TOKEN envs during
+	// terraform run.
+	// 'VAULT_AWS_ENG_PATH' env set on controller will be used as credential path
+	// +optional
+	AWS *VaultAWSRequest `json:"aws,omitempty"`
+}
+
+type VaultAWSRequest struct {
+	// VaultRole Specifies the name of the vault role to generate credentials against.
+	// +required
+	VaultRole string `json:"vaultRole,omitempty"`
+
+	// CredentialType specifies the type of credential to be used when retrieving credentials from the role.
+	// Must be one of iam_user, assumed_role, or federation_token.
+	// +kubebuilder:validation:Enum=iam_user;assumed_role;federation_token
+	// +kubebuilder:default=assumed_role
+	// +optional
+	CredentialType string `json:"credentialType,omitempty"`
+
+	// The ARN of the role to assume if credential_type on the Vault role is assumed_role.
+	// Optional if the Vault role only allows a single AWS role ARN.
+	// +optional
+	RoleARN string `json:"roleARN,omitempty"`
 }
 
 // The potential reasons for events

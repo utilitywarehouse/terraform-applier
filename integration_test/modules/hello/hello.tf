@@ -62,6 +62,17 @@ resource "null_resource" "echo_env3" {
   }
 
   depends_on = [
+    null_resource.echo_env2
+  ]
+}
+
+
+resource "null_resource" "echo_AWS_KEY" {
+  provisioner "local-exec" {
+    command = "echo $AWS_ACCESS_KEY_ID"
+  }
+
+  depends_on = [
     null_resource.echo_env3
   ]
 }

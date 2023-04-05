@@ -51,6 +51,7 @@ import (
 	"github.com/utilitywarehouse/terraform-applier/metrics"
 	"github.com/utilitywarehouse/terraform-applier/runner"
 	"github.com/utilitywarehouse/terraform-applier/sysutil"
+	"github.com/utilitywarehouse/terraform-applier/vault"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -75,13 +76,14 @@ var (
 	testControllerQueue chan runner.Request
 
 	// testRunnerQueue only used for send job to runner of runner testing
-	testRunnerQueue chan runner.Request
-	testGitUtil     *git.MockUtilInterface
-	testMetrics     *metrics.MockPrometheusInterface
-	testDelegate    *runner.MockDelegateInterface
-	testRunner      runner.Runner
-	testReconciler  *controllers.ModuleReconciler
-	testRunnerDone  chan bool
+	testRunnerQueue  chan runner.Request
+	testGitUtil      *git.MockUtilInterface
+	testMetrics      *metrics.MockPrometheusInterface
+	testDelegate     *runner.MockDelegateInterface
+	testRunner       runner.Runner
+	testReconciler   *controllers.ModuleReconciler
+	testVaultAWSConf *vault.MockAWSSecretsEngineInterface
+	testRunnerDone   chan bool
 )
 
 func TestAPIs(t *testing.T) {
@@ -151,6 +153,8 @@ var _ = BeforeSuite(func() {
 	testMetrics = metrics.NewMockPrometheusInterface(goMockCtrl)
 	testDelegate = runner.NewMockDelegateInterface(goMockCtrl)
 
+	testVaultAWSConf = vault.NewMockAWSSecretsEngineInterface(goMockCtrl)
+
 	testReconciler = &controllers.ModuleReconciler{
 		Client:                 k8sManager.GetClient(),
 		Scheme:                 k8sManager.GetScheme(),
@@ -201,6 +205,7 @@ var _ = BeforeSuite(func() {
 		Log:                    testLogger.Named("runner"),
 		Metrics:                testMetrics,
 		TerraformExecPath:      execPath,
+		AWSSecretsEngineConfig: testVaultAWSConf,
 		TerminationGracePeriod: 10 * time.Second,
 	}
 
