@@ -328,6 +328,7 @@ func main() {
 		Authenticator: oidcAuthenticator,
 		ListenAddress: listenAddress,
 		ClusterClt:    mgr.GetClient(),
+		KubeClient:    kubeClient,
 		RunQueue:      wsQueue,
 		Log:           logger.Named("webserver"),
 	}
