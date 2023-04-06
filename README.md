@@ -117,7 +117,7 @@ spec:
       // Must be one of iam_user, assumed_role, or federation_token.
       credentialType: assumed_role
       // The ARN of the role to assume if credential_type on the Vault role is assumed_role.
-	    // Optional if the Vault role only allows a single AWS role ARN.
+      // Optional if the Vault role only allows a single AWS role ARN.
       roleARN: arn:aws:iam::00000000:role/sys-tf-applier-example
 ```
 ## Monitoring
