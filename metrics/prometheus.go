@@ -82,7 +82,7 @@ func (p *Prometheus) Init() {
 	)
 	p.terraformExitCodeCount = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Namespace: metricsNamespace,
-		Name:      "terraform_exit_code_count",
+		Name:      "module_terraform_exit_code_count",
 		Help:      "Count of terraform exit codes",
 	},
 		[]string{
