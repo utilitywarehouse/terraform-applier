@@ -78,7 +78,8 @@ Controller will force shutdown on current stage run if it takes more time then `
   to be applied. The immediate subdirectories of this directory should contain
   the root modules which will be referenced by users in `module`.
 
-- `LOG_LEVEL` - (default: `INFO`) `TRACE|DEBUG|INFO|WARN|ERROR`, case insensitive
+- `LOG_LEVEL` - (default: `INFO`) `TRACE|DEBUG|INFO|WARN|ERROR`, case insensitive.
+- `LISTEN_ADDRESS` - (default: `:8080`) The listening address of web server.
 - `MIN_INTERVAL_BETWEEN_RUNS` - (default: `60`) The minimum interval in seconds, user can set
   between 2 consecutive runs. This value defines the frequency of runs.
 - `TERMINATION_GRACE_PERIOD` - (default: `60`) Termination grace period is the ime given to
@@ -91,6 +92,34 @@ Controller will force shutdown on current stage run if it takes more time then `
   don't specify an explicit version, it will choose the latest available
   one. Ignored if `TERRAFORM_PATH` is set.
 
+- `VAULT_ADDR` - (default: `""`) The Address of the Vault server expressed as a URL and port
+- `VAULT_CACERT` - (default: `""`) The path to a PEM-encoded CA certificate file.
+- `VAULT_CAPATH` - (default: `""`) The Path to a directory of PEM-encoded CA certificate files on the local disk.
+- `VAULT_AWS_ENG_PATH` - (default: `/aws`) The path where AWS secrets engine is enabled.
+- `VAULT_KUBE_AUTH_PATH` - (default: `/auth/kubernetes`) The path where kubernetes auth method is mounted. 
+
+- `OIDC_CALLBACK_URL` - (default: `""`) The callback url used for OIDC auth flow, this should be the terraform-applier url.
+- `OIDC_CLIENT_ID` - (default: `""`) The client ID of the OIDC app.
+- `OIDC_CLIENT_SECRET` - (default: `""`) The client secret of the OIDC app.
+- `OIDC_ISSUER` - (default: `""`) The url of the IDP where OIDC app is created. 
+
+**If all 4 `OIDC` envs are not set then web server will skip authentication and all `force run` requests will be allowed.**
+
+## Vault integration
+terraform-applier supports fetching (generating) secrets from the vault. Module's delegated service account's jwt (secret:terraform-applier-delegate-token) will be used for vault login for given `vaultRole`. at the moment only aws secrets engine is supported.
+
+```yaml
+spec:
+  vaultRequests:
+    aws:
+      // VaultRole Specifies the name of the vault role to generate credentials against.
+      vaultRole: dev_aws_some-vault-role
+      // Must be one of iam_user, assumed_role, or federation_token.
+      credentialType: assumed_role
+      // The ARN of the role to assume if credential_type on the Vault role is assumed_role.
+	    // Optional if the Vault role only allows a single AWS role ARN.
+      roleARN: arn:aws:iam::00000000:role/sys-tf-applier-example
+```
 ## Monitoring
 
 ### Metrics
@@ -105,7 +134,7 @@ In addition to the [controller-runtime](https://book.kubebuilder.io/reference/me
   each module, tagged with the result of the run (`success=true|false`)
 - `terraform_applier_module_apply_success` - (tags: `module`,`namespace`) A `Gauge` which
   tracks whether the last terraform run for a module was successful.
-- `terraform_applier_terraform_exit_code_count` - (tags: `module`,`namespace`, `command`, `exit_code`) A `Counter` for each exit code returned by executions of
+- `terraform_applier_module_terraform_exit_code_count` - (tags: `module`,`namespace`, `command`, `exit_code`) A `Counter` for each exit code returned by executions of
   `terraform`, labelled with the command issued (`init`, `plan`,`apply`) and the exit code. It's worth noting that `plan` will
   return a code of `2` if there are changes to be made, which is not an error or a failure, so you may wish to account for this in your alerting.
 - `terraform_applier_running_module_count` - (tags: `namespace`) A `Gauge` which tracks number of modules in running state at a given time.
