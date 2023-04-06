@@ -73,7 +73,9 @@ spec:
                 default: terraform-applier-delegate-token
                 description: DelegateServiceAccountSecretRef references a Secret of
                   type kubernetes.io/service-account-token in the same namespace as
-                  the Module that will be used to fetch secrets from namespace runs.
+                  the Module that will be used to fetch secrets, configmaps from modules'
+                  namespace. if vaultRequests are specified, the service account's
+                  jwt will be used for vault authentication.
                 minLength: 1
                 type: string
               env:
@@ -322,6 +324,38 @@ spec:
                   - name
                   type: object
                 type: array
+              vaultRequests:
+                description: VaultRequests specifies credential generate requests
+                  from the vault configured on the controller
+                properties:
+                  aws:
+                    description: aws specifies vault credential generation request
+                      for AWS secrets engine If specified, controller will request
+                      AWS creds from vault and set AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY
+                      and AWS_SESSION_TOKEN envs during terraform run. 'VAULT_AWS_ENG_PATH'
+                      env set on controller will be used as credential path
+                    properties:
+                      credentialType:
+                        default: assumed_role
+                        description: CredentialType specifies the type of credential
+                          to be used when retrieving credentials from the role. Must
+                          be one of iam_user, assumed_role, or federation_token.
+                        enum:
+                        - iam_user
+                        - assumed_role
+                        - federation_token
+                        type: string
+                      roleARN:
+                        description: The ARN of the role to assume if credential_type
+                          on the Vault role is assumed_role. Optional if the Vault
+                          role only allows a single AWS role ARN.
+                        type: string
+                      vaultRole:
+                        description: VaultRole Specifies the name of the vault role
+                          to generate credentials against.
+                        type: string
+                    type: object
+                type: object
             required:
             - path
             type: object

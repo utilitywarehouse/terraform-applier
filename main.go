@@ -24,6 +24,7 @@ import (
 	"github.com/utilitywarehouse/terraform-applier/metrics"
 	"github.com/utilitywarehouse/terraform-applier/runner"
 	"github.com/utilitywarehouse/terraform-applier/sysutil"
+	"github.com/utilitywarehouse/terraform-applier/vault"
 	"github.com/utilitywarehouse/terraform-applier/webserver"
 	"github.com/utilitywarehouse/terraform-applier/webserver/oidc"
 
@@ -74,10 +75,14 @@ var (
 	terminationGracePeriodSeconds = getEnv("TERMINATION_GRACE_PERIOD", "60")
 	minIntervalBetweenRuns        = getEnv("MIN_INTERVAL_BETWEEN_RUNS", "60")
 	listenAddress                 = getEnv("LISTEN_ADDRESS", ":8080")
-	oidcCallbackURL               = os.Getenv("OIDC_CALLBACK_URL")
-	oidcClientID                  = os.Getenv("OIDC_CLIENT_ID")
-	oidcClientSecret              = os.Getenv("OIDC_CLIENT_SECRET")
-	oidcIssuer                    = os.Getenv("OIDC_ISSUER")
+
+	vaultAWSEngPath   = getEnv("VAULT_AWS_ENG_PATH", "/aws")
+	vaultKubeAuthPath = getEnv("VAULT_KUBE_AUTH_PATH", "/auth/kubernetes")
+
+	oidcCallbackURL  = os.Getenv("OIDC_CALLBACK_URL")
+	oidcClientID     = os.Getenv("OIDC_CLIENT_ID")
+	oidcClientSecret = os.Getenv("OIDC_CLIENT_SECRET")
+	oidcIssuer       = os.Getenv("OIDC_ISSUER")
 
 	terraformPath    = os.Getenv("TERRAFORM_PATH")
 	terraformVersion = os.Getenv("TERRAFORM_VERSION")
@@ -303,6 +308,10 @@ func main() {
 		Metrics:                metrics,
 		TerraformExecPath:      execPath,
 		TerminationGracePeriod: terminationGracePeriodDuration,
+		AWSSecretsEngineConfig: &vault.AWSSecretsEngineConfig{
+			SecretsEngPath: vaultAWSEngPath,
+			AuthPath:       vaultKubeAuthPath,
+		},
 	}
 
 	// try to setup oidc if any of the oidc ENVs set
@@ -319,6 +328,7 @@ func main() {
 		Authenticator: oidcAuthenticator,
 		ListenAddress: listenAddress,
 		ClusterClt:    mgr.GetClient(),
+		KubeClient:    kubeClient,
 		RunQueue:      wsQueue,
 		Log:           logger.Named("webserver"),
 	}

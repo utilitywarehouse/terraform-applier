@@ -21,6 +21,12 @@ rules:
   verbs:
   - get
 - apiGroups:
+  - authorization.k8s.io
+  resources:
+  - subjectaccessreviews
+  verbs:
+  - create
+- apiGroups:
   - terraform-applier.uw.systems
   resources:
   - modules

@@ -11,6 +11,7 @@ import (
 	"github.com/utilitywarehouse/terraform-applier/git"
 	"github.com/utilitywarehouse/terraform-applier/metrics"
 	"github.com/utilitywarehouse/terraform-applier/sysutil"
+	"github.com/utilitywarehouse/terraform-applier/vault"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -42,6 +43,7 @@ type Runner struct {
 	Metrics                metrics.PrometheusInterface
 	TerraformExecPath      string
 	TerminationGracePeriod time.Duration
+	AWSSecretsEngineConfig vault.AWSSecretsEngineInterface
 }
 
 // Start runs a continuous loop that starts a new run when a request comes into the queue channel.
@@ -151,7 +153,14 @@ func (r *Runner) process(req Request, cancelChan <-chan struct{}) bool {
 	}
 
 	// Setup Delegation and get vars and envs
-	delegatedClient, err := r.Delegate.SetupDelegation(ctx, r.KubeClt, module)
+	jwt, err := r.Delegate.DelegateToken(ctx, r.KubeClt, module)
+	if err != nil {
+		log.Error("unable to get service account token", "err", err)
+		r.setFailedStatus(req, module, tfaplv1beta1.ReasonDelegationFailed, err.Error(), r.Clock.Now())
+		return false
+	}
+
+	delegatedClient, err := r.Delegate.SetupDelegation(ctx, jwt)
 	if err != nil {
 		log.Error("unable to create kube client", "err", err)
 		r.setFailedStatus(req, module, tfaplv1beta1.ReasonDelegationFailed, err.Error(), r.Clock.Now())
@@ -170,6 +179,17 @@ func (r *Runner) process(req Request, cancelChan <-chan struct{}) bool {
 		log.Error("unable to get vars", "err", err)
 		r.setFailedStatus(req, module, tfaplv1beta1.ReasonRunPreparationFailed, err.Error(), r.Clock.Now())
 		return false
+	}
+
+	if module.Spec.VaultRequests != nil {
+		if module.Spec.VaultRequests.AWS != nil {
+			err = r.generateVaultAWSCreds(ctx, module, jwt, envs)
+			if err != nil {
+				log.Error("unable to generate vault aws secrets", "err", err)
+				r.setFailedStatus(req, module, tfaplv1beta1.ReasonRunPreparationFailed, err.Error(), r.Clock.Now())
+				return false
+			}
+		}
 	}
 
 	te, err := r.NewTFRunner(ctx, module, envs, vars)

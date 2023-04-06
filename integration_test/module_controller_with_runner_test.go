@@ -8,6 +8,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	tfaplv1beta1 "github.com/utilitywarehouse/terraform-applier/api/v1beta1"
+	"github.com/utilitywarehouse/terraform-applier/vault"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -74,7 +75,8 @@ var _ = Describe("Module controller with Runner", func() {
 
 			// Setup FakeDelegation
 			fakeClient := fake.NewSimpleClientset()
-			testDelegate.EXPECT().SetupDelegation(gomock.Any(), gomock.Any(), gomock.Any()).Return(fakeClient, nil)
+			testDelegate.EXPECT().DelegateToken(gomock.Any(), gomock.Any(), gomock.Any()).Return("token.X1", nil)
+			testDelegate.EXPECT().SetupDelegation(gomock.Any(), "token.X1").Return(fakeClient, nil)
 
 			By("By making sure job was sent to jobQueue when commit hash is changed")
 			Eventually(func() string {
@@ -149,7 +151,8 @@ var _ = Describe("Module controller with Runner", func() {
 
 			// Setup FakeDelegation
 			fakeClient := fake.NewSimpleClientset()
-			testDelegate.EXPECT().SetupDelegation(gomock.Any(), gomock.Any(), gomock.Any()).Return(fakeClient, nil)
+			testDelegate.EXPECT().DelegateToken(gomock.Any(), gomock.Any(), gomock.Any()).Return("token.X2", nil)
+			testDelegate.EXPECT().SetupDelegation(gomock.Any(), "token.X2").Return(fakeClient, nil)
 
 			By("By making sure job was sent to jobQueue when commit hash is changed")
 			Eventually(func() string {
@@ -265,7 +268,8 @@ var _ = Describe("Module controller with Runner", func() {
 					},
 				},
 			)
-			testDelegate.EXPECT().SetupDelegation(gomock.Any(), gomock.Any(), gomock.Any()).Return(fakeClient, nil)
+			testDelegate.EXPECT().DelegateToken(gomock.Any(), gomock.Any(), gomock.Any()).Return("token.X3", nil)
+			testDelegate.EXPECT().SetupDelegation(gomock.Any(), "token.X3").Return(fakeClient, nil)
 
 			By("By making sure job was sent to jobQueue when commit hash is changed")
 			Eventually(func() string {
@@ -314,6 +318,78 @@ var _ = Describe("Module controller with Runner", func() {
 			Expect(fetchedModule.Status.LastApplyInfo.Output).Should(ContainSubstring("VAR-VALUE1"))
 			Expect(fetchedModule.Status.LastApplyInfo.Output).Should(ContainSubstring("VAR-VALUE2"))
 			Expect(fetchedModule.Status.LastApplyInfo.Output).Should(ContainSubstring("VAR-VALUE3"))
+		})
+
+		It("Should send module to job queue on commit change and runner should generate aws vault creds", func() {
+			const (
+				moduleName = "hello-with-aws-creds"
+				path       = "hello"
+			)
+
+			By("By creating a new Module")
+			ctx := context.Background()
+			vaultReq := tfaplv1beta1.VaultRequests{
+				AWS: &tfaplv1beta1.VaultAWSRequest{
+					VaultRole: "aws-vault-role",
+				},
+			}
+			module := &tfaplv1beta1.Module{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: "terraform-applier.uw.systems/v1beta1",
+					Kind:       "Module",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      moduleName,
+					Namespace: moduleNamespace,
+				},
+				Spec: tfaplv1beta1.ModuleSpec{
+					Schedule:      "50 * * * *",
+					Path:          path,
+					VaultRequests: &vaultReq,
+				},
+			}
+			Expect(k8sClient.Create(ctx, module)).Should(Succeed())
+
+			moduleLookupKey := types.NamespacedName{Name: moduleName, Namespace: moduleNamespace}
+			fetchedModule := &tfaplv1beta1.Module{}
+
+			// Setup FakeDelegation
+			fakeClient := fake.NewSimpleClientset()
+			testDelegate.EXPECT().DelegateToken(gomock.Any(), gomock.Any(), gomock.Any()).Return("token.X4", nil)
+			testDelegate.EXPECT().SetupDelegation(gomock.Any(), "token.X4").Return(fakeClient, nil)
+
+			testVaultAWSConf.EXPECT().GenerateCreds("token.X4", gomock.Any()).
+				Return(&vault.AWSCredentials{AccessKeyID: "AWS_KEY_ABCD1234", SecretAccessKey: "secret", Token: "token"}, nil)
+
+			By("By making sure job was sent to jobQueue when commit hash is changed")
+			Eventually(func() string {
+				err := k8sClient.Get(ctx, moduleLookupKey, fetchedModule)
+				if err != nil {
+					return ""
+				}
+				return fetchedModule.Status.CurrentState
+			}, time.Second*30, interval).Should(Not(Equal("")))
+
+			Expect(fetchedModule.Status.CurrentState).Should(Equal("Running"))
+
+			// advance time for testing
+			fakeClock.T = time.Date(2022, 02, 01, 01, 01, 00, 0000, time.UTC)
+
+			By("By making sure job run finished with expected AWS ENVs")
+			Eventually(func() string {
+				err := k8sClient.Get(ctx, moduleLookupKey, fetchedModule)
+				if err != nil {
+					return ""
+				}
+				return fetchedModule.Status.CurrentState
+			}, time.Second*30, interval).Should(Not(Equal("Running")))
+
+			Expect(fetchedModule.Status.CurrentState).Should(Equal("Ready"))
+			Expect(fetchedModule.Status.RunFinishedAt.UTC()).Should(Equal(fakeClock.T.UTC()))
+			Expect(fetchedModule.Status.StateMessage).Should(ContainSubstring("Apply complete"))
+
+			// make sure all values are there in output
+			Expect(fetchedModule.Status.LastApplyInfo.Output).Should(ContainSubstring("AWS_KEY_ABCD1234"))
 		})
 	})
 
