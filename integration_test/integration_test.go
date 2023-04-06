@@ -1,6 +1,8 @@
 package integration_test
 
 import (
+	"fmt"
+
 	. "github.com/onsi/ginkgo/v2"
 )
 
@@ -44,11 +46,13 @@ func (t recoveringGinkgoT) Failed() bool {
 
 func (t recoveringGinkgoT) Fatal(args ...interface{}) {
 	defer GinkgoRecover()
+	fmt.Println(args...)
 	t.GinkgoT.Fatal(args...)
 }
 
 func (t recoveringGinkgoT) Fatalf(format string, args ...interface{}) {
 	defer GinkgoRecover()
+	fmt.Printf(format+"\n", args...)
 	t.GinkgoT.Fatalf(format, args...)
 }
 
