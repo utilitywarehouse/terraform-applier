@@ -52,6 +52,10 @@ apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   name: terraform-applier
+  annotations:
+    "app.uw.systems/description": "Heavily adapted from kube-applier, terraform-applier enables continuous deployment of Terraform code by applying modules from a Git repository or local directory."
+    "app.uw.systems/tier": "tier_3"
+    "app.uw.systems/repos.terraform-applier": "https://github.com/utilitywarehouse/terraform-applier"
 spec:
   replicas: 1
   selector:
