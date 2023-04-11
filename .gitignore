@@ -2,5 +2,5 @@ terraform-applier
 
 # Binaries for programs and plugins
 bin
-
-
+# test state files
+*.tfstate

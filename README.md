@@ -26,6 +26,16 @@ spec:
   pollInterval: 60
   runTimeout: 900
   delegateServiceAccountSecretRef: terraform-applier-delegate-token
+  backend:
+    - name: bucket
+      value: dev-terraform-state
+    - name: region
+      value: eu-west-1
+    - name: key
+      valueFrom:
+        configMapKeyRef:
+          name: hello-module-config
+          key: bucket_key
   env:
     - name: AWS_REGION
       value: eu-west-1
@@ -60,6 +70,12 @@ namespace as the Module itself and should typically be given only `GET` access t
 The `envs` referenced in module will be set before the terraform run. this should not be used for any well known Terraform environment variables that are already covered in options. [more info](https://pkg.go.dev/github.com/hashicorp/terraform-exec@v0.18.1/tfexec#Terraform)
 
 All referenced `vars` will be json encoded as key-value pair and written to temp file `*.auto.tfvars.json` in module's root folder. Terraform will load these vars during `plan` and `apply`.
+
+#### Terraform backend configuration
+
+use `backend` to configure backend of the module. The key/value pair referenced in the module's `backend` will be set when initialising Terraform via `-backend-config="KEY=VALUE"` flag.
+Please note `backend` doesn't setup new backend it only configures existing backend, please see [Partial Configuration](https://developer.hashicorp.com/terraform/language/settings/backends/configuration#partial-configuration) for more info.
+
 
 #### Graceful shutdown
 

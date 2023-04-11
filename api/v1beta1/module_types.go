@@ -45,6 +45,11 @@ type ModuleSpec struct {
 	// +optional
 	PlanOnly *bool `json:"planOnly,omitempty"`
 
+	// List of backend config attributes passed to the Terraform init
+	// for terraform backend configuration
+	// +optional
+	Backend []corev1.EnvVar `json:"backend,omitempty"`
+
 	// List of environment variables passed to the Terraform execution.
 	// +optional
 	Env []corev1.EnvVar `json:"env,omitempty"`

@@ -75,6 +75,8 @@ var (
 	// testControllerQueue only used for controller behaviour testing
 	testControllerQueue chan runner.Request
 
+	testStateFilePath string
+
 	// testRunnerQueue only used for send job to runner of runner testing
 	testRunnerQueue  chan runner.Request
 	testGitUtil      *git.MockUtilInterface
@@ -209,6 +211,10 @@ var _ = BeforeSuite(func() {
 		TerminationGracePeriod: 10 * time.Second,
 	}
 
+	pwd, err := os.Getwd()
+	Expect(err).NotTo(HaveOccurred())
+	testStateFilePath = filepath.Join(pwd, "modules", "hello", "terraform.tfstate")
+
 	go func() {
 		defer GinkgoRecover()
 		testRunner.Start(ctx, testRunnerDone)
@@ -221,6 +227,8 @@ var _ = AfterSuite(func() {
 	By("tearing down the test environment")
 	err := testEnv.Stop()
 	Expect(err).NotTo(HaveOccurred())
+
+	os.Remove(testStateFilePath)
 })
 
 func setupTFBin() (string, error) {

@@ -19,7 +19,7 @@ import (
 //go:generate go run github.com/golang/mock/mockgen -package runner -destination tfexec_mock.go github.com/utilitywarehouse/terraform-applier/runner TFExecuter
 
 type TFExecuter interface {
-	init(ctx context.Context) (string, error)
+	init(ctx context.Context, backendConf map[string]string) (string, error)
 	plan(ctx context.Context) (bool, string, error)
 	apply(ctx context.Context) (string, error)
 	cleanUp()
@@ -87,12 +87,21 @@ func (te *tfRunner) cleanUp() {
 	os.RemoveAll(te.workingDir)
 }
 
-func (te *tfRunner) init(ctx context.Context) (string, error) {
+func (te *tfRunner) init(ctx context.Context, backendConf map[string]string) (string, error) {
 	var out bytes.Buffer
 	te.tf.SetStdout(&out)
 	te.tf.SetStderr(&out)
 
-	if err := te.tf.Init(ctx, tfexec.Upgrade(true)); err != nil {
+	opts := []tfexec.InitOption{
+		tfexec.Upgrade(true),
+	}
+
+	for k, v := range backendConf {
+		attrStr := fmt.Sprintf("%s=%s", k, v)
+		opts = append(opts, tfexec.BackendConfig(attrStr))
+	}
+
+	if err := te.tf.Init(ctx, opts...); err != nil {
 		if uerr := errors.Unwrap(err); uerr != nil {
 			if e, ok := uerr.(*exec.ExitError); ok {
 				te.metrics.UpdateTerraformExitCodeCount(te.moduleName, te.moduleNamespace, "init", e.ExitCode())
