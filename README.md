@@ -29,10 +29,13 @@ spec:
   backend:
     - name: bucket
       value: dev-terraform-state
-    - name: key
-      value: "hello.tfstate"
     - name: region
       value: eu-west-1
+    - name: key
+      valueFrom:
+        configMapKeyRef:
+          name: hello-module-config
+          key: bucket_key
   env:
     - name: AWS_REGION
       value: eu-west-1
