@@ -2,6 +2,7 @@ package integration_test
 
 import (
 	"context"
+	"os"
 	"time"
 
 	"github.com/golang/mock/gomock"
@@ -44,6 +45,9 @@ var _ = Describe("Module controller with Runner", func() {
 			testMetrics.EXPECT().UpdateTerraformExitCodeCount(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 			testMetrics.EXPECT().IncRunningModuleCount(gomock.Any()).AnyTimes()
 			testMetrics.EXPECT().DecRunningModuleCount(gomock.Any()).AnyTimes()
+
+			// clear state file if exits
+			os.Remove(testStateFilePath)
 		})
 
 		It("Should send module to job queue on commit change and runner should do plan & apply", func() {
@@ -196,7 +200,7 @@ var _ = Describe("Module controller with Runner", func() {
 			Expect(fetchedModule.Status.LastApplyInfo.Timestamp).Should(BeNil())
 		})
 
-		It("Should send module to job queue on commit change and runner should read configmaps and secrets before apply", func() {
+		It("Should send module to job queue on commit change and runner should read configmaps and secrets before apply and setup local backend", func() {
 			const (
 				moduleName = "hello-with-var-env"
 				path       = "hello"
@@ -216,6 +220,9 @@ var _ = Describe("Module controller with Runner", func() {
 				Spec: tfaplv1beta1.ModuleSpec{
 					Schedule: "50 * * * *",
 					Path:     path,
+					Backend: []corev1.EnvVar{
+						{Name: "path", Value: testStateFilePath},
+					},
 					Env: []corev1.EnvVar{
 						{Name: "TF_ENV_1", Value: "ENV-VALUE1"},
 						{Name: "TF_ENV_2", ValueFrom: &corev1.EnvVarSource{
@@ -318,6 +325,9 @@ var _ = Describe("Module controller with Runner", func() {
 			Expect(fetchedModule.Status.LastApplyInfo.Output).Should(ContainSubstring("VAR-VALUE1"))
 			Expect(fetchedModule.Status.LastApplyInfo.Output).Should(ContainSubstring("VAR-VALUE2"))
 			Expect(fetchedModule.Status.LastApplyInfo.Output).Should(ContainSubstring("VAR-VALUE3"))
+
+			// make sure state file is created by local backend
+			Expect(testStateFilePath).Should(BeAnExistingFile())
 		})
 
 		It("Should send module to job queue on commit change and runner should generate aws vault creds", func() {

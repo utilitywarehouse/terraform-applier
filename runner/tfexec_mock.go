@@ -62,18 +62,18 @@ func (mr *MockTFExecuterMockRecorder) cleanUp() *gomock.Call {
 }
 
 // init mocks base method.
-func (m *MockTFExecuter) init(arg0 context.Context) (string, error) {
+func (m *MockTFExecuter) init(arg0 context.Context, arg1 map[string]string) (string, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "init", arg0)
+	ret := m.ctrl.Call(m, "init", arg0, arg1)
 	ret0, _ := ret[0].(string)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // init indicates an expected call of init.
-func (mr *MockTFExecuterMockRecorder) init(arg0 interface{}) *gomock.Call {
+func (mr *MockTFExecuterMockRecorder) init(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "init", reflect.TypeOf((*MockTFExecuter)(nil).init), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "init", reflect.TypeOf((*MockTFExecuter)(nil).init), arg0, arg1)
 }
 
 // plan mocks base method.

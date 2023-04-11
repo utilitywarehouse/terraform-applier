@@ -167,6 +167,13 @@ func (r *Runner) process(req Request, cancelChan <-chan struct{}) bool {
 		return false
 	}
 
+	backendConf, err := fetchEnvVars(ctx, delegatedClient, module, module.Spec.Backend)
+	if err != nil {
+		log.Error("unable to get backend config", "err", err)
+		r.setFailedStatus(req, module, tfaplv1beta1.ReasonRunPreparationFailed, err.Error(), r.Clock.Now())
+		return false
+	}
+
 	envs, err := fetchEnvVars(ctx, delegatedClient, module, module.Spec.Env)
 	if err != nil {
 		log.Error("unable to get envs", "err", err)
@@ -201,7 +208,7 @@ func (r *Runner) process(req Request, cancelChan <-chan struct{}) bool {
 	defer te.cleanUp()
 
 	// Process RUN
-	return r.runTF(ctx, req, module, te, commitHash, cancelChan)
+	return r.runTF(ctx, req, module, te, backendConf, commitHash, cancelChan)
 }
 
 // runTF executes terraform commands and updates module status when required.
@@ -211,6 +218,7 @@ func (r *Runner) runTF(
 	req Request,
 	module *tfaplv1beta1.Module,
 	te TFExecuter,
+	backendConf map[string]string,
 	commitHash string,
 	cancelChan <-chan struct{},
 ) bool {
@@ -221,7 +229,7 @@ func (r *Runner) runTF(
 		return false
 	}
 
-	initOut, err := te.init(ctx)
+	initOut, err := te.init(ctx, backendConf)
 	if err != nil {
 		log.Error("unable to init module", "err", err)
 		r.setFailedStatus(req, module, tfaplv1beta1.ReasonInitialiseFailed, err.Error(), r.Clock.Now())

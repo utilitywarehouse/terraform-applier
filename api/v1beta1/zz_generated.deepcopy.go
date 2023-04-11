@@ -98,6 +98,13 @@ func (in *ModuleSpec) DeepCopyInto(out *ModuleSpec) {
 		*out = new(bool)
 		**out = **in
 	}
+	if in.Backend != nil {
+		in, out := &in.Backend, &out.Backend
+		*out = make([]v1.EnvVar, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
 	if in.Env != nil {
 		in, out := &in.Env, &out.Env
 		*out = make([]v1.EnvVar, len(*in))
