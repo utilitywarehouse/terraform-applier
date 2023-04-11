@@ -23,6 +23,7 @@ package v1beta1
 
 import (
 	"k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -143,9 +144,10 @@ func (in *ModuleStatus) DeepCopyInto(out *ModuleStatus) {
 		in, out := &in.RunStartedAt, &out.RunStartedAt
 		*out = (*in).DeepCopy()
 	}
-	if in.RunFinishedAt != nil {
-		in, out := &in.RunFinishedAt, &out.RunFinishedAt
-		*out = (*in).DeepCopy()
+	if in.RunDuration != nil {
+		in, out := &in.RunDuration, &out.RunDuration
+		*out = new(metav1.Duration)
+		**out = **in
 	}
 	in.LastDriftInfo.DeepCopyInto(&out.LastDriftInfo)
 	in.LastApplyInfo.DeepCopyInto(&out.LastApplyInfo)

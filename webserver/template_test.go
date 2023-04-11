@@ -42,11 +42,11 @@ func Test_ExecuteTemplate(t *testing.T) {
 				PlanOnly: &boolTrue,
 			},
 			Status: tfaplv1beta1.ModuleStatus{
-				CurrentState:  "Errored",
-				Type:          tfaplv1beta1.PollingRun,
-				RunStartedAt:  getMetaTime(10, 30, 1),
-				RunFinishedAt: getMetaTime(10, 35, 30),
-				StateMessage:  `some very long error message with \n  Terraform has created a lock file .terraform.lock.hcl to record the provider selections it made above. Include this file in your version control repository so that Terraform can guarantee to make the same selections by default when you run "terraform init" in the future`,
+				CurrentState: "Errored",
+				Type:         tfaplv1beta1.PollingRun,
+				RunStartedAt: getMetaTime(10, 30, 1),
+				RunDuration:  &metav1.Duration{Duration: 60 * time.Second},
+				StateMessage: `some very long error message with \n  Terraform has created a lock file .terraform.lock.hcl to record the provider selections it made above. Include this file in your version control repository so that Terraform can guarantee to make the same selections by default when you run "terraform init" in the future`,
 			},
 		},
 		{
@@ -66,9 +66,9 @@ func Test_ExecuteTemplate(t *testing.T) {
 				Path:     "dev/groups",
 			},
 			Status: tfaplv1beta1.ModuleStatus{
-				CurrentState:  "Ready",
-				RunStartedAt:  getMetaTime(2, 10, 1),
-				RunFinishedAt: getMetaTime(2, 15, 30),
+				CurrentState: "Ready",
+				RunStartedAt: getMetaTime(2, 10, 1),
+				RunDuration:  &metav1.Duration{Duration: 60 * time.Second},
 
 				StateMessage:  "Apply complete! Resources: 7 added, 0 changed, 0 destroyed",
 				RemoteURL:     "github.com/org/repo",
@@ -131,9 +131,9 @@ Apply complete! Resources: 7 added, 0 changed, 0 destroyed.`,
 				Path:     "dev/users",
 			},
 			Status: tfaplv1beta1.ModuleStatus{
-				CurrentState:  "Errored",
-				RunStartedAt:  getMetaTime(10, 30, 1),
-				RunFinishedAt: getMetaTime(10, 35, 30),
+				CurrentState: "Errored",
+				RunStartedAt: getMetaTime(10, 30, 1),
+				RunDuration:  &metav1.Duration{Duration: 120 * time.Second},
 				StateMessage: `unparseable schedule "*/04 * * * ": expected exactly 5 fields, found
 				4: [*/04 * * *]`,
 			},
@@ -162,8 +162,8 @@ Apply complete! Resources: 7 added, 0 changed, 0 destroyed.`,
 	}
 
 	// uncomment to load index.html file locally after running test
-	// if err := os.WriteFile("index.html", rendered.Bytes(), 0666); err != nil {
-	// 	t.Errorf("error reading test file:  %v\n", err)
-	// 	return
-	// }
+	if err := os.WriteFile("index.html", rendered.Bytes(), 0666); err != nil {
+		t.Errorf("error reading test file:  %v\n", err)
+		return
+	}
 }

@@ -93,7 +93,7 @@ var _ = Describe("Module controller with Runner", func() {
 
 			Expect(fetchedModule.Status.CurrentState).Should(Equal("Running"))
 			Expect(fetchedModule.Status.RunStartedAt.UTC()).Should(Equal(fakeClock.T.UTC()))
-			Expect(fetchedModule.Status.RunFinishedAt).Should(BeNil())
+			Expect(fetchedModule.Status.RunDuration).Should(BeNil())
 			Expect(fetchedModule.Status.ObservedGeneration).Should(Equal(fetchedModule.ObjectMeta.Generation))
 			Expect(fetchedModule.Status.RunCommitHash).Should(Equal(commitHash))
 			Expect(fetchedModule.Status.RunCommitMsg).Should(Equal(commitMsg))
@@ -111,7 +111,7 @@ var _ = Describe("Module controller with Runner", func() {
 			}, time.Second*30, interval).Should(Not(Equal("Running")))
 
 			Expect(fetchedModule.Status.CurrentState).Should(Equal("Ready"))
-			Expect(fetchedModule.Status.RunFinishedAt.UTC()).Should(Equal(fakeClock.T.UTC()))
+			Expect(fetchedModule.Status.RunDuration.Duration.String()).Should(Equal("1m0s"))
 			Expect(fetchedModule.Status.StateMessage).Should(ContainSubstring("Apply complete"))
 
 			// Make sure LastDriftInfo & LastApplyInfo is also set
@@ -169,7 +169,7 @@ var _ = Describe("Module controller with Runner", func() {
 
 			Expect(fetchedModule.Status.CurrentState).Should(Equal("Running"))
 			Expect(fetchedModule.Status.RunStartedAt.UTC()).Should(Equal(fakeClock.T.UTC()))
-			Expect(fetchedModule.Status.RunFinishedAt).Should(BeNil())
+			Expect(fetchedModule.Status.RunDuration).Should(BeNil())
 			Expect(fetchedModule.Status.ObservedGeneration).Should(Equal(fetchedModule.ObjectMeta.Generation))
 			Expect(fetchedModule.Status.RunCommitHash).Should(Equal(commitHash))
 			Expect(fetchedModule.Status.RunCommitMsg).Should(Equal(commitMsg))
@@ -187,7 +187,7 @@ var _ = Describe("Module controller with Runner", func() {
 			}, time.Second*30, interval).Should(Not(Equal("Running")))
 
 			Expect(fetchedModule.Status.CurrentState).Should(Equal("Ready"))
-			Expect(fetchedModule.Status.RunFinishedAt.UTC()).Should(Equal(fakeClock.T.UTC()))
+			Expect(fetchedModule.Status.RunDuration.Duration.String()).Should(Equal("1m0s"))
 			Expect(fetchedModule.Status.StateMessage).Should(ContainSubstring("PlanOnly"))
 
 			// Make sure LastDriftInfo & LastApplyInfo is also set
@@ -289,7 +289,7 @@ var _ = Describe("Module controller with Runner", func() {
 
 			Expect(fetchedModule.Status.CurrentState).Should(Equal("Running"))
 			Expect(fetchedModule.Status.RunStartedAt.UTC()).Should(Equal(fakeClock.T.UTC()))
-			Expect(fetchedModule.Status.RunFinishedAt).Should(BeNil())
+			Expect(fetchedModule.Status.RunDuration).Should(BeNil())
 			Expect(fetchedModule.Status.ObservedGeneration).Should(Equal(fetchedModule.ObjectMeta.Generation))
 			Expect(fetchedModule.Status.RunCommitHash).Should(Equal(commitHash))
 			Expect(fetchedModule.Status.RunCommitMsg).Should(Equal(commitMsg))
@@ -307,7 +307,7 @@ var _ = Describe("Module controller with Runner", func() {
 			}, time.Second*30, interval).Should(Not(Equal("Running")))
 
 			Expect(fetchedModule.Status.CurrentState).Should(Equal("Ready"))
-			Expect(fetchedModule.Status.RunFinishedAt.UTC()).Should(Equal(fakeClock.T.UTC()))
+			Expect(fetchedModule.Status.RunDuration.Duration.String()).Should(Equal("1m0s"))
 			Expect(fetchedModule.Status.StateMessage).Should(ContainSubstring("Apply complete"))
 
 			// Make sure LastDriftInfo & LastApplyInfo is also set
@@ -395,7 +395,7 @@ var _ = Describe("Module controller with Runner", func() {
 			}, time.Second*30, interval).Should(Not(Equal("Running")))
 
 			Expect(fetchedModule.Status.CurrentState).Should(Equal("Ready"))
-			Expect(fetchedModule.Status.RunFinishedAt.UTC()).Should(Equal(fakeClock.T.UTC()))
+			Expect(fetchedModule.Status.RunDuration.Duration.String()).Should(Equal("1m0s"))
 			Expect(fetchedModule.Status.StateMessage).Should(ContainSubstring("Apply complete"))
 
 			// make sure all values are there in output

@@ -112,9 +112,10 @@ type ModuleStatus struct {
 	// Information when was the last time the run was started.
 	// +optional
 	RunStartedAt *metav1.Time `json:"runStartedAt,omitempty"`
-	// Information when was the last time the run was finished.
+
+	// The duration of the last terraform run.
 	// +optional
-	RunFinishedAt *metav1.Time `json:"runFinishedAt,omitempty"`
+	RunDuration *metav1.Duration `json:"runDuration,omitempty"`
 
 	// RemoteURL is the URL of the modules git repo
 	// +optional
@@ -142,7 +143,7 @@ type ModuleStatus struct {
 //+kubebuilder:printcolumn:name="PlanOnly",type="string",JSONPath=".spec.planOnly",description=""
 //+kubebuilder:printcolumn:name="State",type="string",JSONPath=".status.currentState",description=""
 //+kubebuilder:printcolumn:name="Started At",type="string",JSONPath=`.status.runStartedAt`,description=""
-//+kubebuilder:printcolumn:name="Finished At",type="string",JSONPath=`.status.runFinishedAt`,description=""
+//+kubebuilder:printcolumn:name="Took",type="string",JSONPath=`.status.runDuration`,description=""
 //+kubebuilder:printcolumn:name="Commit",type="string",JSONPath=`.status.runCommitHash`,description="",priority=10
 //+kubebuilder:printcolumn:name="Path",type="string",JSONPath=`.spec.path`,description="",priority=20
 //+kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp",description="",priority=20
