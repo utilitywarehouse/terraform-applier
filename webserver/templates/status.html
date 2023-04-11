@@ -85,7 +85,7 @@
                             </div>
                             
                             <div class="">Commit Hash: 
-                                <a href="{{ commitURL .Status.RemoteURL .Status.RunCommitHash}}">{{.Status.RunCommitHash}}</a>
+                                <small><a href="{{ commitURL .Status.RemoteURL .Status.RunCommitHash}}">{{.Status.RunCommitHash}}</a></small>
                             </div>
                             <div class="">Commit Message: <small>{{.Status.RunCommitMsg}}</small></div>
                         </div>
