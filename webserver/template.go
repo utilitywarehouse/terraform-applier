@@ -16,7 +16,7 @@ func createTemplate(statusHTML string) (*template.Template, error) {
 			"sanitizedUniqueName": sanitizedUniqueName,
 			"commitURL":           commitURL,
 			"formattedTime":       formattedTime,
-			"latency":             latency,
+			"duration":            duration,
 		}).
 		Parse(statusHTML)
 	if err != nil {
@@ -38,12 +38,12 @@ func formattedTime(t *metav1.Time) string {
 	return t.Time.Truncate(time.Second).Format(time.RFC3339)
 }
 
-// Latency returns the latency between the two Times in human readable string.
-func latency(t1, t2 *metav1.Time) string {
-	if t1 == nil || t2 == nil {
+// duration returns duration in human readable string.
+func duration(d *metav1.Duration) string {
+	if d == nil {
 		return "-"
 	}
-	return t2.Time.Sub(t1.Time).String()
+	return d.Duration.Round(time.Second).String()
 }
 
 // commitURL will return commit url from given repo url and commit hash

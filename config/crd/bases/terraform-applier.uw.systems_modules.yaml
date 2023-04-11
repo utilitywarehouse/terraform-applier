@@ -31,8 +31,8 @@ spec:
     - jsonPath: .status.runStartedAt
       name: Started At
       type: string
-    - jsonPath: .status.runFinishedAt
-      name: Finished At
+    - jsonPath: .status.runDuration
+      name: Took
       type: string
     - jsonPath: .status.runCommitHash
       name: Commit
@@ -524,9 +524,8 @@ spec:
               runCommitMsg:
                 description: RunCommitMsg is the message of git commit of last run.
                 type: string
-              runFinishedAt:
-                description: Information when was the last time the run was finished.
-                format: date-time
+              runDuration:
+                description: The duration of the last terraform run.
                 type: string
               runStartedAt:
                 description: Information when was the last time the run was started.

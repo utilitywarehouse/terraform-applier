@@ -332,7 +332,7 @@ func (r *Runner) SetRunStartedStatus(req Request, m *tfaplv1beta1.Module, msg, c
 	m.Status.CurrentState = string(tfaplv1beta1.StatusRunning)
 	m.Status.Type = req.Type
 	m.Status.RunStartedAt = &metav1.Time{Time: now}
-	m.Status.RunFinishedAt = nil
+	m.Status.RunDuration = nil
 	m.Status.ObservedGeneration = m.Generation
 	m.Status.RunCommitHash = commitHash
 	m.Status.RunCommitMsg = commitMsg
@@ -346,7 +346,7 @@ func (r *Runner) SetRunStartedStatus(req Request, m *tfaplv1beta1.Module, msg, c
 
 func (r *Runner) SetRunFinishedStatus(objectKey types.NamespacedName, m *tfaplv1beta1.Module, reason, msg string, now time.Time) error {
 	m.Status.CurrentState = string(tfaplv1beta1.StatusReady)
-	m.Status.RunFinishedAt = &metav1.Time{Time: now}
+	m.Status.RunDuration = &metav1.Duration{Duration: now.Sub(m.Status.RunStartedAt.Time).Round(time.Second)}
 	m.Status.StateMessage = msg
 
 	r.Recorder.Event(m, corev1.EventTypeNormal, reason, msg)
@@ -357,7 +357,7 @@ func (r *Runner) SetRunFinishedStatus(objectKey types.NamespacedName, m *tfaplv1
 func (r *Runner) setFailedStatus(req Request, module *tfaplv1beta1.Module, reason, msg string, now time.Time) {
 
 	module.Status.CurrentState = string(tfaplv1beta1.StatusErrored)
-	module.Status.RunFinishedAt = &metav1.Time{Time: now}
+	module.Status.RunDuration = &metav1.Duration{Duration: now.Sub(module.Status.RunStartedAt.Time).Round(time.Second)}
 	module.Status.StateMessage = msg
 
 	r.Recorder.Event(module, corev1.EventTypeWarning, reason, msg)

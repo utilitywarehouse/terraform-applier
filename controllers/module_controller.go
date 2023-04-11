@@ -226,7 +226,7 @@ func (r *ModuleReconciler) setFailedStatus(req ctrl.Request, module *tfaplv1beta
 	module.Status.CurrentState = string(tfaplv1beta1.StatusErrored)
 	module.Status.StateMessage = msg
 	module.Status.RunStartedAt = nil
-	module.Status.RunFinishedAt = nil
+	module.Status.RunDuration = nil
 	module.Status.ObservedGeneration = module.Generation
 
 	r.Recorder.Event(module, corev1.EventTypeWarning, reason, msg)
