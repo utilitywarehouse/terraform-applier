@@ -73,7 +73,8 @@ var (
 	goMockCtrl *gomock.Controller
 	testLogger hclog.Logger
 	// testControllerQueue only used for controller behaviour testing
-	testControllerQueue chan runner.Request
+	testControllerQueue       chan runner.Request
+	testFilterControllerQueue chan runner.Request
 
 	testStateFilePath string
 	testFilter        *controllers.Filter
@@ -148,6 +149,7 @@ var _ = BeforeSuite(func() {
 
 	minIntervalBetweenRunsDuration := 1 * time.Minute
 	testControllerQueue = make(chan runner.Request)
+	testFilterControllerQueue = make(chan runner.Request)
 	testRunnerQueue = make(chan runner.Request)
 
 	goMockCtrl = gomock.NewController(RecoveringGinkgoT())

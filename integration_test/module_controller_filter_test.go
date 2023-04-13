@@ -27,7 +27,7 @@ var _ = Describe("Module controller without runner with label selector", func() 
 		BeforeEach(func() {
 			// reset Time
 			fakeClock.T = time.Date(2022, 02, 01, 01, 00, 00, 0000, time.UTC)
-			testReconciler.Queue = testControllerQueue
+			testReconciler.Queue = testFilterControllerQueue
 
 			// add label selector
 			testFilter.LabelSelectorKey = labelSelectorKey
@@ -65,13 +65,15 @@ var _ = Describe("Module controller without runner with label selector", func() 
 				timer := time.NewTimer(time.Second)
 				for {
 					select {
-					case req := <-testControllerQueue:
+					case req := <-testFilterControllerQueue:
 						return req.NamespacedName
 					case <-timer.C:
 						return types.NamespacedName{}
 					}
 				}
 			}, time.Second*10, interval).Should(Equal(moduleLookupKey))
+			// delete module to stopping requeue
+			Expect(k8sClient.Delete(ctx, module)).Should(Succeed())
 		})
 
 		It("Should not send module with valid selector label key but invalid value to job queue", func() {
@@ -100,13 +102,15 @@ var _ = Describe("Module controller without runner with label selector", func() 
 				timer := time.NewTimer(time.Second)
 				for {
 					select {
-					case req := <-testControllerQueue:
+					case req := <-testFilterControllerQueue:
 						return req.NamespacedName
 					case <-timer.C:
 						return types.NamespacedName{}
 					}
 				}
 			}, time.Second*10, interval).Should(Not(Equal(moduleLookupKey)))
+			// delete module to stopping requeue
+			Expect(k8sClient.Delete(ctx, module)).Should(Succeed())
 		})
 
 		It("Should not send module with missing selector label selector to job queue", func() {
@@ -135,13 +139,15 @@ var _ = Describe("Module controller without runner with label selector", func() 
 				timer := time.NewTimer(time.Second)
 				for {
 					select {
-					case req := <-testControllerQueue:
+					case req := <-testFilterControllerQueue:
 						return req.NamespacedName
 					case <-timer.C:
 						return types.NamespacedName{}
 					}
 				}
 			}, time.Second*10, interval).Should(Not(Equal(moduleLookupKey)))
+			// delete module to stopping requeue
+			Expect(k8sClient.Delete(ctx, module)).Should(Succeed())
 		})
 
 		It("Should not send module with mo labels to job queue", func() {
@@ -169,13 +175,15 @@ var _ = Describe("Module controller without runner with label selector", func() 
 				timer := time.NewTimer(time.Second)
 				for {
 					select {
-					case req := <-testControllerQueue:
+					case req := <-testFilterControllerQueue:
 						return req.NamespacedName
 					case <-timer.C:
 						return types.NamespacedName{}
 					}
 				}
 			}, time.Second*10, interval).Should(Not(Equal(moduleLookupKey)))
+			// delete module to stopping requeue
+			Expect(k8sClient.Delete(ctx, module)).Should(Succeed())
 		})
 
 	})
