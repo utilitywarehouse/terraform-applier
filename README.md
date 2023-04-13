@@ -94,7 +94,8 @@ Controller will force shutdown on current stage run if it takes more time then `
   to be applied. The immediate subdirectories of this directory should contain
   the root modules which will be referenced by users in `module`.
 
-- `CRD_LABEL_SELECTOR` - (default: `""`) If present controller will only watch and process modules with this label.
+- `CRD_LABEL_SELECTOR` - (default: `""`) If present controller will only watch and process modules with this label. 
+Env value string should be in the form of 'label-key=label-value'.
 - `WATCH_NAMESPACES` - (default: `""`) if set controller will only watch given namespaces for modules. it will operate 
 in namespace scope mode and controller will not need any cluster permissions. if `CRD_LABEL_SELECTOR` also set then it will
 only watch modules with selector label in a given namespace.
