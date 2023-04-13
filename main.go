@@ -57,6 +57,8 @@ var (
 	labelSelectorKey   string
 	labelSelectorValue string
 
+	watchNamespaces []string
+
 	terminationGracePeriodDuration time.Duration
 	minIntervalBetweenRunsDuration time.Duration
 )
@@ -81,7 +83,8 @@ var (
 	minIntervalBetweenRuns        = getEnv("MIN_INTERVAL_BETWEEN_RUNS", "60")
 	listenAddress                 = getEnv("LISTEN_ADDRESS", ":8080")
 
-	labelSelectorStr = os.Getenv("CRD_LABEL_SELECTOR")
+	labelSelectorStr   = os.Getenv("CRD_LABEL_SELECTOR")
+	watchNamespacesStr = os.Getenv("WATCH_NAMESPACES")
 
 	vaultAWSEngPath   = getEnv("VAULT_AWS_ENG_PATH", "/aws")
 	vaultKubeAuthPath = getEnv("VAULT_KUBE_AUTH_PATH", "/auth/kubernetes")
@@ -130,7 +133,16 @@ func validate() {
 		labelSelectorValue = labelKV[1]
 	}
 
+	watchNamespaces = strings.Split(watchNamespacesStr, ",")
+
+	// https://github.com/kubernetes-sigs/controller-runtime/issues/2273
+	if len(watchNamespaces) > 1 {
+		logger.Error("for now only 1 namespace is allowed in watch list WATCH_NAMESPACES")
+		os.Exit(1)
+	}
+
 	logger.Info("config", "repoPath", repoPath)
+	logger.Info("config", "watchNamespaces", watchNamespaces)
 	logger.Info("config", "selectorLabel", fmt.Sprintf("%s:%s", labelSelectorKey, labelSelectorValue))
 	logger.Info("config", "minIntervalBetweenRunsDuration", minIntervalBetweenRunsDuration)
 	logger.Info("config", "terminationGracePeriodDuration", terminationGracePeriodDuration)
@@ -225,7 +237,7 @@ func main() {
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
 	opts := zap.Options{
-		Development: true,
+		Development: false,
 	}
 	opts.BindFlags(flag.CommandLine)
 	flag.Parse()
@@ -284,8 +296,14 @@ func main() {
 		labelSelector = labels.Set{labelSelectorKey: labelSelectorValue}.AsSelector()
 	}
 
+	var watchNS string
+	if len(watchNamespaces) > 0 {
+		watchNS = watchNamespaces[0]
+	}
+
 	options.NewCache = cache.BuilderWithOptions(cache.Options{
-		Scheme: scheme,
+		Scheme:    scheme,
+		Namespace: watchNS,
 		SelectorsByObject: cache.SelectorsByObject{
 			&tfaplv1beta1.Module{}: {
 				Label: labelSelector,
