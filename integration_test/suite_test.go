@@ -76,6 +76,7 @@ var (
 	testControllerQueue chan runner.Request
 
 	testStateFilePath string
+	testFilter        *controllers.Filter
 
 	// testRunnerQueue only used for send job to runner of runner testing
 	testRunnerQueue  chan runner.Request
@@ -137,7 +138,7 @@ var _ = BeforeSuite(func() {
 
 	testLogger = hclog.New(&hclog.LoggerOptions{
 		Name:            "test",
-		Level:           hclog.LevelFromString("DEBUG"),
+		Level:           hclog.LevelFromString("TRACE"),
 		IncludeLocation: false,
 	})
 
@@ -168,7 +169,13 @@ var _ = BeforeSuite(func() {
 		MinIntervalBetweenRuns: minIntervalBetweenRunsDuration,
 	}
 
-	err = testReconciler.SetupWithManager(k8sManager)
+	testFilter = &controllers.Filter{
+		Log:                testLogger.Named("filter"),
+		LabelSelectorKey:   "",
+		LabelSelectorValue: "",
+	}
+
+	err = testReconciler.SetupWithManager(k8sManager, testFilter)
 	Expect(err).ToNot(HaveOccurred())
 
 	go func() {

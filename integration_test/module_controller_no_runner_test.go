@@ -25,6 +25,10 @@ var _ = Describe("Module controller without runner", func() {
 			// reset Time
 			fakeClock.T = time.Date(2022, 02, 01, 01, 00, 00, 0000, time.UTC)
 			testReconciler.Queue = testControllerQueue
+
+			// remove any label selector
+			testFilter.LabelSelectorKey = ""
+			testFilter.LabelSelectorValue = ""
 		})
 
 		It("Should send module to job queue on schedule", func() {

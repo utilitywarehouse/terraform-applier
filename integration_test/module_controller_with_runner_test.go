@@ -35,6 +35,10 @@ var _ = Describe("Module controller with Runner", func() {
 			fakeClock.T = time.Date(2022, 02, 01, 01, 00, 00, 0000, time.UTC)
 			testReconciler.Queue = testRunnerQueue
 
+			// remove any label selector
+			testFilter.LabelSelectorKey = ""
+			testFilter.LabelSelectorValue = ""
+
 			// Trigger Job run as soon as module is created
 			testGitUtil.EXPECT().HeadCommitHashAndLog("hello").
 				Return(commitHash, commitMsg, nil).AnyTimes()

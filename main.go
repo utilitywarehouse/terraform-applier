@@ -34,10 +34,12 @@ import (
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 	"k8s.io/client-go/rest"
 
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
@@ -51,6 +53,9 @@ var (
 	oidcAuthenticator *oidc.Authenticator
 
 	scheme = runtime.NewScheme()
+
+	labelSelectorKey   string
+	labelSelectorValue string
 
 	terminationGracePeriodDuration time.Duration
 	minIntervalBetweenRunsDuration time.Duration
@@ -75,6 +80,8 @@ var (
 	terminationGracePeriodSeconds = getEnv("TERMINATION_GRACE_PERIOD", "60")
 	minIntervalBetweenRuns        = getEnv("MIN_INTERVAL_BETWEEN_RUNS", "60")
 	listenAddress                 = getEnv("LISTEN_ADDRESS", ":8080")
+
+	labelSelectorStr = os.Getenv("CRD_LABEL_SELECTOR")
 
 	vaultAWSEngPath   = getEnv("VAULT_AWS_ENG_PATH", "/aws")
 	vaultKubeAuthPath = getEnv("VAULT_KUBE_AUTH_PATH", "/auth/kubernetes")
@@ -113,11 +120,20 @@ func validate() {
 	}
 	minIntervalBetweenRunsDuration = time.Duration(minInterval) * time.Second
 
-	logger.Info("config",
-		"repoPath", repoPath,
-		"minIntervalBetweenRunsDuration", minIntervalBetweenRunsDuration,
-		"terminationGracePeriodDuration", terminationGracePeriodDuration,
-	)
+	if labelSelectorStr != "" {
+		labelKV := strings.Split(labelSelectorStr, "=")
+		if len(labelKV) != 2 || labelKV[0] == "" || labelKV[1] == "" {
+			logger.Error("CRD_LABEL_SELECTOR must be in the form 'key=value'")
+			os.Exit(1)
+		}
+		labelSelectorKey = labelKV[0]
+		labelSelectorValue = labelKV[1]
+	}
+
+	logger.Info("config", "repoPath", repoPath)
+	logger.Info("config", "selectorLabel", fmt.Sprintf("%s:%s", labelSelectorKey, labelSelectorValue))
+	logger.Info("config", "minIntervalBetweenRunsDuration", minIntervalBetweenRunsDuration)
+	logger.Info("config", "terminationGracePeriodDuration", terminationGracePeriodDuration)
 
 }
 
@@ -243,7 +259,7 @@ func main() {
 	}
 	setupLog.Info("found terraform binary", "version", version)
 
-	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
+	options := ctrl.Options{
 		Scheme:                 scheme,
 		MetricsBindAddress:     metricsAddr,
 		Port:                   9443,
@@ -261,7 +277,29 @@ func main() {
 		// if you are doing or is intended to do any operation such as perform cleanups
 		// after the manager stops then its usage might be unsafe.
 		// LeaderElectionReleaseOnCancel: true,
+	}
+
+	var labelSelector labels.Selector
+	if labelSelectorKey != "" {
+		labelSelector = labels.Set{labelSelectorKey: labelSelectorValue}.AsSelector()
+	}
+
+	options.NewCache = cache.BuilderWithOptions(cache.Options{
+		Scheme: scheme,
+		SelectorsByObject: cache.SelectorsByObject{
+			&tfaplv1beta1.Module{}: {
+				Label: labelSelector,
+			},
+		},
 	})
+
+	filter := &controllers.Filter{
+		Log:                logger.Named("filter"),
+		LabelSelectorKey:   labelSelectorKey,
+		LabelSelectorValue: labelSelectorValue,
+	}
+
+	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), options)
 	if err != nil {
 		setupLog.Error("unable to start manager", "err", err)
 		os.Exit(1)
@@ -276,7 +314,7 @@ func main() {
 		GitUtil:                gitUtil,
 		Log:                    logger.Named("manager"),
 		MinIntervalBetweenRuns: minIntervalBetweenRunsDuration,
-	}).SetupWithManager(mgr); err != nil {
+	}).SetupWithManager(mgr, filter); err != nil {
 		setupLog.Error("unable to create module controller", "err", err)
 		os.Exit(1)
 	}
