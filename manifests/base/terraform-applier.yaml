@@ -70,7 +70,7 @@ spec:
       serviceAccountName: terraform-applier
       containers:
         - name: terraform-applier
-          image: quay.io/utilitywarehouse/terraform-applier:v1
+          image: quay.io/utilitywarehouse/terraform-applier:v1.0.0
           resources:
             requests:
               cpu: 10m
