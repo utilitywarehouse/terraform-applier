@@ -101,7 +101,7 @@ with other controllers run.
 - `WATCH_NAMESPACES` - (default: `""`) if set controller will only watch given namespaces for modules. it will operate 
 in namespace scope mode and controller will not need any cluster permissions. if `CRD_LABEL_SELECTOR` also set then it will
 only watch modules with selector label in a given namespace.
-- `ELECTION_ID` - (default: `auto generated`) if multiple controllers are running with same label selector and watch namespace value then they belong to same stack. if election enabled, ELECTION_ID needs to be unique per stack. If this is not unique to the stack then only one stack will be working concurrently.
+- `ELECTION_ID` - (default: `auto generated`) it determines the name of the resource that leader election will use for holding the leader lock. if multiple controllers are running with same label selector and watch namespace value then they belong to same stack. if election enabled, ELECTION_ID needs to be unique per stack. If this is not unique to the stack then only one stack will be working concurrently. if not set value will be auto generated based on given label selector and watch namespace value.
 
 - `LOG_LEVEL` - (default: `INFO`) `TRACE|DEBUG|INFO|WARN|ERROR`, case insensitive.
 - `LISTEN_ADDRESS` - (default: `:8080`) The listening address of web server.
