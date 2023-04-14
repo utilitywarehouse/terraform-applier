@@ -1,0 +1,12 @@
+apiVersion: terraform-applier.uw.systems/v1beta1
+kind: Module
+metadata:
+  labels:
+    app.kubernetes.io/name: module
+    app.kubernetes.io/instance: module-sample
+    app.kubernetes.io/part-of: terraform-applier
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/created-by: terraform-applier
+  name: module-sample
+spec:
+  # TODO(user): Add fields here

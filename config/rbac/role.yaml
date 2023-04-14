@@ -1,0 +1,54 @@
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  creationTimestamp: null
+  name: terraform-applier
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - events
+  verbs:
+  - create
+  - patch
+- apiGroups:
+  - ""
+  resourceNames:
+  - terraform-applier-delegate-token
+  resources:
+  - secrets
+  verbs:
+  - get
+- apiGroups:
+  - authorization.k8s.io
+  resources:
+  - subjectaccessreviews
+  verbs:
+  - create
+- apiGroups:
+  - terraform-applier.uw.systems
+  resources:
+  - modules
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - terraform-applier.uw.systems
+  resources:
+  - modules/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - terraform-applier.uw.systems
+  resources:
+  - modules/status
+  verbs:
+  - get
+  - patch
+  - update
