@@ -2,8 +2,10 @@ package main
 
 import (
 	"context"
+	"crypto/md5"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"os/signal"
 	"strconv"
@@ -85,6 +87,7 @@ var (
 
 	labelSelectorStr   = os.Getenv("CRD_LABEL_SELECTOR")
 	watchNamespacesStr = os.Getenv("WATCH_NAMESPACES")
+	electionID         = os.Getenv("ELECTION_ID")
 
 	vaultAWSEngPath   = getEnv("VAULT_AWS_ENG_PATH", "/aws")
 	vaultKubeAuthPath = getEnv("VAULT_KUBE_AUTH_PATH", "/auth/kubernetes")
@@ -221,6 +224,14 @@ func kubeClient() (*kubernetes.Clientset, error) {
 	return kubernetes.NewForConfig(config)
 }
 
+func generateElectionID(salt, labelSelectorKey, labelSelectorValue string, watchNamespaces []string) string {
+	h := md5.New()
+	io.WriteString(h, salt)
+	io.WriteString(h, labelSelectorKey+"="+labelSelectorValue)
+	io.WriteString(h, fmt.Sprintf("%s", watchNamespaces))
+	return fmt.Sprintf("%x.terraform-applier.uw.systems", h.Sum(nil))
+}
+
 func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -271,24 +282,17 @@ func main() {
 	}
 	setupLog.Info("found terraform binary", "version", version)
 
+	if electionID == "" {
+		electionID = generateElectionID("4ee367ac", labelSelectorKey, labelSelectorValue, watchNamespaces)
+	}
+
 	options := ctrl.Options{
 		Scheme:                 scheme,
 		MetricsBindAddress:     metricsAddr,
 		Port:                   9443,
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
-		LeaderElectionID:       "4ee367ac.uw.systems",
-		// LeaderElectionReleaseOnCancel defines if the leader should step down voluntarily
-		// when the Manager ends. This requires the binary to immediately end when the
-		// Manager is stopped, otherwise, this setting is unsafe. Setting this significantly
-		// speeds up voluntary leader transitions as the new leader don't have to wait
-		// LeaseDuration time first.
-		//
-		// In the default scaffold provided, the program ends immediately after
-		// the manager stops, so would be fine to enable this option. However,
-		// if you are doing or is intended to do any operation such as perform cleanups
-		// after the manager stops then its usage might be unsafe.
-		// LeaderElectionReleaseOnCancel: true,
+		LeaderElectionID:       electionID,
 	}
 
 	var labelSelector labels.Selector
