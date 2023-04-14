@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	"crypto/md5"
+	"crypto/sha256"
 	"flag"
 	"fmt"
 	"io"
@@ -225,11 +225,10 @@ func kubeClient() (*kubernetes.Clientset, error) {
 }
 
 func generateElectionID(salt, labelSelectorKey, labelSelectorValue string, watchNamespaces []string) string {
-	h := md5.New()
-	io.WriteString(h, salt)
-	io.WriteString(h, labelSelectorKey+"="+labelSelectorValue)
-	io.WriteString(h, fmt.Sprintf("%s", watchNamespaces))
-	return fmt.Sprintf("%x.terraform-applier.uw.systems", h.Sum(nil))
+	h := sha256.New()
+	io.WriteString(h,
+		fmt.Sprintf("%s-%s-%s-%s", salt, labelSelectorKey, labelSelectorValue, watchNamespaces))
+	return fmt.Sprintf("%x.terraform-applier.uw.systems", h.Sum(nil)[:5])
 }
 
 func main() {
