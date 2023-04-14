@@ -88,10 +88,12 @@ func (r *ModuleReconciler) Reconcile(ctx context.Context, req reconcile.Request)
 		return ctrl.Result{}, nil
 	}
 
-	// Do not requeue if module is running as it will be added back once
-	// status is updated
+	// pollIntervalDuration is used as minimum duration for the next run
+	pollIntervalDuration := time.Duration(module.Spec.PollInterval) * time.Second
+
+	// if module is in running state, use next poll internal as minimum queue duration
 	if module.Status.CurrentState == string(tfaplv1beta1.StatusRunning) {
-		return ctrl.Result{}, nil
+		return ctrl.Result{RequeueAfter: pollIntervalDuration}, nil
 	}
 
 	// check for new commit on modules path
@@ -99,18 +101,16 @@ func (r *ModuleReconciler) Reconcile(ctx context.Context, req reconcile.Request)
 	if err != nil {
 		r.setFailedStatus(req, &module, tfaplv1beta1.ReasonGitFailure, err.Error(), r.Clock.Now())
 		log.Error("unable to get commit hash", "err", err)
-		// TODO: should we requeue here?
-		return ctrl.Result{}, nil
+		// since issue is not related to module specs, requeue again in case its fixed
+		return ctrl.Result{RequeueAfter: pollIntervalDuration}, nil
 	}
 
 	if module.Status.RunCommitHash != commitHash {
 		log.Info("new commit is available starting run", "RunCommitHash", module.Status.RunCommitHash, "currentHash", commitHash)
 		r.Queue <- runner.Request{NamespacedName: req.NamespacedName, Type: tfaplv1beta1.PollingRun}
-		// no need to add to queue as we will see this object again once status is updated
-		return ctrl.Result{}, nil
+		// use next poll internal as minimum queue duration as status change will not trigger Reconcile
+		return ctrl.Result{RequeueAfter: pollIntervalDuration}, nil
 	}
-
-	pollIntervalDuration := time.Duration(module.Spec.PollInterval) * time.Second
 
 	// If No schedule is provided, just requeue for next git check
 	if module.Spec.Schedule == "" {
@@ -130,9 +130,6 @@ func (r *ModuleReconciler) Reconcile(ctx context.Context, req reconcile.Request)
 	if numOfMissedRuns > 0 {
 		log.Info("starting scheduled run", "missed-runs", numOfMissedRuns)
 		r.Queue <- runner.Request{NamespacedName: req.NamespacedName, Type: tfaplv1beta1.ScheduledRun}
-
-		// no need to add to queue as we will see this object again once status is updated
-		return ctrl.Result{}, nil
 	}
 
 	// Calculate shortest duration to next run
@@ -141,13 +138,12 @@ func (r *ModuleReconciler) Reconcile(ctx context.Context, req reconcile.Request)
 		requeueAfter = pollIntervalDuration
 	}
 
-	// Requeue if there are no missed runs or new commits
-	// ie still waiting on next schedule
+	// Requeue module again even after triggering run as status change will not trigger Reconcile
 	return ctrl.Result{RequeueAfter: requeueAfter}, nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *ModuleReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *ModuleReconciler) SetupWithManager(mgr ctrl.Manager, filter *Filter) error {
 	// set up a real clock
 	if r.Clock == nil {
 		r.Clock = &sysutil.Clock{}
@@ -155,6 +151,7 @@ func (r *ModuleReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&tfaplv1beta1.Module{}).
+		WithEventFilter(filter).
 		Complete(r)
 }
 

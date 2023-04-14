@@ -48,7 +48,7 @@ type StatusPageHandler struct {
 
 // ServeHTTP populates the status page template with data and serves it when there is a request.
 func (s *StatusPageHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	s.Log.Debug("Applier status request")
+	s.Log.Trace("Applier status request")
 
 	if s.Authenticator != nil {
 		_, err := s.Authenticator.Authenticate(r.Context(), w, r)
@@ -82,7 +82,7 @@ func (s *StatusPageHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		log.Error("Request failed: %v", err)
 		return
 	}
-	s.Log.Debug("Request completed successfully")
+	s.Log.Trace("Request completed successfully")
 }
 
 // ForceRunHandler implements the http.Handle interface and serves an API

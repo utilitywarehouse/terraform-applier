@@ -25,6 +25,10 @@ var _ = Describe("Module controller without runner", func() {
 			// reset Time
 			fakeClock.T = time.Date(2022, 02, 01, 01, 00, 00, 0000, time.UTC)
 			testReconciler.Queue = testControllerQueue
+
+			// remove any label selector
+			testFilter.LabelSelectorKey = ""
+			testFilter.LabelSelectorValue = ""
 		})
 
 		It("Should send module to job queue on schedule", func() {
@@ -104,6 +108,8 @@ var _ = Describe("Module controller without runner", func() {
 					}
 				}
 			}, time.Second*60, interval).Should(Equal(moduleLookupKey))
+			// delete module to stopping requeue
+			Expect(k8sClient.Delete(ctx, module)).Should(Succeed())
 		})
 
 		It("Should send module to job queue on commit change", func() {
@@ -147,6 +153,8 @@ var _ = Describe("Module controller without runner", func() {
 					}
 				}
 			}, time.Second*70, interval).Should(Equal(moduleLookupKey))
+			// delete module to stopping requeue
+			Expect(k8sClient.Delete(ctx, module)).Should(Succeed())
 		})
 
 		It("Should not trigger run for module with invalid schedule", func() {
@@ -185,6 +193,8 @@ var _ = Describe("Module controller without runner", func() {
 				}
 				return fetchedModule.Status.CurrentState
 			}, time.Second*30, interval).Should(Equal("Errored"))
+			// delete module to stopping requeue
+			Expect(k8sClient.Delete(ctx, module)).Should(Succeed())
 		})
 
 		It("Should not trigger run for module with git error", func() {
@@ -223,6 +233,8 @@ var _ = Describe("Module controller without runner", func() {
 				}
 				return fetchedModule.Status.CurrentState
 			}, time.Second*30, interval).Should(Equal("Errored"))
+			// delete module to stopping requeue
+			Expect(k8sClient.Delete(ctx, module)).Should(Succeed())
 		})
 
 		It("Should not trigger run for suspended module", func() {
@@ -286,6 +298,8 @@ var _ = Describe("Module controller without runner", func() {
 					}
 				}
 			}, time.Second*20, interval).Should(Equal(types.NamespacedName{}))
+			// delete module to stopping requeue
+			Expect(k8sClient.Delete(ctx, module)).Should(Succeed())
 		})
 
 	})

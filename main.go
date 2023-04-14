@@ -2,8 +2,10 @@ package main
 
 import (
 	"context"
+	"crypto/sha256"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"os/signal"
 	"strconv"
@@ -34,10 +36,12 @@ import (
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 	"k8s.io/client-go/rest"
 
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
@@ -51,6 +55,11 @@ var (
 	oidcAuthenticator *oidc.Authenticator
 
 	scheme = runtime.NewScheme()
+
+	labelSelectorKey   string
+	labelSelectorValue string
+
+	watchNamespaces []string
 
 	terminationGracePeriodDuration time.Duration
 	minIntervalBetweenRunsDuration time.Duration
@@ -75,6 +84,10 @@ var (
 	terminationGracePeriodSeconds = getEnv("TERMINATION_GRACE_PERIOD", "60")
 	minIntervalBetweenRuns        = getEnv("MIN_INTERVAL_BETWEEN_RUNS", "60")
 	listenAddress                 = getEnv("LISTEN_ADDRESS", ":8080")
+
+	labelSelectorStr   = os.Getenv("CRD_LABEL_SELECTOR")
+	watchNamespacesStr = os.Getenv("WATCH_NAMESPACES")
+	electionID         = os.Getenv("ELECTION_ID")
 
 	vaultAWSEngPath   = getEnv("VAULT_AWS_ENG_PATH", "/aws")
 	vaultKubeAuthPath = getEnv("VAULT_KUBE_AUTH_PATH", "/auth/kubernetes")
@@ -113,11 +126,29 @@ func validate() {
 	}
 	minIntervalBetweenRunsDuration = time.Duration(minInterval) * time.Second
 
-	logger.Info("config",
-		"repoPath", repoPath,
-		"minIntervalBetweenRunsDuration", minIntervalBetweenRunsDuration,
-		"terminationGracePeriodDuration", terminationGracePeriodDuration,
-	)
+	if labelSelectorStr != "" {
+		labelKV := strings.Split(labelSelectorStr, "=")
+		if len(labelKV) != 2 || labelKV[0] == "" || labelKV[1] == "" {
+			logger.Error("CRD_LABEL_SELECTOR must be in the form 'key=value'")
+			os.Exit(1)
+		}
+		labelSelectorKey = labelKV[0]
+		labelSelectorValue = labelKV[1]
+	}
+
+	watchNamespaces = strings.Split(watchNamespacesStr, ",")
+
+	// https://github.com/kubernetes-sigs/controller-runtime/issues/2273
+	if len(watchNamespaces) > 1 {
+		logger.Error("for now only 1 namespace is allowed in watch list WATCH_NAMESPACES")
+		os.Exit(1)
+	}
+
+	logger.Info("config", "repoPath", repoPath)
+	logger.Info("config", "watchNamespaces", watchNamespaces)
+	logger.Info("config", "selectorLabel", fmt.Sprintf("%s:%s", labelSelectorKey, labelSelectorValue))
+	logger.Info("config", "minIntervalBetweenRunsDuration", minIntervalBetweenRunsDuration)
+	logger.Info("config", "terminationGracePeriodDuration", terminationGracePeriodDuration)
 
 }
 
@@ -193,6 +224,13 @@ func kubeClient() (*kubernetes.Clientset, error) {
 	return kubernetes.NewForConfig(config)
 }
 
+func generateElectionID(salt, labelSelectorKey, labelSelectorValue string, watchNamespaces []string) string {
+	h := sha256.New()
+	io.WriteString(h,
+		fmt.Sprintf("%s-%s-%s-%s", salt, labelSelectorKey, labelSelectorValue, watchNamespaces))
+	return fmt.Sprintf("%x.terraform-applier.uw.systems", h.Sum(nil)[:5])
+}
+
 func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -209,7 +247,7 @@ func main() {
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
 	opts := zap.Options{
-		Development: true,
+		Development: false,
 	}
 	opts.BindFlags(flag.CommandLine)
 	flag.Parse()
@@ -243,25 +281,46 @@ func main() {
 	}
 	setupLog.Info("found terraform binary", "version", version)
 
-	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
+	if electionID == "" {
+		electionID = generateElectionID("4ee367ac", labelSelectorKey, labelSelectorValue, watchNamespaces)
+	}
+
+	options := ctrl.Options{
 		Scheme:                 scheme,
 		MetricsBindAddress:     metricsAddr,
 		Port:                   9443,
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
-		LeaderElectionID:       "4ee367ac.uw.systems",
-		// LeaderElectionReleaseOnCancel defines if the leader should step down voluntarily
-		// when the Manager ends. This requires the binary to immediately end when the
-		// Manager is stopped, otherwise, this setting is unsafe. Setting this significantly
-		// speeds up voluntary leader transitions as the new leader don't have to wait
-		// LeaseDuration time first.
-		//
-		// In the default scaffold provided, the program ends immediately after
-		// the manager stops, so would be fine to enable this option. However,
-		// if you are doing or is intended to do any operation such as perform cleanups
-		// after the manager stops then its usage might be unsafe.
-		// LeaderElectionReleaseOnCancel: true,
+		LeaderElectionID:       electionID,
+	}
+
+	var labelSelector labels.Selector
+	if labelSelectorKey != "" {
+		labelSelector = labels.Set{labelSelectorKey: labelSelectorValue}.AsSelector()
+	}
+
+	var watchNS string
+	if len(watchNamespaces) > 0 {
+		watchNS = watchNamespaces[0]
+	}
+
+	options.NewCache = cache.BuilderWithOptions(cache.Options{
+		Scheme:    scheme,
+		Namespace: watchNS,
+		SelectorsByObject: cache.SelectorsByObject{
+			&tfaplv1beta1.Module{}: {
+				Label: labelSelector,
+			},
+		},
 	})
+
+	filter := &controllers.Filter{
+		Log:                logger.Named("filter"),
+		LabelSelectorKey:   labelSelectorKey,
+		LabelSelectorValue: labelSelectorValue,
+	}
+
+	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), options)
 	if err != nil {
 		setupLog.Error("unable to start manager", "err", err)
 		os.Exit(1)
@@ -276,7 +335,7 @@ func main() {
 		GitUtil:                gitUtil,
 		Log:                    logger.Named("manager"),
 		MinIntervalBetweenRuns: minIntervalBetweenRunsDuration,
-	}).SetupWithManager(mgr); err != nil {
+	}).SetupWithManager(mgr, filter); err != nil {
 		setupLog.Error("unable to create module controller", "err", err)
 		os.Exit(1)
 	}

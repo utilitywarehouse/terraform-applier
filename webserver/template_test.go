@@ -161,9 +161,9 @@ Apply complete! Resources: 7 added, 0 changed, 0 destroyed.`,
 		return
 	}
 
-	// uncomment to load index.html file locally after running test
-	if err := os.WriteFile("index.html", rendered.Bytes(), 0666); err != nil {
-		t.Errorf("error reading test file:  %v\n", err)
-		return
-	}
+	// // uncomment to load index.html file locally after running test
+	// if err := os.WriteFile("index.html", rendered.Bytes(), 0666); err != nil {
+	// 	t.Errorf("error reading test file:  %v\n", err)
+	// 	return
+	// }
 }
