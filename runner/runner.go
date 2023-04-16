@@ -75,7 +75,11 @@ func (r *Runner) Start(ctx context.Context, done chan bool) {
 				r.Metrics.IncRunningModuleCount(req.Namespace)
 				start := time.Now()
 
+				r.Log.Info("starting run", "module", req.NamespacedName, "type", req.Type)
+
 				success := r.process(req, cancelChan)
+
+				r.Log.Info("run finished", "module", req.NamespacedName, "success", success)
 
 				r.Metrics.UpdateModuleSuccess(req.Name, req.Namespace, success)
 				r.Metrics.UpdateModuleRunDuration(req.Name, req.Namespace, time.Since(start).Seconds(), success)
@@ -87,8 +91,6 @@ func (r *Runner) Start(ctx context.Context, done chan bool) {
 // process will prepare and run module it returns bool indicating failed run
 func (r *Runner) process(req Request, cancelChan <-chan struct{}) bool {
 	log := r.Log.With("module", req.NamespacedName)
-
-	log.Debug("starting run....")
 
 	// create new context
 	ctx, cancel := context.WithCancel(context.Background())
