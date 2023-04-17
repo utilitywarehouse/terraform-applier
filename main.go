@@ -109,9 +109,8 @@ var (
 				"if not set, it will choose the latest available one. Ignored if `TERRAFORM_PATH` is set.",
 		},
 		&cli.StringFlag{
-			Name:        "global-run-envs",
-			EnvVars:     []string{"GLOBAL_RUN_ENVS"},
-			Destination: &terraformPath,
+			Name:    "global-run-envs",
+			EnvVars: []string{"GLOBAL_RUN_ENVS"},
 			Usage: "The comma separated list of ENVs which will be passed from controller to all terraform run process. " +
 				"The values should be set on controller",
 		},
