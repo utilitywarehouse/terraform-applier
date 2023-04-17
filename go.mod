@@ -12,7 +12,7 @@ require (
 	github.com/hashicorp/terraform-exec v0.18.1
 	github.com/hashicorp/vault/api v1.9.0
 	github.com/onsi/ginkgo/v2 v2.9.2
-	github.com/onsi/gomega v1.27.4
+	github.com/onsi/gomega v1.27.6
 	github.com/prometheus/client_golang v1.14.0
 	github.com/robfig/cron/v3 v3.0.1
 	github.com/urfave/cli/v2 v2.25.1
