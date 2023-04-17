@@ -21,7 +21,7 @@ import (
 )
 
 var (
-	rePlanStatus  = regexp.MustCompile(`.*(Plan: .* destroy)`)
+	rePlanStatus  = regexp.MustCompile(`.*((Plan:|No changes.) .*)`)
 	reApplyStatus = regexp.MustCompile(`.*(Apply complete! .* destroyed)`)
 )
 
@@ -255,29 +255,31 @@ func (r *Runner) runTF(
 	}
 
 	diffDetected, planOut, err := te.plan(ctx)
+	module.Status.RunOutput = planOut
 	if err != nil {
 		log.Error("unable to plan module", "err", err)
-		module.Status.LastDriftInfo = tfaplv1beta1.OutputStats{Timestamp: &metav1.Time{Time: r.Clock.Now()}, CommitHash: commitHash, Output: planOut + "\n" + err.Error()}
 		r.setFailedStatus(req, module, tfaplv1beta1.ReasonPlanFailed, err.Error(), r.Clock.Now())
 		return false
 	}
 
+	// extract last line of output
+	// Plan: X to add, 0 to change, 0 to destroy.
+	// OR
+	// No changes. Your infrastructure matches the configuration.
+	planStatus := rePlanStatus.FindString(planOut)
+
+	log.Info("planed", "status", planStatus)
+
+	// return if no drift detected
 	if !diffDetected {
-		if err = r.SetRunFinishedStatus(req.NamespacedName, module, tfaplv1beta1.ReasonPlanedNoDriftDetected, "No changes. Your infrastructure matches the configuration.", r.Clock.Now()); err != nil {
+		if err = r.SetRunFinishedStatus(req.NamespacedName, module, tfaplv1beta1.ReasonPlanedNoDriftDetected, planStatus, r.Clock.Now()); err != nil {
 			log.Error("unable to set no drift status", "err", err)
 			return false
 		}
 		return true
 	}
 
-	// extract last line of output
-	// Plan: X to add, 0 to change, 0 to destroy.
-	planStatus := rePlanStatus.FindString(planOut)
-
-	log.Info("planed", "status", planStatus)
-
-	module.Status.LastDriftInfo = tfaplv1beta1.OutputStats{Timestamp: &metav1.Time{Time: r.Clock.Now()}, CommitHash: commitHash, Output: planOut}
-
+	// return if plan only mode
 	if module.Spec.PlanOnly != nil && *module.Spec.PlanOnly {
 		if err = r.SetRunFinishedStatus(req.NamespacedName, module, tfaplv1beta1.ReasonPlanedDriftDetected, "PlanOnly/"+planStatus, r.Clock.Now()); err != nil {
 			log.Error("unable to set drift status", "err", err)
@@ -300,14 +302,14 @@ func (r *Runner) runTF(
 	}
 
 	applyOut, err := te.apply(ctx)
+	module.Status.RunOutput = planOut + applyOut
 	if err != nil {
 		log.Error("unable to plan module", "err", err)
-		module.Status.LastApplyInfo = tfaplv1beta1.OutputStats{Timestamp: &metav1.Time{Time: r.Clock.Now()}, CommitHash: commitHash, Output: applyOut + "\n" + err.Error()}
 		r.setFailedStatus(req, module, tfaplv1beta1.ReasonApplyFailed, err.Error(), r.Clock.Now())
 		return false
 	}
 
-	module.Status.LastApplyInfo = tfaplv1beta1.OutputStats{Timestamp: &metav1.Time{Time: r.Clock.Now()}, CommitHash: commitHash, Output: applyOut}
+	module.Status.LastApplyInfo = tfaplv1beta1.OutputStats{Timestamp: &metav1.Time{Time: r.Clock.Now()}, CommitHash: commitHash, Output: planOut + applyOut}
 
 	// extract last line of output
 	// Apply complete! Resources: 1 added, 0 changed, 0 destroyed.

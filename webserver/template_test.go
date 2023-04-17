@@ -75,11 +75,7 @@ func Test_ExecuteTemplate(t *testing.T) {
 				RunCommitHash: "abcccf2a0f758ba0d8e88a834a2acdba5885577c",
 				RunCommitMsg:  `initial commit (john)`,
 				Type:          tfaplv1beta1.ScheduledRun,
-				LastDriftInfo: tfaplv1beta1.OutputStats{
-					CommitHash: "abcccf2a0f758ba0d8e88a834a2acdba5885577c",
-					Timestamp:  getMetaTime(2, 15, 19),
-					Output: `2
-
+				RunOutput: `
 Terraform used the selected providers to generate the following execution
 plan. Resource actions are indicated with the following symbols:
 + create
@@ -102,7 +98,6 @@ Terraform will perform the following actions:
 	}
 
 Plan: 7 to add, 0 to change, 0 to destroy.`,
-				},
 				LastApplyInfo: tfaplv1beta1.OutputStats{
 					CommitHash: "abcccf2a0f758ba0d8e88a834a2acdba5885577c",
 					Timestamp:  getMetaTime(2, 15, 39),

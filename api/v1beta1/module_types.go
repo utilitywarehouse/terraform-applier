@@ -128,9 +128,10 @@ type ModuleStatus struct {
 	// +optional
 	RunCommitMsg string `json:"runCommitMsg,omitempty"`
 
-	// LastDriftInfo is the stdout of plan command.  it may contain error stream
+	// runOutput is the stdout of terraform command. it may contain error stream
 	// +optional
-	LastDriftInfo OutputStats `json:"lastDriftInfo,omitempty"`
+	RunOutput string `json:"runOutput,omitempty"`
+
 	// LastApplyInfo is the stdout of apply command. it may contain error stream
 	// +optional
 	LastApplyInfo OutputStats `json:"lastApplyInfo,omitempty"`
