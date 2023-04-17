@@ -44,6 +44,7 @@ type Runner struct {
 	TerraformExecPath      string
 	TerminationGracePeriod time.Duration
 	AWSSecretsEngineConfig vault.AWSSecretsEngineInterface
+	GlobalENVs             []string
 }
 
 // Start runs a continuous loop that starts a new run when a request comes into the queue channel.

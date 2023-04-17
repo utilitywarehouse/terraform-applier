@@ -66,6 +66,11 @@ func (r *Runner) NewTFRunner(
 		return nil, err
 	}
 
+	// add global envs to run envs
+	for _, ge := range r.GlobalENVs {
+		envs[ge] = os.Getenv(ge)
+	}
+
 	tf.SetEnv(envs)
 
 	// Setup *.auto.tfvars.json file to auto load TF variables during plan and apply
