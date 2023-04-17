@@ -335,7 +335,7 @@ func main() {
 }
 
 func run(c *cli.Context) {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(c.Context)
 
 	setupLog := logger.Named("setup")
 
