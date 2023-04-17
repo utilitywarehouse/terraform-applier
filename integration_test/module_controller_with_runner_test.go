@@ -119,9 +119,7 @@ var _ = Describe("Module controller with Runner", func() {
 			Expect(fetchedModule.Status.StateMessage).Should(ContainSubstring("Apply complete"))
 
 			// Make sure LastDriftInfo & LastApplyInfo is also set
-			Expect(fetchedModule.Status.LastDriftInfo.CommitHash).Should(Equal(commitHash))
-			Expect(fetchedModule.Status.LastDriftInfo.Output).Should(ContainSubstring("Plan:"))
-			Expect(fetchedModule.Status.LastDriftInfo.Timestamp.UTC()).Should(Equal(fakeClock.T.UTC()))
+			Expect(fetchedModule.Status.RunOutput).Should(ContainSubstring("Plan:"))
 
 			Expect(fetchedModule.Status.LastApplyInfo.CommitHash).Should(Equal(commitHash))
 			Expect(fetchedModule.Status.LastApplyInfo.Output).Should(ContainSubstring("Apply complete!"))
@@ -193,12 +191,9 @@ var _ = Describe("Module controller with Runner", func() {
 			Expect(fetchedModule.Status.CurrentState).Should(Equal("Ready"))
 			Expect(fetchedModule.Status.RunDuration.Duration.String()).Should(Equal("1m0s"))
 			Expect(fetchedModule.Status.StateMessage).Should(ContainSubstring("PlanOnly"))
+			Expect(fetchedModule.Status.RunOutput).Should(ContainSubstring("Plan:"))
 
-			// Make sure LastDriftInfo & LastApplyInfo is also set
-			Expect(fetchedModule.Status.LastDriftInfo.CommitHash).Should(Equal(commitHash))
-			Expect(fetchedModule.Status.LastDriftInfo.Output).Should(ContainSubstring("Plan:"))
-			Expect(fetchedModule.Status.LastDriftInfo.Timestamp.UTC()).Should(Equal(fakeClock.T.UTC()))
-
+			// Make sure LastApplyInfo is also set
 			Expect(fetchedModule.Status.LastApplyInfo.CommitHash).Should(Equal(""))
 			Expect(fetchedModule.Status.LastApplyInfo.Output).Should(ContainSubstring(""))
 			Expect(fetchedModule.Status.LastApplyInfo.Timestamp).Should(BeNil())
@@ -314,10 +309,7 @@ var _ = Describe("Module controller with Runner", func() {
 			Expect(fetchedModule.Status.RunDuration.Duration.String()).Should(Equal("1m0s"))
 			Expect(fetchedModule.Status.StateMessage).Should(ContainSubstring("Apply complete"))
 
-			// Make sure LastDriftInfo & LastApplyInfo is also set
-			Expect(fetchedModule.Status.LastDriftInfo.CommitHash).Should(Equal(commitHash))
-			Expect(fetchedModule.Status.LastDriftInfo.Output).Should(ContainSubstring("Plan:"))
-			Expect(fetchedModule.Status.LastDriftInfo.Timestamp.UTC()).Should(Equal(fakeClock.T.UTC()))
+			Expect(fetchedModule.Status.RunOutput).Should(ContainSubstring("Plan:"))
 
 			Expect(fetchedModule.Status.LastApplyInfo.CommitHash).Should(Equal(commitHash))
 			Expect(fetchedModule.Status.LastApplyInfo.Timestamp.UTC()).Should(Equal(fakeClock.T.UTC()))

@@ -101,24 +101,18 @@
                 </div>
                 <div>
                     <nav>
-                        <div class="nav nav-tabs" id="nav-tab" role="tablist">
-                            <a class="nav-link active" href="#nav-plan" data-bs-toggle="tab" role="tab">Last Drift Output (plan)</a>
-                            <a class="nav-link" href="#nav-apply" data-bs-toggle="tab" role="tab">Last Apply Output</a>
+                        <div class="nav nav-tabs" role="tablist">
+                            <a class="nav-link active" href="#{{sanitizedUniqueName .}}-nav-plan" data-bs-toggle="tab" role="tab">Last Run Output</a>
+                            <a class="nav-link" href="#{{sanitizedUniqueName .}}-nav-apply" data-bs-toggle="tab" role="tab">Last Apply Output</a>
                         </div>
                     </nav>
-                    <div class="tab-content" id="nav-tabContent">
-                        <div class="tab-pane fade show active" id="nav-plan" role="tabpanel">
-                            <div class="d-flex flex-row m-2">
-                                <div class="pe-4">Commit: 
-                                    <small><a href="{{ commitURL .Status.RemoteURL .Status.LastDriftInfo.CommitHash}}">{{.Status.LastDriftInfo.CommitHash}}</a></small>
-                                </div>
-                                <div>At: <small>{{ formattedTime .Status.LastDriftInfo.Timestamp }}</small></div>
-                            </div>
+                    <div class="tab-content">
+                        <div class="tab-pane fade show active" id="{{sanitizedUniqueName .}}-nav-plan" role="tabpanel">
                             <pre class="file-output font-monospace p-3" style="max-height: 40em; background-color: #f5f5f5;">
-                                <small>{{.Status.LastDriftInfo.Output}}</small>
+                                <small>{{.Status.RunOutput}}</small>
                             </pre>
                         </div>
-                        <div class="tab-pane fade" id="nav-apply" role="tabpanel">
+                        <div class="tab-pane fade" id="{{sanitizedUniqueName .}}-nav-apply" role="tabpanel">
                             <div class="d-flex flex-row m-2">
                                 <div class="pe-4">Commit: 
                                     <small><a href="{{ commitURL .Status.RemoteURL .Status.LastApplyInfo.CommitHash}}">{{.Status.LastApplyInfo.CommitHash}}</a></small>

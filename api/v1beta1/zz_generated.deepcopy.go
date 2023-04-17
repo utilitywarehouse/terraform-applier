@@ -149,7 +149,6 @@ func (in *ModuleStatus) DeepCopyInto(out *ModuleStatus) {
 		*out = new(metav1.Duration)
 		**out = **in
 	}
-	in.LastDriftInfo.DeepCopyInto(&out.LastDriftInfo)
 	in.LastApplyInfo.DeepCopyInto(&out.LastApplyInfo)
 }
 

@@ -480,24 +480,10 @@ spec:
                   run/event
                 type: string
               lastApplyInfo:
-                description: LastApplyInfo is the stdout of apply command. it may
-                  contain error stream
-                properties:
-                  hash:
-                    description: CommitHash is the hash of git commit of this output.
-                    type: string
-                  output:
-                    description: Output is the stdout of terraform command. it may
-                      contain error stream
-                    type: string
-                  timestamp:
-                    description: Timestamp when logs was captured.
-                    format: date-time
-                    type: string
-                type: object
-              lastDriftInfo:
                 description: LastDriftInfo is the stdout of plan command.  it may
-                  contain error stream
+                  contain error stream LastDriftInfo OutputStats `json:"lastDriftInfo,omitempty"`
+                  LastApplyInfo is the stdout of apply command. it may contain error
+                  stream
                 properties:
                   hash:
                     description: CommitHash is the hash of git commit of this output.
@@ -526,6 +512,10 @@ spec:
                 type: string
               runDuration:
                 description: The duration of the last terraform run.
+                type: string
+              runOutput:
+                description: runOutput is the stdout of terraform command. it may
+                  contain error stream
                 type: string
               runStartedAt:
                 description: Information when was the last time the run was started.

@@ -88,47 +88,48 @@ it will not do `apply` even if drift is detected.
 Controller will force shutdown on current stage run if it takes more time then `TERMINATION_GRACE_PERIOD` set on controller.
 
 ### Controller config
-#### Environment variables
 
-- `REPO_PATH` - (default: `/src`) Absolute path to the directory containing the modules
+- `--repo-path (REPO_PATH)` - (default: `/src/modules`) Absolute path to the directory containing the modules
   to be applied. The immediate subdirectories of this directory should contain
   the root modules which will be referenced by users in `module`.
-
-- `CRD_LABEL_SELECTOR` - (default: `""`) If present controller will only watch and process modules with this label. 
-Env value string should be in the form of 'label-key=label-value'. if multiple terraform-applier is running in same cluster 
-and if any 1 of them is in cluster scope mode then this env `must` be set otherwise it will watch ALL modules and interfere 
-with other controllers run.
-- `WATCH_NAMESPACES` - (default: `""`) if set controller will only watch given namespaces for modules. it will operate 
-in namespace scope mode and controller will not need any cluster permissions. if `CRD_LABEL_SELECTOR` also set then it will
-only watch modules with selector label in a given namespace.
-- `ELECTION_ID` - (default: `auto generated`) it determines the name of the resource that leader election will use for holding the leader lock. if multiple controllers are running with same label selector and watch namespace value then they belong to same stack. if election enabled, ELECTION_ID needs to be unique per stack. If this is not unique to the stack then only one stack will be working concurrently. if not set value will be auto generated based on given label selector and watch namespace value.
-
-- `LOG_LEVEL` - (default: `INFO`) `TRACE|DEBUG|INFO|WARN|ERROR`, case insensitive.
-- `LISTEN_ADDRESS` - (default: `:8080`) The listening address of web server.
-- `MIN_INTERVAL_BETWEEN_RUNS` - (default: `60`) The minimum interval in seconds, user can set
-  between 2 consecutive runs. This value defines the frequency of runs.
-- `TERMINATION_GRACE_PERIOD` - (default: `60`) Termination grace period is the ime given to
+- `--min-interval-between-runs (MIN_INTERVAL_BETWEEN_RUNS)` - (default: `60`) The minimum interval in seconds, user can set between 2 consecutive runs. This value defines the frequency of runs.
+- `--termination-grace-period (TERMINATION_GRACE_PERIOD)` - (default: `60`) Termination grace period is the ime given to
   the running job to finish current run after 1st TERM signal is received. After this timeout runner will be forced to shutdown.
   Ideally this timeout should be just below the `terminationGracePeriodSeconds` set on controller pod.
-- `TERRAFORM_PATH` - (default: `""`) The local path to a terraform
+- `--terraform-path (TERRAFORM_PATH)` - (default: `""`) The local path to a terraform
   binary to use.
-- `TERRAFORM_VERSION` - (default: `""`) The version of terraform to
+- `--terraform-version (TERRAFORM_VERSION)` - (default: `""`) The version of terraform to
   use. The applier will install the requested release when it starts up. If you
   don't specify an explicit version, it will choose the latest available
   one. Ignored if `TERRAFORM_PATH` is set.
+---
+- `--module-label-selector (MODULE_LABEL_SELECTOR)` - (default: `""`) If present controller will only watch and process modules with this label. 
+Env value string should be in the form of 'label-key=label-value'. if multiple terraform-applier is running in same cluster 
+and if any 1 of them is in cluster scope mode then this env `must` be set otherwise it will watch ALL modules and interfere 
+with other controllers run.
+- `--watch-namespaces (WATCH_NAMESPACES)` - (default: `""`) if set controller will only watch given namespaces for modules. it will operate 
+in namespace scope mode and controller will not need any cluster permissions. if `label selector` also set then it will
+only watch modules with selector label in a given namespace.
+- `--leader-elect (LEADER_ELECT)` - (default: `false`) Enable leader election for controller manager. Enabling this will ensure there is only one active controller manager.
+- `--election-id (ELECTION_ID)` - (default: `auto generated`) it determines the name of the resource that leader election will use for holding the leader lock. if multiple controllers are running with same label selector and watch namespace value then they belong to same stack. if election enabled, ELECTION_ID needs to be unique per stack. If this is not unique to the stack then only one stack will be working concurrently. if not set value will be auto generated based on given label selector and watch namespace value.
+---
+- `--log-level (LOG_LEVEL)` - (default: `INFO`) `TRACE|DEBUG|INFO|WARN|ERROR`, case insensitive.
+- `--webserver-bind-address` - (default: `8080`) The address the web server binds to.
+- `--metrics-bind-address` - (default: `8081`) The address the metric endpoint binds to.
+- `--health-probe-bind-address` - (default: `8082`) The address the probe endpoint binds to.
+---
+- `(VAULT_ADDR)` - (default: `""`) The Address of the Vault server expressed as a URL and port
+- `(VAULT_CACERT)` - (default: `""`) The path to a PEM-encoded CA certificate file.
+- `(VAULT_CAPATH)` - (default: `""`) The Path to a directory of PEM-encoded CA certificate files on the local disk.
+- `--vault-aws-secret-engine-path (VAULT_AWS_SEC_ENG_PATH)` - (default: `/aws`) The path where AWS secrets engine is enabled.
+- `--vault-kube-auth-path (VAULT_KUBE_AUTH_PATH)` - (default: `/auth/kubernetes`) The path where kubernetes auth method is mounted. 
+---
+- `--oidc-callback-url (OIDC_CALLBACK_URL)` - (default: `""`) The callback url used for OIDC auth flow, this should be the terraform-applier url.
+- `--oidc-client-id (OIDC_CLIENT_ID)` - (default: `""`) The client ID of the OIDC app.
+- `--oidc-client-secret (OIDC_CLIENT_SECRET)` - (default: `""`) The client secret of the OIDC app.
+- `--oidc-issuer (OIDC_ISSUER)` - (default: `""`) The url of the IDP where OIDC app is created. 
 
-- `VAULT_ADDR` - (default: `""`) The Address of the Vault server expressed as a URL and port
-- `VAULT_CACERT` - (default: `""`) The path to a PEM-encoded CA certificate file.
-- `VAULT_CAPATH` - (default: `""`) The Path to a directory of PEM-encoded CA certificate files on the local disk.
-- `VAULT_AWS_ENG_PATH` - (default: `/aws`) The path where AWS secrets engine is enabled.
-- `VAULT_KUBE_AUTH_PATH` - (default: `/auth/kubernetes`) The path where kubernetes auth method is mounted. 
-
-- `OIDC_CALLBACK_URL` - (default: `""`) The callback url used for OIDC auth flow, this should be the terraform-applier url.
-- `OIDC_CLIENT_ID` - (default: `""`) The client ID of the OIDC app.
-- `OIDC_CLIENT_SECRET` - (default: `""`) The client secret of the OIDC app.
-- `OIDC_ISSUER` - (default: `""`) The url of the IDP where OIDC app is created. 
-
-**If all 4 `OIDC` envs are not set then web server will skip authentication and all `force run` requests will be allowed.**
+**If  `OIDC Issuer` is not set then web server will skip authentication and all `force run` requests will be allowed.**
 
 ## Vault integration
 terraform-applier supports fetching (generating) secrets from the vault. Module's delegated service account's jwt (secret:terraform-applier-delegate-token) will be used for vault login for given `vaultRole`. at the moment only aws secrets engine is supported.

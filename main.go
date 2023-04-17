@@ -3,12 +3,10 @@ package main
 import (
 	"context"
 	"crypto/sha256"
-	"flag"
 	"fmt"
 	"io"
 	"os"
 	"os/signal"
-	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -21,6 +19,8 @@ import (
 	"github.com/hashicorp/hc-install/releases"
 	"github.com/hashicorp/hc-install/src"
 	"github.com/hashicorp/terraform-exec/tfexec"
+	"github.com/urfave/cli/v2"
+	"go.uber.org/zap/zapcore"
 
 	"github.com/utilitywarehouse/terraform-applier/git"
 	"github.com/utilitywarehouse/terraform-applier/metrics"
@@ -56,13 +56,145 @@ var (
 
 	scheme = runtime.NewScheme()
 
+	logLevel           string
+	repoPath           string
 	labelSelectorKey   string
 	labelSelectorValue string
+	electionID         string
+	terraformPath      string
+	terraformVersion   string
+	watchNamespaces    []string
 
-	watchNamespaces []string
+	zapLevelStrings = map[string]zapcore.Level{
+		"trace": zapcore.DebugLevel,
+		"debug": zapcore.DebugLevel,
+		"info":  zapcore.InfoLevel,
+		"warn":  zapcore.WarnLevel,
+		"error": zapcore.ErrorLevel,
+	}
 
-	terminationGracePeriodDuration time.Duration
-	minIntervalBetweenRunsDuration time.Duration
+	flags = []cli.Flag{
+		&cli.StringFlag{
+			Name:        "repo-path",
+			EnvVars:     []string{"REPO_PATH"},
+			Value:       "/src/modules",
+			Destination: &repoPath,
+			Usage: "Absolute path to the directory containing the modules to be applied. " +
+				"The immediate subdirectories of this directory should contain the root modules which will be referenced in modules.",
+		},
+		&cli.IntFlag{
+			Name:    "min-interval-between-runs",
+			EnvVars: []string{"MIN_INTERVAL_BETWEEN_RUNS"},
+			Value:   60,
+			Usage:   "The minimum interval in seconds, user can set between 2 consecutive runs. This value defines the frequency of runs.",
+		},
+		&cli.IntFlag{
+			Name:    "termination-grace-period",
+			EnvVars: []string{"TERMINATION_GRACE_PERIOD"},
+			Value:   60,
+			Usage: "Termination grace period in second, is the time given to the running job to finish current run after 1st TERM signal is received. " +
+				"After this timeout runner will be forced to shutdown.",
+		},
+		&cli.StringFlag{
+			Name:        "terraform-path",
+			EnvVars:     []string{"TERRAFORM_PATH"},
+			Destination: &terraformPath,
+			Usage:       " The local path to a terraform binary to use.",
+		},
+		&cli.StringFlag{
+			Name:        "terraform-version",
+			EnvVars:     []string{"TERRAFORM_VERSION"},
+			Destination: &terraformVersion,
+			Usage: "The version of terraform to use. The controller will install the requested release when it starts up. " +
+				"if not set, it will choose the latest available one. Ignored if `TERRAFORM_PATH` is set.",
+		},
+
+		&cli.StringFlag{
+			Name:    "module-label-selector",
+			EnvVars: []string{"MODULE_LABEL_SELECTOR"},
+			Usage: "If set controller will only watch and process modules with this label. " +
+				"value should be in the form of 'label-key=label-value'.",
+		},
+		&cli.StringFlag{
+			Name:    "watch-namespaces",
+			EnvVars: []string{"WATCH_NAMESPACES"},
+			Usage: "if set controller will only watch given namespaces for modules. " +
+				"it will operate in namespace scope mode.",
+		},
+		&cli.BoolFlag{
+			Name:    "leader-elect",
+			EnvVars: []string{"LEADER_ELECT"},
+			Value:   false,
+			Usage: "Enable leader election for controller manager. " +
+				"Enabling this will ensure there is only one active controller manager.",
+		},
+		&cli.StringFlag{
+			Name:        "election-id",
+			EnvVars:     []string{"ELECTION_ID"},
+			Destination: &electionID,
+			Usage: "it determines the name of the resource that leader election will use for holding the leader lock. " +
+				"if multiple controllers are running with same label selector and watch namespace value then they belong to same stack. if election enabled, " +
+				"election id needs to be unique per stack. If this is not unique to the stack then only one stack will be working concurrently. " +
+				"if not set value will be auto generated based on given label selector and watch namespace value.",
+		},
+
+		&cli.StringFlag{
+			Name:    "vault-aws-secret-engine-path",
+			EnvVars: []string{"VAULT_AWS_SEC_ENG_PATH"},
+			Value:   "/aws",
+			Usage:   "The path where AWS secrets engine is enabled.",
+		},
+		&cli.StringFlag{
+			Name:    "vault-kube-auth-path",
+			EnvVars: []string{"VAULT_KUBE_AUTH_PATH"},
+			Value:   "/auth/kubernetes",
+			Usage:   "The path where kubernetes auth method is mounted.",
+		},
+
+		&cli.StringFlag{
+			Name:    "oidc-issuer",
+			EnvVars: []string{"OIDC_ISSUER"},
+			Usage:   "The url of the IDP where OIDC app is created.",
+		},
+		&cli.StringFlag{
+			Name:    "oidc-client-id",
+			EnvVars: []string{"OIDC_CLIENT_ID"},
+			Usage:   "The client ID of the OIDC app.",
+		},
+		&cli.StringFlag{
+			Name:    "oidc-client-secret",
+			EnvVars: []string{"OIDC_CLIENT_SECRET"},
+			Usage:   "The client secret of the OIDC app.",
+		},
+		&cli.StringFlag{
+			Name:    "oidc-callback-url",
+			EnvVars: []string{"OIDC_CALLBACK_URL"},
+			Usage:   "The callback url used for OIDC auth flow, this should be the terraform-applier url.",
+		},
+
+		&cli.StringFlag{
+			Name:        "log-level",
+			EnvVars:     []string{"LOG_LEVEL"},
+			Value:       "info",
+			Destination: &logLevel,
+			Usage:       "Log level",
+		},
+		&cli.StringFlag{
+			Name:  "webserver-bind-address",
+			Value: ":8080",
+			Usage: "The address the web server binds to.",
+		},
+		&cli.StringFlag{
+			Name:  "metrics-bind-address",
+			Value: ":8081",
+			Usage: "The address the metric endpoint binds to.",
+		},
+		&cli.StringFlag{
+			Name:  "health-probe-bind-address",
+			Value: ":8082",
+			Usage: "The address the probe endpoint binds to.",
+		},
+	}
 )
 
 func init() {
@@ -73,61 +205,16 @@ func init() {
 
 	logger = hclog.New(&hclog.LoggerOptions{
 		Name:            "terraform-applier",
-		Level:           hclog.LevelFromString("warn"),
+		Level:           hclog.Info,
 		IncludeLocation: false,
 	})
 }
 
-var (
-	logLevel                      = getEnv("LOG_LEVEL", "warn")
-	repoPath                      = getEnv("REPO_PATH", "/src")
-	terminationGracePeriodSeconds = getEnv("TERMINATION_GRACE_PERIOD", "60")
-	minIntervalBetweenRuns        = getEnv("MIN_INTERVAL_BETWEEN_RUNS", "60")
-	listenAddress                 = getEnv("LISTEN_ADDRESS", ":8080")
-
-	labelSelectorStr   = os.Getenv("CRD_LABEL_SELECTOR")
-	watchNamespacesStr = os.Getenv("WATCH_NAMESPACES")
-	electionID         = os.Getenv("ELECTION_ID")
-
-	vaultAWSEngPath   = getEnv("VAULT_AWS_ENG_PATH", "/aws")
-	vaultKubeAuthPath = getEnv("VAULT_KUBE_AUTH_PATH", "/auth/kubernetes")
-
-	oidcCallbackURL  = os.Getenv("OIDC_CALLBACK_URL")
-	oidcClientID     = os.Getenv("OIDC_CLIENT_ID")
-	oidcClientSecret = os.Getenv("OIDC_CLIENT_SECRET")
-	oidcIssuer       = os.Getenv("OIDC_ISSUER")
-
-	terraformPath    = os.Getenv("TERRAFORM_PATH")
-	terraformVersion = os.Getenv("TERRAFORM_VERSION")
-)
-
-func getEnv(key, fallback string) string {
-	value, ok := os.LookupEnv(key)
-	if ok {
-		return value
-	}
-	return fallback
-}
-
-func validate() {
+func validate(c *cli.Context) {
 	logger.SetLevel(hclog.LevelFromString(logLevel))
 
-	tgp, err := strconv.Atoi(terminationGracePeriodSeconds)
-	if err != nil {
-		logger.Error("TERMINATION_GRACE_PERIOD must be an int")
-		os.Exit(1)
-	}
-	terminationGracePeriodDuration = time.Duration(tgp) * time.Second
-
-	minInterval, err := strconv.Atoi(minIntervalBetweenRuns)
-	if err != nil {
-		logger.Error("MIN_INTERVAL_BETWEEN_RUNS must be an int")
-		os.Exit(1)
-	}
-	minIntervalBetweenRunsDuration = time.Duration(minInterval) * time.Second
-
-	if labelSelectorStr != "" {
-		labelKV := strings.Split(labelSelectorStr, "=")
+	if c.IsSet("module-label-selector") {
+		labelKV := strings.Split(c.String("module-label-selector"), "=")
 		if len(labelKV) != 2 || labelKV[0] == "" || labelKV[1] == "" {
 			logger.Error("CRD_LABEL_SELECTOR must be in the form 'key=value'")
 			os.Exit(1)
@@ -136,7 +223,7 @@ func validate() {
 		labelSelectorValue = labelKV[1]
 	}
 
-	watchNamespaces = strings.Split(watchNamespacesStr, ",")
+	watchNamespaces = strings.Split(c.String("watch-namespaces"), ",")
 
 	// https://github.com/kubernetes-sigs/controller-runtime/issues/2273
 	if len(watchNamespaces) > 1 {
@@ -147,8 +234,8 @@ func validate() {
 	logger.Info("config", "repoPath", repoPath)
 	logger.Info("config", "watchNamespaces", watchNamespaces)
 	logger.Info("config", "selectorLabel", fmt.Sprintf("%s:%s", labelSelectorKey, labelSelectorValue))
-	logger.Info("config", "minIntervalBetweenRunsDuration", minIntervalBetweenRunsDuration)
-	logger.Info("config", "terminationGracePeriodDuration", terminationGracePeriodDuration)
+	logger.Info("config", "minIntervalBetweenRunsDuration", c.Int("min-interval-between-runs"))
+	logger.Info("config", "terminationGracePeriodDuration", c.Int("termination-grace-period"))
 
 }
 
@@ -232,26 +319,30 @@ func generateElectionID(salt, labelSelectorKey, labelSelectorValue string, watch
 }
 
 func main() {
-	ctx, cancel := context.WithCancel(context.Background())
+	app := &cli.App{
+		Name: "terraform-applier",
+		Usage: "terraform-applier is a kube controller for module CRD. " +
+			"module enables continuous deployment of Terraform modules by applying from a Git repository.",
+		Flags: flags,
+		Action: func(cCtx *cli.Context) error {
+			validate(cCtx)
+			run(cCtx)
+			return nil
+		},
+	}
 
-	validate()
+	app.Run(os.Args)
+}
+
+func run(c *cli.Context) {
+	ctx, cancel := context.WithCancel(c.Context)
 
 	setupLog := logger.Named("setup")
 
-	var metricsAddr string
-	var enableLeaderElection bool
-	var probeAddr string
-	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8081", "The address the metric endpoint binds to.")
-	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8082", "The address the probe endpoint binds to.")
-	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
-		"Enable leader election for controller manager. "+
-			"Enabling this will ensure there is only one active controller manager.")
 	opts := zap.Options{
-		Development: false,
+		Development: true,
+		Level:       zapLevelStrings[strings.ToLower(logLevel)],
 	}
-	opts.BindFlags(flag.CommandLine)
-	flag.Parse()
-
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
 	wsQueue := make(chan runner.Request)
@@ -287,10 +378,10 @@ func main() {
 
 	options := ctrl.Options{
 		Scheme:                 scheme,
-		MetricsBindAddress:     metricsAddr,
+		MetricsBindAddress:     c.String("metrics-bind-address"),
 		Port:                   9443,
-		HealthProbeBindAddress: probeAddr,
-		LeaderElection:         enableLeaderElection,
+		HealthProbeBindAddress: c.String("health-probe-bind-address"),
+		LeaderElection:         c.Bool("leader-elect"),
 		LeaderElectionID:       electionID,
 	}
 
@@ -334,7 +425,7 @@ func main() {
 		Queue:                  wsQueue,
 		GitUtil:                gitUtil,
 		Log:                    logger.Named("manager"),
-		MinIntervalBetweenRuns: minIntervalBetweenRunsDuration,
+		MinIntervalBetweenRuns: time.Duration(c.Int("min-interval-between-runs")) * time.Second,
 	}).SetupWithManager(mgr, filter); err != nil {
 		setupLog.Error("unable to create module controller", "err", err)
 		os.Exit(1)
@@ -366,26 +457,30 @@ func main() {
 		Log:                    logger.Named("runner"),
 		Metrics:                metrics,
 		TerraformExecPath:      execPath,
-		TerminationGracePeriod: terminationGracePeriodDuration,
+		TerminationGracePeriod: time.Duration(c.Int("termination-grace-period")) * time.Second,
 		AWSSecretsEngineConfig: &vault.AWSSecretsEngineConfig{
-			SecretsEngPath: vaultAWSEngPath,
-			AuthPath:       vaultKubeAuthPath,
+			SecretsEngPath: c.String("vault-aws-secret-engine-path"),
+			AuthPath:       c.String("vault-kube-auth-path"),
 		},
 	}
 
-	// try to setup oidc if any of the oidc ENVs set
-	if strings.Join([]string{oidcIssuer, oidcClientID, oidcClientSecret, oidcCallbackURL}, "") != "" {
-		oidcAuthenticator, err = oidc.NewAuthenticator(oidcIssuer, oidcClientID, oidcClientSecret, oidcCallbackURL)
+	if c.IsSet("oidc-issuer") {
+		oidcAuthenticator, err = oidc.NewAuthenticator(
+			c.String("oidc-issuer"),
+			c.String("oidc-client-id"),
+			c.String("oidc-client-secret"),
+			c.String("oidc-callback-url"),
+		)
 		if err != nil {
 			setupLog.Error("could not setup oidc authenticator", "error", err)
 			os.Exit(1)
 		}
-		setupLog.Info("OIDC authentication configured", "issuer", oidcIssuer, "clientID", oidcClientID)
+		setupLog.Info("OIDC authentication configured", "issuer", c.String("oidc-issuer"), "clientID", c.String("oidc-client-id"))
 	}
 
 	webserver := &webserver.WebServer{
 		Authenticator: oidcAuthenticator,
-		ListenAddress: listenAddress,
+		ListenAddress: c.String("webserver-bind-address"),
 		ClusterClt:    mgr.GetClient(),
 		KubeClient:    kubeClient,
 		RunQueue:      wsQueue,
