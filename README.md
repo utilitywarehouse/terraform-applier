@@ -102,6 +102,7 @@ Controller will force shutdown on current stage run if it takes more time then `
   use. The applier will install the requested release when it starts up. If you
   don't specify an explicit version, it will choose the latest available
   one. Ignored if `TERRAFORM_PATH` is set.
+- `--global-run-envs (GLOBAL_RUN_ENVS)` - (default: `""`) The comma separated list of ENVs which will be passed from controller to all terraform run process. The envs should be set on controller
 ---
 - `--module-label-selector (MODULE_LABEL_SELECTOR)` - (default: `""`) If present controller will only watch and process modules with this label. 
 Env value string should be in the form of 'label-key=label-value'. if multiple terraform-applier is running in same cluster 

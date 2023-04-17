@@ -99,7 +99,7 @@ var (
 			Name:        "terraform-path",
 			EnvVars:     []string{"TERRAFORM_PATH"},
 			Destination: &terraformPath,
-			Usage:       " The local path to a terraform binary to use.",
+			Usage:       "The local path to a terraform binary to use.",
 		},
 		&cli.StringFlag{
 			Name:        "terraform-version",
@@ -107,6 +107,13 @@ var (
 			Destination: &terraformVersion,
 			Usage: "The version of terraform to use. The controller will install the requested release when it starts up. " +
 				"if not set, it will choose the latest available one. Ignored if `TERRAFORM_PATH` is set.",
+		},
+		&cli.StringFlag{
+			Name:        "global-run-envs",
+			EnvVars:     []string{"GLOBAL_RUN_ENVS"},
+			Destination: &terraformPath,
+			Usage: "The comma separated list of ENVs which will be passed from controller to all terraform run process. " +
+				"The values should be set on controller",
 		},
 
 		&cli.StringFlag{
@@ -462,6 +469,7 @@ func run(c *cli.Context) {
 			SecretsEngPath: c.String("vault-aws-secret-engine-path"),
 			AuthPath:       c.String("vault-kube-auth-path"),
 		},
+		GlobalENVs: strings.Split(c.String("global-run-envs"), ","),
 	}
 
 	if c.IsSet("oidc-issuer") {
