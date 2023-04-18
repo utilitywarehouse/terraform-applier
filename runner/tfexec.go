@@ -66,12 +66,18 @@ func (r *Runner) NewTFRunner(
 		return nil, err
 	}
 
-	// add global envs to run envs
-	for _, ge := range r.GlobalENVs {
-		envs[ge] = os.Getenv(ge)
+	runEnv := make(map[string]string)
+
+	// first add Global ENV and then module ENVs
+	// this way user can override Global ENV if needed
+	for key := range r.GlobalENV {
+		runEnv[key] = r.GlobalENV[key]
+	}
+	for key := range envs {
+		runEnv[key] = envs[key]
 	}
 
-	tf.SetEnv(envs)
+	tf.SetEnv(runEnv)
 
 	// Setup *.auto.tfvars.json file to auto load TF variables during plan and apply
 	jsonBytes, err := json.Marshal(vars)

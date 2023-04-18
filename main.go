@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
@@ -64,6 +65,7 @@ var (
 	terraformPath      string
 	terraformVersion   string
 	watchNamespaces    []string
+	globalRunEnv       map[string]string
 
 	zapLevelStrings = map[string]zapcore.Level{
 		"trace": zapcore.DebugLevel,
@@ -109,8 +111,8 @@ var (
 				"if not set, it will choose the latest available one. Ignored if `TERRAFORM_PATH` is set.",
 		},
 		&cli.StringFlag{
-			Name:    "global-run-envs",
-			EnvVars: []string{"GLOBAL_RUN_ENVS"},
+			Name:    "allowed-controller-env",
+			EnvVars: []string{"ALLOWED_CONTROLLER_ENV"},
 			Usage: "The comma separated list of ENVs which will be passed from controller to all terraform run process. " +
 				"The values should be set on controller",
 		},
@@ -324,6 +326,45 @@ func generateElectionID(salt, labelSelectorKey, labelSelectorValue string, watch
 	return fmt.Sprintf("%x.terraform-applier.uw.systems", h.Sum(nil)[:5])
 }
 
+func setupGlobalEnv(c *cli.Context) {
+
+	globalRunEnv = make(map[string]string)
+
+	for _, env := range strings.Split(c.String("allowed-controller-env"), ",") {
+		globalRunEnv[env] = os.Getenv(env)
+	}
+
+	// KUBE_CONFIG_PATH will be used by modules with kubernetes backend.
+	// ideally modules should be using own SA to auth with kube cluster and not depend on default in cluster config of controller's SA
+	// but without this config terraform ignores `host` and `token` backend attributes
+	// hence generating config with just server info and setting it as Global ENV
+	// https://github.com/hashicorp/terraform/issues/31275
+	configPath := filepath.Join(os.TempDir(), "tf-applier-in-cluster-config")
+	globalRunEnv["KUBE_CONFIG_PATH"] = configPath
+
+	defaultCurrentKubeConfig := `apiVersion: v1
+kind: Config
+clusters:
+- cluster:
+    certificate-authority: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+    server: https://kubernetes.default.svc
+  name: in-cluster
+contexts:
+- context:
+    cluster: in-cluster
+  name: in-cluster
+current-context: in-cluster
+users: []
+preferences: {}
+`
+	err := os.WriteFile(configPath, []byte(defaultCurrentKubeConfig), 0666)
+	if err != nil {
+		logger.Error("unable to create custom in cluster config file", "err", err)
+		os.Exit(1)
+	}
+
+}
+
 func main() {
 	app := &cli.App{
 		Name: "terraform-applier",
@@ -332,6 +373,7 @@ func main() {
 		Flags: flags,
 		Action: func(cCtx *cli.Context) error {
 			validate(cCtx)
+			setupGlobalEnv(cCtx)
 			run(cCtx)
 			return nil
 		},
@@ -468,7 +510,7 @@ func run(c *cli.Context) {
 			SecretsEngPath: c.String("vault-aws-secret-engine-path"),
 			AuthPath:       c.String("vault-kube-auth-path"),
 		},
-		GlobalENVs: strings.Split(c.String("global-run-envs"), ","),
+		GlobalENV: globalRunEnv,
 	}
 
 	if c.IsSet("oidc-issuer") {
