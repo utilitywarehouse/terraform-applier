@@ -111,10 +111,10 @@ var (
 				"if not set, it will choose the latest available one. Ignored if `TERRAFORM_PATH` is set.",
 		},
 		&cli.StringFlag{
-			Name:    "allowed-controller-env",
-			EnvVars: []string{"ALLOWED_CONTROLLER_ENV"},
-			Usage: "The comma separated list of ENVs which will be passed from controller to all terraform run process. " +
-				"The values should be set on controller",
+			Name:    "controller-runtime-env",
+			EnvVars: []string{"CONTROLLER_RUNTIME_ENV"},
+			Usage: "The comma separated list of ENVs which will be passed from controller to its managed modules during terraform run. " +
+				"The values should be set on the controller.",
 		},
 
 		&cli.StringFlag{
@@ -330,7 +330,7 @@ func setupGlobalEnv(c *cli.Context) {
 
 	globalRunEnv = make(map[string]string)
 
-	for _, env := range strings.Split(c.String("allowed-controller-env"), ",") {
+	for _, env := range strings.Split(c.String("controller-runtime-env"), ",") {
 		globalRunEnv[env] = os.Getenv(env)
 	}
 
