@@ -102,7 +102,7 @@ Controller will force shutdown on current stage run if it takes more time then `
   use. The applier will install the requested release when it starts up. If you
   don't specify an explicit version, it will choose the latest available
   one. Ignored if `TERRAFORM_PATH` is set.
-- `--global-run-envs (GLOBAL_RUN_ENVS)` - (default: `""`) The comma separated list of ENVs which will be passed from controller to all terraform run process. The envs should be set on controller
+- `--controller-runtime-env (CONTROLLER_RUNTIME_ENV)` - (default: `""`) The comma separated list of ENVs which will be passed from controller to all terraform run process. The envs should be set on the controller.
 ---
 - `--module-label-selector (MODULE_LABEL_SELECTOR)` - (default: `""`) If present controller will only watch and process modules with this label. 
 Env value string should be in the form of 'label-key=label-value'. if multiple terraform-applier is running in same cluster 
@@ -131,6 +131,29 @@ only watch modules with selector label in a given namespace.
 - `--oidc-issuer (OIDC_ISSUER)` - (default: `""`) The url of the IDP where OIDC app is created. 
 
 **If  `OIDC Issuer` is not set then web server will skip authentication and all `force run` requests will be allowed.**
+
+## Kube backend
+For modules using kubernetes backend or provider, ideally module should be using its own SA's token (terraform-applier-delegate-token) for authentication with kube cluster and not depend on default in cluster config of controller's SA but kube provider ignores `host` and `token` backend attributes if kube config is not set. [related issue](https://github.com/hashicorp/terraform/issues/31275)
+
+controller creates a kube config at temp location and sets `KUBE_CONFIG_PATH` ENV for the module. this generated config contains server URL as well as cluster CA cert.
+since `KUBE_CONFIG_PATH` is already set module just need to set `namespace` and `token`. token can be passed as ENV `KUBE_TOKEN`. [doc](https://developer.hashicorp.com/terraform/language/settings/backends/kubernetes)
+
+```yaml
+apiVersion: terraform-applier.uw.systems/v1beta1
+kind: Module
+metadata:
+  name: hello-kube
+spec:
+  backend:
+    - name: namespace
+      value: sys-hello-kube
+  env:
+    - name: KUBE_TOKEN
+      valueFrom:
+        secretKeyRef:
+          name: terraform-applier-delegate-token
+          key: token
+```
 
 ## Vault integration
 terraform-applier supports fetching (generating) secrets from the vault. Module's delegated service account's jwt (secret:terraform-applier-delegate-token) will be used for vault login for given `vaultRole`. at the moment only aws secrets engine is supported.
