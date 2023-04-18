@@ -132,6 +132,29 @@ only watch modules with selector label in a given namespace.
 
 **If  `OIDC Issuer` is not set then web server will skip authentication and all `force run` requests will be allowed.**
 
+## Kube backend
+For modules using kubernetes backend or provider, ideally module should be using its own SA's token (terraform-applier-delegate-token) for authentication with kube cluster and not depend on default in cluster config of controller's SA but kube provider ignores `host` and `token` backend attributes if kube config is not set. [related issue](https://github.com/hashicorp/terraform/issues/31275)
+
+controller creates a kube config at temp location and sets `KUBE_CONFIG_PATH` ENV for the module. this generated config contains server URL as well as cluster CA cert.
+since `KUBE_CONFIG_PATH` is already set module just need to set `namespace` and `token`. token can be passed as ENV `KUBE_TOKEN`. [doc](https://developer.hashicorp.com/terraform/language/settings/backends/kubernetes)
+
+```yaml
+apiVersion: terraform-applier.uw.systems/v1beta1
+kind: Module
+metadata:
+  name: hello-kube
+spec:
+  backend:
+    - name: namespace
+      value: sys-hello-kube
+  env:
+    - name: KUBE_TOKEN
+      valueFrom:
+        secretKeyRef:
+          name: terraform-applier-delegate-token
+          key: token
+```
+
 ## Vault integration
 terraform-applier supports fetching (generating) secrets from the vault. Module's delegated service account's jwt (secret:terraform-applier-delegate-token) will be used for vault login for given `vaultRole`. at the moment only aws secrets engine is supported.
 
