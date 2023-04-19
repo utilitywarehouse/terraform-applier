@@ -480,10 +480,8 @@ spec:
                   run/event
                 type: string
               lastApplyInfo:
-                description: LastDriftInfo is the stdout of plan command.  it may
-                  contain error stream LastDriftInfo OutputStats `json:"lastDriftInfo,omitempty"`
-                  LastApplyInfo is the stdout of apply command. it may contain error
-                  stream
+                description: LastApplyInfo is the stdout of apply command. it may
+                  contain error stream
                 properties:
                   hash:
                     description: CommitHash is the hash of git commit of this output.
