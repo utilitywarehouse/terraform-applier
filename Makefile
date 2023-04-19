@@ -46,11 +46,9 @@ update-bootstrap-js:
 	cp /tmp/bootstrap-$(BJS_VERSION)-dist/css/bootstrap.min.css.map webserver/static/bootstrap/css/bootstrap.min.css.map
 
 release:
-	@sd "master" "$(VERSION)" ./manifests/base/namespaced/kustomization.yaml
-	@git add -- manifests/base/terraform-applier.yaml
-	@git add -- manifests/git-sync/terraform-applier.yaml
+	@sd "master" "$(VERSION)" manifests/base/namespaced/kustomization.yaml
+	@git add -- manifests/base/namespaced/kustomization.yaml
 	@git commit -m "Release $(VERSION)"
-	@sd "$(VERSION)" "master" ./manifests/base/namespaced/kustomization.yaml
-	@git add -- manifests/base/terraform-applier.yaml
-	@git add -- manifests/git-sync/terraform-applier.yaml
+	@sd "$(VERSION)" "master" manifests/base/namespaced/kustomization.yaml
+	@git add -- manifests/base/namespaced/kustomization.yaml
 	@git commit -m "Clean up release $(VERSION)"
