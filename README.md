@@ -180,9 +180,9 @@ In addition to the [controller-runtime](https://book.kubebuilder.io/reference/me
 
 - `terraform_applier_module_run_count` - (tags: `module`,`namespace`, `success`) A Counter for each module that has had a terraform run attempt over the lifetime of
   the application, incremented with each apply attempt and tagged with the result of the run (`success=true|false`)
-- `terraform_applier_module_apply_duration_seconds` - (tags: `module`,`namespace`, `success`) A Summary that keeps track of the durations of each terraform run for
+- `terraform_applier_module_run_duration_seconds` - (tags: `module`,`namespace`, `success`) A Summary that keeps track of the durations of each terraform run for
   each module, tagged with the result of the run (`success=true|false`)
-- `terraform_applier_module_apply_success` - (tags: `module`,`namespace`) A `Gauge` which
+- `terraform_applier_module_last_run_success` - (tags: `module`,`namespace`) A `Gauge` which
   tracks whether the last terraform run for a module was successful.
 - `terraform_applier_module_terraform_exit_code_count` - (tags: `module`,`namespace`, `command`, `exit_code`) A `Counter` for each exit code returned by executions of
   `terraform`, labelled with the command issued (`init`, `plan`,`apply`) and the exit code. It's worth noting that `plan` will
