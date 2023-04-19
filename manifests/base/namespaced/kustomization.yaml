@@ -13,6 +13,6 @@ patches:
 images:
   - name: terraform-applier
     newName: quay.io/utilitywarehouse/terraform-applier
-    newTag: v2.0.0-rc1
+    newTag: master
   - name: registry.k8s.io/git-sync/git-sync
     newTag: v3.6.3
