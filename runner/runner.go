@@ -2,6 +2,7 @@ package runner
 
 import (
 	"context"
+	"fmt"
 	"regexp"
 	"sync"
 	"time"
@@ -158,36 +159,41 @@ func (r *Runner) process(req Request, cancelChan <-chan struct{}) bool {
 	// Setup Delegation and get vars and envs
 	jwt, err := r.Delegate.DelegateToken(ctx, r.KubeClt, module)
 	if err != nil {
-		log.Error("unable to get service account token", "err", err)
-		r.setFailedStatus(req, module, tfaplv1beta1.ReasonDelegationFailed, err.Error(), r.Clock.Now())
+		msg := fmt.Sprintf("unable to get service account token: err:%s", err)
+		log.Error(msg)
+		r.setFailedStatus(req, module, tfaplv1beta1.ReasonDelegationFailed, msg, r.Clock.Now())
 		return false
 	}
 
 	delegatedClient, err := r.Delegate.SetupDelegation(ctx, jwt)
 	if err != nil {
-		log.Error("unable to create kube client", "err", err)
-		r.setFailedStatus(req, module, tfaplv1beta1.ReasonDelegationFailed, err.Error(), r.Clock.Now())
+		msg := fmt.Sprintf("unable to create kube client: err:%s", err)
+		log.Error(msg)
+		r.setFailedStatus(req, module, tfaplv1beta1.ReasonDelegationFailed, msg, r.Clock.Now())
 		return false
 	}
 
 	backendConf, err := fetchEnvVars(ctx, delegatedClient, module, module.Spec.Backend)
 	if err != nil {
-		log.Error("unable to get backend config", "err", err)
-		r.setFailedStatus(req, module, tfaplv1beta1.ReasonRunPreparationFailed, err.Error(), r.Clock.Now())
+		msg := fmt.Sprintf("unable to get backend config: err:%s", err)
+		log.Error(msg)
+		r.setFailedStatus(req, module, tfaplv1beta1.ReasonRunPreparationFailed, msg, r.Clock.Now())
 		return false
 	}
 
 	envs, err := fetchEnvVars(ctx, delegatedClient, module, module.Spec.Env)
 	if err != nil {
-		log.Error("unable to get envs", "err", err)
-		r.setFailedStatus(req, module, tfaplv1beta1.ReasonRunPreparationFailed, err.Error(), r.Clock.Now())
+		msg := fmt.Sprintf("unable to get envs: err:%s", err)
+		log.Error(msg)
+		r.setFailedStatus(req, module, tfaplv1beta1.ReasonRunPreparationFailed, msg, r.Clock.Now())
 		return false
 	}
 
 	vars, err := fetchEnvVars(ctx, delegatedClient, module, module.Spec.Var)
 	if err != nil {
-		log.Error("unable to get vars", "err", err)
-		r.setFailedStatus(req, module, tfaplv1beta1.ReasonRunPreparationFailed, err.Error(), r.Clock.Now())
+		msg := fmt.Sprintf("unable to get vars: err:%s", err)
+		log.Error(msg)
+		r.setFailedStatus(req, module, tfaplv1beta1.ReasonRunPreparationFailed, msg, r.Clock.Now())
 		return false
 	}
 
@@ -195,8 +201,9 @@ func (r *Runner) process(req Request, cancelChan <-chan struct{}) bool {
 		if module.Spec.VaultRequests.AWS != nil {
 			err = r.generateVaultAWSCreds(ctx, module, jwt, envs)
 			if err != nil {
-				log.Error("unable to generate vault aws secrets", "err", err)
-				r.setFailedStatus(req, module, tfaplv1beta1.ReasonRunPreparationFailed, err.Error(), r.Clock.Now())
+				msg := fmt.Sprintf("unable to generate vault aws secrets: err:%s", err)
+				log.Error(msg)
+				r.setFailedStatus(req, module, tfaplv1beta1.ReasonRunPreparationFailed, msg, r.Clock.Now())
 				return false
 			}
 		}
@@ -204,8 +211,9 @@ func (r *Runner) process(req Request, cancelChan <-chan struct{}) bool {
 
 	te, err := r.NewTFRunner(ctx, module, envs, vars)
 	if err != nil {
-		log.Error("unable to create terraform executer", "err", err)
-		r.setFailedStatus(req, module, tfaplv1beta1.ReasonRunPreparationFailed, err.Error(), r.Clock.Now())
+		msg := fmt.Sprintf("unable to create terraform executer: err:%s", err)
+		log.Error(msg)
+		r.setFailedStatus(req, module, tfaplv1beta1.ReasonRunPreparationFailed, msg, r.Clock.Now())
 		return false
 	}
 	defer te.cleanUp()
@@ -234,8 +242,9 @@ func (r *Runner) runTF(
 
 	initOut, err := te.init(ctx, backendConf)
 	if err != nil {
-		log.Error("unable to init module", "err", err)
-		r.setFailedStatus(req, module, tfaplv1beta1.ReasonInitialiseFailed, err.Error(), r.Clock.Now())
+		msg := fmt.Sprintf("unable to init module: err:%s", err)
+		log.Error(msg)
+		r.setFailedStatus(req, module, tfaplv1beta1.ReasonInitialiseFailed, msg, r.Clock.Now())
 		return false
 	}
 
@@ -250,16 +259,18 @@ func (r *Runner) runTF(
 
 	// if termination signal received its safe to return here
 	if isChannelClosed(cancelChan) {
-		log.Error("terraform run interrupted as runner is shutting down")
-		r.setFailedStatus(req, module, tfaplv1beta1.ReasonControllerShutdown, "terraform run interrupted as runner is shutting down", r.Clock.Now())
+		msg := "unable to plan module: terraform run interrupted as runner is shutting down"
+		log.Error(msg)
+		r.setFailedStatus(req, module, tfaplv1beta1.ReasonControllerShutdown, msg, r.Clock.Now())
 		return false
 	}
 
 	diffDetected, planOut, err := te.plan(ctx)
 	module.Status.RunOutput = planOut
 	if err != nil {
-		log.Error("unable to plan module", "err", err)
-		r.setFailedStatus(req, module, tfaplv1beta1.ReasonPlanFailed, err.Error(), r.Clock.Now())
+		msg := fmt.Sprintf("unable to plan module: err:%s", err)
+		log.Error(msg)
+		r.setFailedStatus(req, module, tfaplv1beta1.ReasonPlanFailed, msg, r.Clock.Now())
 		return false
 	}
 
@@ -291,8 +302,9 @@ func (r *Runner) runTF(
 
 	// if termination signal received its safe to return here
 	if isChannelClosed(cancelChan) {
-		log.Error("terraform run interrupted as runner is shutting down")
-		r.setFailedStatus(req, module, tfaplv1beta1.ReasonControllerShutdown, "terraform run interrupted as runner is shutting down", r.Clock.Now())
+		msg := "unable to apply module: terraform run interrupted as runner is shutting down"
+		log.Error(msg)
+		r.setFailedStatus(req, module, tfaplv1beta1.ReasonControllerShutdown, msg, r.Clock.Now())
 		return false
 	}
 
@@ -305,8 +317,9 @@ func (r *Runner) runTF(
 	applyOut, err := te.apply(ctx)
 	module.Status.RunOutput = planOut + applyOut
 	if err != nil {
-		log.Error("unable to plan module", "err", err)
-		r.setFailedStatus(req, module, tfaplv1beta1.ReasonApplyFailed, err.Error(), r.Clock.Now())
+		msg := fmt.Sprintf("unable to apply module: err:%s", err)
+		log.Error(msg)
+		r.setFailedStatus(req, module, tfaplv1beta1.ReasonApplyFailed, msg, r.Clock.Now())
 		return false
 	}
 
