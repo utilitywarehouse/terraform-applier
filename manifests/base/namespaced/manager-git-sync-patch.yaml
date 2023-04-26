@@ -12,6 +12,13 @@ spec:
           args:
             - --leader-elect
             - --termination-grace-period=240
+          resources:
+            requests:
+              cpu: 0m
+              memory: 128Mi
+            limits:
+              cpu: 2000m
+              memory: 2Gi
           volumeMounts:
             - name: git-repo
               mountPath: /src
