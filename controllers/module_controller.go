@@ -99,8 +99,9 @@ func (r *ModuleReconciler) Reconcile(ctx context.Context, req reconcile.Request)
 	// check for new commit on modules path
 	commitHash, _, err := r.GitUtil.HeadCommitHashAndLog(module.Spec.Path)
 	if err != nil {
-		r.setFailedStatus(req, &module, tfaplv1beta1.ReasonGitFailure, err.Error(), r.Clock.Now())
-		log.Error("unable to get commit hash", "err", err)
+		msg := fmt.Sprintf("unable to get commit hash: err:%s", err)
+		log.Error(msg)
+		r.setFailedStatus(req, &module, tfaplv1beta1.ReasonGitFailure, msg, r.Clock.Now())
 		// since issue is not related to module specs, requeue again in case its fixed
 		return ctrl.Result{RequeueAfter: pollIntervalDuration}, nil
 	}
@@ -120,8 +121,9 @@ func (r *ModuleReconciler) Reconcile(ctx context.Context, req reconcile.Request)
 	// figure out the next times that we need to run or last missed runs time if any.
 	numOfMissedRuns, nextRun, err := NextSchedule(&module, r.Clock.Now(), r.MinIntervalBetweenRuns)
 	if err != nil {
-		r.setFailedStatus(req, &module, tfaplv1beta1.ReasonSpecsParsingFailure, err.Error(), r.Clock.Now())
-		log.Error("unable to figure out CronJob schedule", "err", err)
+		msg := fmt.Sprintf("unable to figure out CronJob schedule: err:%s", err)
+		log.Error(msg)
+		r.setFailedStatus(req, &module, tfaplv1beta1.ReasonSpecsParsingFailure, msg, r.Clock.Now())
 		// we don't really care about requeuing until we get an update that
 		// fixes the schedule, so don't return an error
 		return ctrl.Result{}, nil
