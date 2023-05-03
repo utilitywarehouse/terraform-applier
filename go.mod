@@ -24,7 +24,7 @@ require (
 	k8s.io/client-go v1.5.2
 	sigs.k8s.io/controller-runtime v0.14.6
 	sigs.k8s.io/controller-runtime/tools/setup-envtest v0.0.0-20230418213659-3d915df2799f
-	sigs.k8s.io/controller-tools v0.11.4
+	sigs.k8s.io/controller-tools v0.12.0
 )
 
 require (
