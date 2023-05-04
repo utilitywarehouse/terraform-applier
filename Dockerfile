@@ -25,7 +25,7 @@ RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go generate ./...
 
 FROM alpine:3.17
 
-RUN apk --no-cache add ca-certificates git
+RUN apk --no-cache add ca-certificates git openssh-client
 
 WORKDIR /
 COPY --from=builder /workspace/manager .
