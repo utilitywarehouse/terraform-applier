@@ -1,6 +1,8 @@
 package git
 
 import (
+	"fmt"
+	"os"
 	"os/exec"
 	"strings"
 )
@@ -72,4 +74,21 @@ func runGitCmd(dir string, args ...string) (string, error) {
 	cmd.Dir = dir
 	out, err := cmd.CombinedOutput()
 	return string(out), err
+}
+
+func GitSSHCommand(sshKeyPath, knownHostsFilePath string, verifyKnownHosts bool) (string, error) {
+	knownHostsFragment := `-o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no`
+
+	if _, err := os.Stat(sshKeyPath); err != nil {
+		return "", fmt.Errorf("can't access SSH key file %s: %w", sshKeyPath, err)
+	}
+
+	if verifyKnownHosts {
+		if _, err := os.Stat(knownHostsFilePath); err != nil {
+			return "", fmt.Errorf("can't access SSH known_hosts file %s: %w", knownHostsFilePath, err)
+		}
+		knownHostsFragment = fmt.Sprintf("-o StrictHostKeyChecking=yes -o UserKnownHostsFile=%s", knownHostsFilePath)
+	}
+
+	return fmt.Sprintf(`ssh -i %s %s`, sshKeyPath, knownHostsFragment), nil
 }

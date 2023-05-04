@@ -102,6 +102,10 @@ Controller will force shutdown on current stage run if it takes more time then `
   use. The applier will install the requested release when it starts up. If you
   don't specify an explicit version, it will choose the latest available
   one. Ignored if `TERRAFORM_PATH` is set.
+- `--set-git-ssh-command (SET_GIT_SSH_COMMAND)` - (default: `false`) If set GIT_SSH_COMMAND env will be set as global env for all modules. This ssh command will be used by modules during terraform init to pull private remote modules.
+- `--git-ssh-key-file (GIT_SSH_KEY_FILE)` - (default: `/etc/git-secret/ssh`) The path to git ssh key which will be used to setup GIT_SSH_COMMAND env.
+- `--git-ssh-known-hosts-file (GIT_SSH_KNOWN_HOSTS_FILE)` - (default: `/etc/git-secret/known_hosts`) The local path to the known hosts file used to setup GIT_SSH_COMMAND env.
+- `--git-verify-known-hosts (GIT_VERIFY_KNOWN_HOSTS)` - (default: `true`) The local path to the known hosts file used to setup GIT_SSH_COMMAND env.
 - `--controller-runtime-env (CONTROLLER_RUNTIME_ENV)` - (default: `""`) The comma separated list of ENVs which will be passed from controller to all terraform run process. The envs should be set on the controller.
 ---
 - `--module-label-selector (MODULE_LABEL_SELECTOR)` - (default: `""`) If present controller will only watch and process modules with this label. 
