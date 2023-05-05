@@ -50,7 +50,6 @@ spec:
               cpu: 0m
               memory: 128Mi
           securityContext:
-            runAsGroup: 0 # root group to read mounted Secrets
             allowPrivilegeEscalation: false
             capabilities:
               drop:
