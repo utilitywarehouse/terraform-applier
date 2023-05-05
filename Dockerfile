@@ -26,6 +26,7 @@ RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go generate ./...
 FROM alpine:3.17
 
 ENV USER_ID=65532
+ENV GROUP_ID=0
 
 RUN adduser -S -u $USER_ID tf-applier \
       && apk --no-cache add ca-certificates git openssh-client
@@ -35,6 +36,6 @@ COPY --from=builder /workspace/manager .
 
 ENV USER=tf-applier
 
-USER $USER_ID
+USER $USER_ID:$GROUP_ID
 
 ENTRYPOINT ["/manager"]
