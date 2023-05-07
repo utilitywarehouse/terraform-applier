@@ -64,8 +64,6 @@ spec:
             runAsUser: 65533 # git-sync user
             runAsGroup: 0 # root group to read mounted Secrets
           env:
-            - name: GIT_SYNC_DEST
-              value: "modules"
             - name: GIT_SYNC_SSH
               value: "true"
             - name: GIT_SYNC_MAX_SYNC_FAILURES

@@ -131,13 +131,13 @@ func (r *Runner) process(req Request, cancelChan <-chan struct{}) bool {
 		}
 	}()
 
-	commitHash, commitLog, err := r.GitUtil.HeadCommitHashAndLog(module.Spec.Path)
+	commitHash, commitLog, err := r.GitUtil.HeadCommitHashAndLog(module.Spec.RepoName, module.Spec.Path)
 	if err != nil {
 		log.Error("unable to get commit hash and log", "err", err)
 		return false
 	}
 
-	remoteURL, err := r.GitUtil.RemoteURL()
+	remoteURL, err := r.GitUtil.RemoteURL(module.Spec.RepoName)
 	if err != nil {
 		log.Error("unable to get repo's remote url", "err", err)
 	}

@@ -34,14 +34,15 @@ var _ = Describe("Module controller without runner with label selector", func() 
 			testFilter.LabelSelectorValue = "true"
 
 			// Trigger Job run as soon as module is created
-			testGitUtil.EXPECT().HeadCommitHashAndLog("hello-filter-test").
+			testGitUtil.EXPECT().HeadCommitHashAndLog("test-repo", "hello-filter-test").
 				Return(commitHash, commitMsg, nil).AnyTimes()
-			testGitUtil.EXPECT().RemoteURL().Return("github.com/org/repo", nil).AnyTimes()
+			testGitUtil.EXPECT().RemoteURL("test-repo").Return("github.com/org/repo", nil).AnyTimes()
 		})
 
 		It("Should send module with valid selector label selector to job queue", func() {
 			const (
 				moduleName = "filter-test-module1"
+				repo       = "test-repo"
 				path       = "hello-filter-test"
 			)
 
@@ -54,7 +55,7 @@ var _ = Describe("Module controller without runner with label selector", func() 
 					Namespace: moduleNamespace,
 					Labels:    map[string]string{labelSelectorKey: "true"},
 				},
-				Spec: tfaplv1beta1.ModuleSpec{Schedule: "1 * * * *", Path: path},
+				Spec: tfaplv1beta1.ModuleSpec{Schedule: "1 * * * *", RepoName: repo, Path: path},
 			}
 			Expect(k8sClient.Create(ctx, module)).Should(Succeed())
 
@@ -79,6 +80,7 @@ var _ = Describe("Module controller without runner with label selector", func() 
 		It("Should not send module with valid selector label key but invalid value to job queue", func() {
 			const (
 				moduleName = "filter-test-module2"
+				repo       = "test-repo"
 				path       = "hello-filter-test"
 			)
 
@@ -91,7 +93,7 @@ var _ = Describe("Module controller without runner with label selector", func() 
 					Namespace: moduleNamespace,
 					Labels:    map[string]string{labelSelectorKey: "false"},
 				},
-				Spec: tfaplv1beta1.ModuleSpec{Schedule: "1 * * * *", Path: path},
+				Spec: tfaplv1beta1.ModuleSpec{Schedule: "1 * * * *", RepoName: repo, Path: path},
 			}
 			Expect(k8sClient.Create(ctx, module)).Should(Succeed())
 
@@ -116,6 +118,7 @@ var _ = Describe("Module controller without runner with label selector", func() 
 		It("Should not send module with missing selector label selector to job queue", func() {
 			const (
 				moduleName = "filter-test-module3"
+				repo       = "test-repo"
 				path       = "hello-filter-test"
 			)
 
@@ -128,7 +131,7 @@ var _ = Describe("Module controller without runner with label selector", func() 
 					Namespace: moduleNamespace,
 					Labels:    map[string]string{labelSelectorKeyInvalid: "true"},
 				},
-				Spec: tfaplv1beta1.ModuleSpec{Schedule: "1 * * * *", Path: path},
+				Spec: tfaplv1beta1.ModuleSpec{Schedule: "1 * * * *", RepoName: repo, Path: path},
 			}
 			Expect(k8sClient.Create(ctx, module)).Should(Succeed())
 
@@ -153,6 +156,7 @@ var _ = Describe("Module controller without runner with label selector", func() 
 		It("Should not send module with mo labels to job queue", func() {
 			const (
 				moduleName = "filter-test-module4"
+				repo       = "test-repo"
 				path       = "hello-filter-test"
 			)
 
@@ -164,7 +168,7 @@ var _ = Describe("Module controller without runner with label selector", func() 
 					Name:      moduleName,
 					Namespace: moduleNamespace,
 				},
-				Spec: tfaplv1beta1.ModuleSpec{Schedule: "1 * * * *", Path: path},
+				Spec: tfaplv1beta1.ModuleSpec{Schedule: "1 * * * *", RepoName: repo, Path: path},
 			}
 			Expect(k8sClient.Create(ctx, module)).Should(Succeed())
 

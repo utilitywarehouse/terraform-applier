@@ -34,9 +34,9 @@ func (m *MockUtilInterface) EXPECT() *MockUtilInterfaceMockRecorder {
 }
 
 // HeadCommitHashAndLog mocks base method.
-func (m *MockUtilInterface) HeadCommitHashAndLog(arg0 string) (string, string, error) {
+func (m *MockUtilInterface) HeadCommitHashAndLog(arg0, arg1 string) (string, string, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "HeadCommitHashAndLog", arg0)
+	ret := m.ctrl.Call(m, "HeadCommitHashAndLog", arg0, arg1)
 	ret0, _ := ret[0].(string)
 	ret1, _ := ret[1].(string)
 	ret2, _ := ret[2].(error)
@@ -44,37 +44,37 @@ func (m *MockUtilInterface) HeadCommitHashAndLog(arg0 string) (string, string, e
 }
 
 // HeadCommitHashAndLog indicates an expected call of HeadCommitHashAndLog.
-func (mr *MockUtilInterfaceMockRecorder) HeadCommitHashAndLog(arg0 interface{}) *gomock.Call {
+func (mr *MockUtilInterfaceMockRecorder) HeadCommitHashAndLog(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HeadCommitHashAndLog", reflect.TypeOf((*MockUtilInterface)(nil).HeadCommitHashAndLog), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HeadCommitHashAndLog", reflect.TypeOf((*MockUtilInterface)(nil).HeadCommitHashAndLog), arg0, arg1)
 }
 
 // IsRepo mocks base method.
-func (m *MockUtilInterface) IsRepo() (bool, error) {
+func (m *MockUtilInterface) IsRepo(arg0 string) (bool, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "IsRepo")
+	ret := m.ctrl.Call(m, "IsRepo", arg0)
 	ret0, _ := ret[0].(bool)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // IsRepo indicates an expected call of IsRepo.
-func (mr *MockUtilInterfaceMockRecorder) IsRepo() *gomock.Call {
+func (mr *MockUtilInterfaceMockRecorder) IsRepo(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IsRepo", reflect.TypeOf((*MockUtilInterface)(nil).IsRepo))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IsRepo", reflect.TypeOf((*MockUtilInterface)(nil).IsRepo), arg0)
 }
 
 // RemoteURL mocks base method.
-func (m *MockUtilInterface) RemoteURL() (string, error) {
+func (m *MockUtilInterface) RemoteURL(arg0 string) (string, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "RemoteURL")
+	ret := m.ctrl.Call(m, "RemoteURL", arg0)
 	ret0, _ := ret[0].(string)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // RemoteURL indicates an expected call of RemoteURL.
-func (mr *MockUtilInterfaceMockRecorder) RemoteURL() *gomock.Call {
+func (mr *MockUtilInterfaceMockRecorder) RemoteURL(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RemoteURL", reflect.TypeOf((*MockUtilInterface)(nil).RemoteURL))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RemoteURL", reflect.TypeOf((*MockUtilInterface)(nil).RemoteURL), arg0)
 }

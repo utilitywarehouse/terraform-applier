@@ -97,7 +97,7 @@ func (r *ModuleReconciler) Reconcile(ctx context.Context, req reconcile.Request)
 	}
 
 	// check for new commit on modules path
-	commitHash, _, err := r.GitUtil.HeadCommitHashAndLog(module.Spec.Path)
+	commitHash, _, err := r.GitUtil.HeadCommitHashAndLog(module.Spec.RepoName, module.Spec.Path)
 	if err != nil {
 		msg := fmt.Sprintf("unable to get commit hash: err:%s", err)
 		log.Error(msg)

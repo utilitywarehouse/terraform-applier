@@ -79,10 +79,10 @@ var (
 		&cli.StringFlag{
 			Name:        "repo-path",
 			EnvVars:     []string{"REPO_PATH"},
-			Value:       "/src/modules",
+			Value:       "/src",
 			Destination: &repoPath,
-			Usage: "Absolute path to the directory containing the modules to be applied. " +
-				"The immediate subdirectories of this directory should contain the root modules which will be referenced in modules.",
+			Usage: "Absolute path to the directory containing repositories of the modules. " +
+				"The immediate subdirectories of this directory should contain the module repo directories and directory name should match repoName referenced in  module.",
 		},
 		&cli.IntFlag{
 			Name:    "min-interval-between-runs",
@@ -442,7 +442,7 @@ func run(c *cli.Context) {
 	metrics.Init()
 
 	gitUtil := &git.Util{
-		Path: repoPath,
+		RootPath: repoPath,
 	}
 
 	// Find the requested version of terraform and log the version

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 )
 
@@ -12,35 +13,35 @@ import (
 // UtilInterface allows for mocking out the functionality of GitUtil when
 // testing the full process of an apply run.
 type UtilInterface interface {
-	HeadCommitHashAndLog(path string) (string, string, error)
-	RemoteURL() (string, error)
-	IsRepo() (bool, error)
+	HeadCommitHashAndLog(name, path string) (string, string, error)
+	RemoteURL(name string) (string, error)
+	IsRepo(name string) (bool, error)
 }
 
 // Util allows for fetching information about a Git repository using Git CLI
 // commands.
 type Util struct {
-	Path string
+	RootPath string
 }
 
 // HeadCommitHashAndLog returns the hash and the log of the current HEAD commit for the given path
-func (g *Util) HeadCommitHashAndLog(path string) (string, string, error) {
+func (g *Util) HeadCommitHashAndLog(name, path string) (string, string, error) {
 	// get commit hash
 	cmd := []string{"log", "--pretty=format:'%H'", "-n", "1", "--", path}
-	hash, err := runGitCmd(g.Path, cmd...)
+	hash, err := runGitCmd(filepath.Join(g.RootPath, name), cmd...)
 	if err != nil {
 		return "", "", err
 	}
 
 	// get commit message
 	cmd = []string{"log", "--pretty=format:'%s (%an)'", "-n", "1", "--", path}
-	log, err := runGitCmd(g.Path, cmd...)
+	log, err := runGitCmd(g.RootPath, cmd...)
 	return strings.Trim(hash, "'\n"), strings.Trim(log, "'\n"), err
 }
 
-func (g *Util) RemoteURL() (string, error) {
+func (g *Util) RemoteURL(name string) (string, error) {
 	cmd := []string{"remote", "get-url", "origin"}
-	rURL, err := runGitCmd(g.Path, cmd...)
+	rURL, err := runGitCmd(filepath.Join(g.RootPath, name), cmd...)
 	if err != nil {
 		return "", err
 	}
@@ -54,9 +55,9 @@ func (g *Util) RemoteURL() (string, error) {
 	return rURL, nil
 }
 
-func (g *Util) IsRepo() (bool, error) {
+func (g *Util) IsRepo(name string) (bool, error) {
 	cmd := []string{"rev-parse", "--git-dir"}
-	if _, err := runGitCmd(g.Path, cmd...); err != nil {
+	if _, err := runGitCmd(filepath.Join(g.RootPath, name), cmd...); err != nil {
 		if exiterr, ok := err.(*exec.ExitError); ok {
 			if exiterr.ExitCode() == 128 {
 				return false, nil

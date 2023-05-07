@@ -34,12 +34,13 @@ var _ = Describe("Module controller without runner", func() {
 		It("Should send module to job queue on schedule", func() {
 			const (
 				moduleName = "test-module"
+				repo       = "test-repo"
 				path       = "dev/" + moduleName
 			)
 
 			testGitUtil.
 				EXPECT().
-				HeadCommitHashAndLog(path).
+				HeadCommitHashAndLog(repo, path).
 				Return("", "", nil).MinTimes(1)
 
 			By("By creating a new Module")
@@ -55,6 +56,7 @@ var _ = Describe("Module controller without runner", func() {
 				},
 				Spec: tfaplv1beta1.ModuleSpec{
 					Schedule: "1 * * * *",
+					RepoName: repo,
 					Path:     path,
 				},
 			}
@@ -115,9 +117,10 @@ var _ = Describe("Module controller without runner", func() {
 		It("Should send module to job queue on commit change", func() {
 			const (
 				moduleName = "test-module2"
+				repo       = "test-repo"
 				path       = "dev/" + moduleName
 			)
-			testGitUtil.EXPECT().HeadCommitHashAndLog(path).Return("", "", nil)
+			testGitUtil.EXPECT().HeadCommitHashAndLog(repo, path).Return("", "", nil)
 
 			By("By creating a new Module")
 			ctx := context.Background()
@@ -132,6 +135,7 @@ var _ = Describe("Module controller without runner", func() {
 				},
 				Spec: tfaplv1beta1.ModuleSpec{
 					Schedule: "1 * * * *",
+					RepoName: repo,
 					Path:     path,
 				},
 			}
@@ -140,7 +144,7 @@ var _ = Describe("Module controller without runner", func() {
 			moduleLookupKey := types.NamespacedName{Name: moduleName, Namespace: moduleNamespace}
 
 			By("By making sure job was sent to jobQueue when commit hash is changed")
-			testGitUtil.EXPECT().HeadCommitHashAndLog(path).Return("1234abcd", "test commit", nil)
+			testGitUtil.EXPECT().HeadCommitHashAndLog(repo, path).Return("1234abcd", "test commit", nil)
 			// wait for just about 60 sec default poll interval
 			Eventually(func() types.NamespacedName {
 				timer := time.NewTimer(time.Second)
@@ -160,9 +164,10 @@ var _ = Describe("Module controller without runner", func() {
 		It("Should not trigger run for module with invalid schedule", func() {
 			const (
 				moduleName = "test-module3"
+				repo       = "test-repo"
 				path       = "dev/" + moduleName
 			)
-			testGitUtil.EXPECT().HeadCommitHashAndLog(path).Return("", "", nil).AnyTimes()
+			testGitUtil.EXPECT().HeadCommitHashAndLog(repo, path).Return("", "", nil).AnyTimes()
 
 			By("By creating a new Module")
 			ctx := context.Background()
@@ -177,6 +182,7 @@ var _ = Describe("Module controller without runner", func() {
 				},
 				Spec: tfaplv1beta1.ModuleSpec{
 					Schedule: "1 * * *",
+					RepoName: repo,
 					Path:     path,
 				},
 			}
@@ -200,9 +206,10 @@ var _ = Describe("Module controller without runner", func() {
 		It("Should not trigger run for module with git error", func() {
 			const (
 				moduleName = "test-module4"
+				repo       = "test-repo"
 				path       = "dev/" + moduleName
 			)
-			testGitUtil.EXPECT().HeadCommitHashAndLog(path).Return("", "", fmt.Errorf("generating test error")).AnyTimes()
+			testGitUtil.EXPECT().HeadCommitHashAndLog(repo, path).Return("", "", fmt.Errorf("generating test error")).AnyTimes()
 
 			By("By creating a new Module")
 			ctx := context.Background()
@@ -217,6 +224,7 @@ var _ = Describe("Module controller without runner", func() {
 				},
 				Spec: tfaplv1beta1.ModuleSpec{
 					Schedule: "1 * * * *",
+					RepoName: repo,
 					Path:     path,
 				},
 			}
@@ -240,10 +248,11 @@ var _ = Describe("Module controller without runner", func() {
 		It("Should not trigger run for suspended module", func() {
 			const (
 				moduleName = "test-module5"
+				repo       = "test-repo"
 				path       = "dev/" + moduleName
 			)
 			var boolTrue = true
-			testGitUtil.EXPECT().HeadCommitHashAndLog(path).Return("", "", nil).AnyTimes()
+			testGitUtil.EXPECT().HeadCommitHashAndLog(repo, path).Return("", "", nil).AnyTimes()
 
 			By("By creating a new Module")
 			ctx := context.Background()
@@ -258,6 +267,7 @@ var _ = Describe("Module controller without runner", func() {
 				},
 				Spec: tfaplv1beta1.ModuleSpec{
 					Schedule: "1 * * * *",
+					RepoName: repo,
 					Path:     path,
 				},
 			}
