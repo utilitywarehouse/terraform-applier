@@ -23,8 +23,9 @@ type Util struct {
 	Path string
 }
 
-func (g *Util) SetupGlobalConfig() error {
-	_, err := runGitCmd(g.Path, "config", "--global", "safe.directory", g.Path)
+func SetupGlobalConfig() error {
+	// avoid a "dubious ownership" error
+	_, err := runGitCmd("", "config", "--global", "safe.directory", "*")
 	return err
 }
 

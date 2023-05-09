@@ -34,6 +34,8 @@ WORKDIR /
 COPY --from=builder /workspace/manager .
 
 ENV USER=tf-applier
+# Setting HOME ensures git can write config file .gitconfig.
+ENV HOME=/tmp
 
 USER $USER_ID
 

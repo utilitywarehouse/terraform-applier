@@ -445,7 +445,7 @@ func run(c *cli.Context) {
 		Path: repoPath,
 	}
 
-	if err := gitUtil.SetupGlobalConfig(); err != nil {
+	if err := git.SetupGlobalConfig(); err != nil {
 		setupLog.Error("unable to setup git config", "err", err)
 		os.Exit(1)
 	}
