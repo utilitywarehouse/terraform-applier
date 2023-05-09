@@ -34,7 +34,7 @@ var _ = Describe("Module controller without runner", func() {
 		It("Should send module to job queue on schedule", func() {
 			const (
 				moduleName = "test-module"
-				repo       = "test-repo"
+				repo       = "modules"
 				path       = "dev/" + moduleName
 			)
 
@@ -117,7 +117,7 @@ var _ = Describe("Module controller without runner", func() {
 		It("Should send module to job queue on commit change", func() {
 			const (
 				moduleName = "test-module2"
-				repo       = "test-repo"
+				repo       = "modules"
 				path       = "dev/" + moduleName
 			)
 			testGitUtil.EXPECT().HeadCommitHashAndLog(repo, path).Return("", "", nil)
@@ -164,7 +164,7 @@ var _ = Describe("Module controller without runner", func() {
 		It("Should not trigger run for module with invalid schedule", func() {
 			const (
 				moduleName = "test-module3"
-				repo       = "test-repo"
+				repo       = "modules"
 				path       = "dev/" + moduleName
 			)
 			testGitUtil.EXPECT().HeadCommitHashAndLog(repo, path).Return("", "", nil).AnyTimes()
@@ -206,7 +206,7 @@ var _ = Describe("Module controller without runner", func() {
 		It("Should not trigger run for module with git error", func() {
 			const (
 				moduleName = "test-module4"
-				repo       = "test-repo"
+				repo       = "modules"
 				path       = "dev/" + moduleName
 			)
 			testGitUtil.EXPECT().HeadCommitHashAndLog(repo, path).Return("", "", fmt.Errorf("generating test error")).AnyTimes()
@@ -248,7 +248,7 @@ var _ = Describe("Module controller without runner", func() {
 		It("Should not trigger run for suspended module", func() {
 			const (
 				moduleName = "test-module5"
-				repo       = "test-repo"
+				repo       = "modules"
 				path       = "dev/" + moduleName
 			)
 			var boolTrue = true

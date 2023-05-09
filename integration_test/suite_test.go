@@ -209,7 +209,7 @@ var _ = BeforeSuite(func() {
 		ClusterClt:             k8sManager.GetClient(),
 		Recorder:               k8sManager.GetEventRecorderFor("terraform-applier"),
 		KubeClt:                fakeClient,
-		RepoPath:               "modules",
+		RepoPath:               "src",
 		Queue:                  testRunnerQueue,
 		GitUtil:                testGitUtil,
 		Delegate:               testDelegate,
@@ -222,7 +222,7 @@ var _ = BeforeSuite(func() {
 
 	pwd, err := os.Getwd()
 	Expect(err).NotTo(HaveOccurred())
-	testStateFilePath = filepath.Join(pwd, "modules", "hello", "terraform.tfstate")
+	testStateFilePath = filepath.Join(pwd, "src", "modules", "hello", "terraform.tfstate")
 
 	go func() {
 		defer GinkgoRecover()
