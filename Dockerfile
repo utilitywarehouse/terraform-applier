@@ -25,11 +25,18 @@ RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go generate ./...
 
 FROM alpine:3.17
 
-RUN apk --no-cache add ca-certificates git openssh-client
+ENV USER_ID=65532
+
+RUN adduser -S -H -u $USER_ID tf-applier \
+      && apk --no-cache add ca-certificates git openssh-client
 
 WORKDIR /
 COPY --from=builder /workspace/manager .
-# match git-sync user
-USER 65533
+
+ENV USER=tf-applier
+# Setting HOME ensures git can write config file .gitconfig.
+ENV HOME=/tmp
+
+USER $USER_ID
 
 ENTRYPOINT ["/manager"]

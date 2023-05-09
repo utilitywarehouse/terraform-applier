@@ -58,26 +58,42 @@ See the documentation on the Module CRD
 [spec](api/v1beta1/module_types.go)
 for more details.
 
-#### Delegate ServiceAccount
+### Delegate ServiceAccount
 
 To minimize access required by controller on other namespaces, the concept of a
 delegate ServiceAccount is introduced. When fetching secrets and configmaps for the Module, terraform-applier will use the credentials defined in the Secret referenced by
 `delegateServiceAccountSecretRef`. This is a ServiceAccount in the same
 namespace as the Module itself and should typically be given only `GET` access to only the secrets and configmaps referenced in module CRD.
 
-#### ENV and VAR
+### ENV and VAR
 
 The `envs` referenced in module will be set before the terraform run. this should not be used for any well known Terraform environment variables that are already covered in options. [more info](https://pkg.go.dev/github.com/hashicorp/terraform-exec@v0.18.1/tfexec#Terraform)
 
 All referenced `vars` will be json encoded as key-value pair and written to temp file `*.auto.tfvars.json` in module's root folder. Terraform will load these vars during `plan` and `apply`.
 
-#### Terraform backend configuration
+### Terraform backend configuration
 
 use `backend` to configure backend of the module. The key/value pair referenced in the module's `backend` will be set when initialising Terraform via `-backend-config="KEY=VALUE"` flag.
 Please note `backend` doesn't setup new backend it only configures existing backend, please see [Partial Configuration](https://developer.hashicorp.com/terraform/language/settings/backends/configuration#partial-configuration) for more info.
 
+### Private Module Source
 
-#### Graceful shutdown
+Terraform installs modules from Git repositories by running `git clone`, and so it will respect any local Git configuration set on your system, including credentials. 
+Terraform applier supports SSH credentials to fetch modules from private repository. Admin can enable this by setting `--set-git-ssh-command` flag and mounting SSH key on controller (please see `Controller config`).
+once this flag is enabled controller configures `GIT_SSH_COMMAND` env with correct private key and known-hosts file path. this env will be used by `git` to fetch private repo using SSH.
+Since only SSH auth method is supported module source URL should indicate SSH protocol as shown...
+
+```
+module "consul" {
+  source = "git@github.com:hashicorp/example.git"
+}
+module "storage" {
+  source = "git::ssh://username@example.com/storage.git"
+}
+```
+Since key is set on controller it can be used by ALL modules managed by the controller. Terraform applier doesn't support private key per module yet. 
+
+### Graceful shutdown
 
 To make sure all terraform module run does complete in finite time `runTimeout` is added to the module spec.
 default value is `900s` and MAX value is `1800s`. Terraform run `(init,plan and apply if required)` should finish in this time otherwise it will be forced shutdown.
@@ -102,6 +118,10 @@ Controller will force shutdown on current stage run if it takes more time then `
   use. The applier will install the requested release when it starts up. If you
   don't specify an explicit version, it will choose the latest available
   one. Ignored if `TERRAFORM_PATH` is set.
+- `--set-git-ssh-command (SET_GIT_SSH_COMMAND)` - (default: `false`) If set GIT_SSH_COMMAND env will be set as global env for all modules. This ssh command will be used by modules during terraform init to pull private remote modules.
+- `--git-ssh-key-file (GIT_SSH_KEY_FILE)` - (default: `/etc/git-secret/ssh`) The path to git ssh key which will be used to setup GIT_SSH_COMMAND env.
+- `--git-ssh-known-hosts-file (GIT_SSH_KNOWN_HOSTS_FILE)` - (default: `/etc/git-secret/known_hosts`) The local path to the known hosts file used to setup GIT_SSH_COMMAND env.
+- `--git-verify-known-hosts (GIT_VERIFY_KNOWN_HOSTS)` - (default: `true`) The local path to the known hosts file used to setup GIT_SSH_COMMAND env.
 - `--controller-runtime-env (CONTROLLER_RUNTIME_ENV)` - (default: `""`) The comma separated list of ENVs which will be passed from controller to all terraform run process. The envs should be set on the controller.
 ---
 - `--module-label-selector (MODULE_LABEL_SELECTOR)` - (default: `""`) If present controller will only watch and process modules with this label. 

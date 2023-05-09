@@ -110,6 +110,31 @@ var (
 			Usage: "The version of terraform to use. The controller will install the requested release when it starts up. " +
 				"if not set, it will choose the latest available one. Ignored if `TERRAFORM_PATH` is set.",
 		},
+		&cli.BoolFlag{
+			Name:    "set-git-ssh-command",
+			EnvVars: []string{"SET_GIT_SSH_COMMAND"},
+			Value:   false,
+			Usage: "If set GIT_SSH_COMMAND env will be set as global env for all modules. " +
+				"This ssh command will be used by modules during terraform init to pull private remote modules.",
+		},
+		&cli.StringFlag{
+			Name:    "git-ssh-key-file",
+			EnvVars: []string{"GIT_SSH_KEY_FILE"},
+			Value:   "/etc/git-secret/ssh",
+			Usage:   "The path to git ssh key which will be used to setup GIT_SSH_COMMAND env.",
+		},
+		&cli.StringFlag{
+			Name:    "git-ssh-known-hosts-file",
+			EnvVars: []string{"GIT_SSH_KNOWN_HOSTS_FILE"},
+			Value:   "/etc/git-secret/known_hosts",
+			Usage:   "The local path to the known hosts file used to setup GIT_SSH_COMMAND env.",
+		},
+		&cli.BoolFlag{
+			Name:    "git-verify-known-hosts",
+			EnvVars: []string{"GIT_VERIFY_KNOWN_HOSTS"},
+			Value:   true,
+			Usage:   "The local path to the known hosts file used to setup GIT_SSH_COMMAND env.",
+		},
 		&cli.StringFlag{
 			Name:    "controller-runtime-env",
 			EnvVars: []string{"CONTROLLER_RUNTIME_ENV"},
@@ -337,6 +362,18 @@ func setupGlobalEnv(c *cli.Context) {
 		globalRunEnv[env] = os.Getenv(env)
 	}
 
+	if c.Bool("set-git-ssh-command") {
+		cmdStr, err := git.GitSSHCommand(
+			c.String("git-ssh-key-file"), c.String("git-ssh-known-hosts-file"), c.Bool("git-verify-known-hosts"),
+		)
+		if err != nil {
+			logger.Error("unable to set GIT_SSH_COMMAND", "err", err)
+			os.Exit(1)
+		}
+		logger.Info("setting GIT_SSH_COMMAND as global env", "value", cmdStr)
+		globalRunEnv["GIT_SSH_COMMAND"] = cmdStr
+	}
+
 	// KUBE_CONFIG_PATH will be used by modules with kubernetes backend.
 	// ideally modules should be using own SA to auth with kube cluster and not depend on default in cluster config of controller's SA
 	// but without this config terraform ignores `host` and `token` backend attributes
@@ -406,6 +443,11 @@ func run(c *cli.Context) {
 
 	gitUtil := &git.Util{
 		Path: repoPath,
+	}
+
+	if err := git.SetupGlobalConfig(); err != nil {
+		setupLog.Error("unable to setup git config", "err", err)
+		os.Exit(1)
 	}
 
 	// Find the requested version of terraform and log the version

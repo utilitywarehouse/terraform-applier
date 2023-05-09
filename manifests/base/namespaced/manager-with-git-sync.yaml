@@ -1,33 +1,68 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
+  labels:
+    control-plane: terraform-applier
   name: terraform-applier
 spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      control-plane: terraform-applier
   template:
+    metadata:
+      annotations:
+        kubectl.kubernetes.io/default-container: manager
+      labels:
+        control-plane: terraform-applier
     spec:
+      securityContext:
+        # This GID is added to each container to share folder and
+        # read mounted secrets
+        fsGroup: 101
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
       serviceAccountName: terraform-applier
       terminationGracePeriodSeconds: 300
       containers:
         - name: manager
+          command:
+            - /manager
           args:
             - --leader-elect
             - --termination-grace-period=240
+          image: quay.io/utilitywarehouse/terraform-applier:master
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8082
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 8082
+            initialDelaySeconds: 5
+            periodSeconds: 10
           resources:
-            requests:
-              cpu: 0m
-              memory: 128Mi
             limits:
               cpu: 2000m
               memory: 2Gi
+            requests:
+              cpu: 0m
+              memory: 128Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
           volumeMounts:
-            - name: git-repo
-              mountPath: /src
+            - mountPath: /src
+              name: git-repo
               readOnly: true
         - name: git-sync
           image: registry.k8s.io/git-sync/git-sync:v3.6.3
-          securityContext:
-            runAsUser: 65533 # git-sync user
-            runAsGroup: 0 # root group to read mounted Secrets
           env:
             - name: GIT_SYNC_DEST
               value: "modules"
