@@ -445,6 +445,11 @@ func run(c *cli.Context) {
 		Path: repoPath,
 	}
 
+	if err := gitUtil.SetupGlobalConfig(); err != nil {
+		setupLog.Error("unable to setup git config", "err", err)
+		os.Exit(1)
+	}
+
 	// Find the requested version of terraform and log the version
 	// information
 	execPath, cleanup, err := findTerraformExecPath(ctx, terraformPath, terraformVersion)

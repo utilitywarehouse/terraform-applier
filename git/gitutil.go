@@ -23,6 +23,11 @@ type Util struct {
 	Path string
 }
 
+func (g *Util) SetupGlobalConfig() error {
+	_, err := runGitCmd(g.Path, "config", "--global", "safe.directory", g.Path)
+	return err
+}
+
 // HeadCommitHashAndLog returns the hash and the log of the current HEAD commit for the given path
 func (g *Util) HeadCommitHashAndLog(path string) (string, string, error) {
 	// get commit hash
