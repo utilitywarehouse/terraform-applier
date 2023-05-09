@@ -27,7 +27,7 @@ FROM alpine:3.17
 
 ENV USER_ID=65532
 
-RUN adduser -S -u $USER_ID tf-applier \
+RUN adduser -S -H -u $USER_ID tf-applier \
       && apk --no-cache add ca-certificates git openssh-client
 
 WORKDIR /
