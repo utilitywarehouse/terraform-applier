@@ -24,6 +24,12 @@ type Util struct {
 	RootPath string
 }
 
+func SetupGlobalConfig() error {
+	// avoid a "dubious ownership" error
+	_, err := runGitCmd("", "config", "--global", "safe.directory", "*")
+	return err
+}
+
 // HeadCommitHashAndLog returns the hash and the log of the current HEAD commit for the given path
 func (g *Util) HeadCommitHashAndLog(name, path string) (string, string, error) {
 	// get commit hash

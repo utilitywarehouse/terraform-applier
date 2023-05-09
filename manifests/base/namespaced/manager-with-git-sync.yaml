@@ -17,6 +17,9 @@ spec:
         control-plane: terraform-applier
     spec:
       securityContext:
+        # This GID is added to each container to share folder and
+        # read mounted secrets
+        fsGroup: 101
         runAsNonRoot: true
         seccompProfile:
           type: RuntimeDefault
@@ -60,9 +63,6 @@ spec:
               readOnly: true
         - name: git-sync
           image: registry.k8s.io/git-sync/git-sync:v3.6.3
-          securityContext:
-            runAsUser: 65533 # git-sync user
-            runAsGroup: 0 # root group to read mounted Secrets
           env:
             - name: GIT_SYNC_SSH
               value: "true"
