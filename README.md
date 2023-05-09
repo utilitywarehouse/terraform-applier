@@ -105,9 +105,7 @@ Controller will force shutdown on current stage run if it takes more time then `
 
 ### Controller config
 
-- `--repo-path (REPO_PATH)` - (default: `/src/modules`) Absolute path to the directory containing the modules
-  to be applied. The immediate subdirectories of this directory should contain
-  the root modules which will be referenced by users in `module`.
+- `--repos-root-path (REPOS_ROOT_PATH)` - (default: `/src`) Absolute path to the directory containing all repositories of the modules. The immediate subdirectories of this directory should contain the module repo directories and directory name should match repoName referenced in  module.
 - `--min-interval-between-runs (MIN_INTERVAL_BETWEEN_RUNS)` - (default: `60`) The minimum interval in seconds, user can set between 2 consecutive runs. This value defines the frequency of runs.
 - `--termination-grace-period (TERMINATION_GRACE_PERIOD)` - (default: `60`) Termination grace period is the ime given to
   the running job to finish current run after 1st TERM signal is received. After this timeout runner will be forced to shutdown.

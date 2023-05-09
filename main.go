@@ -58,7 +58,7 @@ var (
 	scheme = runtime.NewScheme()
 
 	logLevel           string
-	repoPath           string
+	reposRootPath      string
 	labelSelectorKey   string
 	labelSelectorValue string
 	electionID         string
@@ -77,11 +77,11 @@ var (
 
 	flags = []cli.Flag{
 		&cli.StringFlag{
-			Name:        "repo-path",
-			EnvVars:     []string{"REPO_PATH"},
+			Name:        "repos-root-path",
+			EnvVars:     []string{"REPOS_ROOT_PATH"},
 			Value:       "/src",
-			Destination: &repoPath,
-			Usage: "Absolute path to the directory containing repositories of the modules. " +
+			Destination: &reposRootPath,
+			Usage: "Absolute path to the directory containing all repositories of the modules. " +
 				"The immediate subdirectories of this directory should contain the module repo directories and directory name should match repoName referenced in  module.",
 		},
 		&cli.IntFlag{
@@ -264,7 +264,7 @@ func validate(c *cli.Context) {
 		os.Exit(1)
 	}
 
-	logger.Info("config", "repoPath", repoPath)
+	logger.Info("config", "reposRootPath", reposRootPath)
 	logger.Info("config", "watchNamespaces", watchNamespaces)
 	logger.Info("config", "selectorLabel", fmt.Sprintf("%s:%s", labelSelectorKey, labelSelectorValue))
 	logger.Info("config", "minIntervalBetweenRunsDuration", c.Int("min-interval-between-runs"))
@@ -442,7 +442,7 @@ func run(c *cli.Context) {
 	metrics.Init()
 
 	gitUtil := &git.Util{
-		RootPath: repoPath,
+		RootPath: reposRootPath,
 	}
 
 	if err := git.SetupGlobalConfig(); err != nil {
@@ -544,7 +544,7 @@ func run(c *cli.Context) {
 		ClusterClt:             mgr.GetClient(),
 		Recorder:               mgr.GetEventRecorderFor("terraform-applier"),
 		KubeClt:                kubeClient,
-		RepoPath:               repoPath,
+		ReposRootPath:          reposRootPath,
 		Queue:                  wsQueue,
 		GitUtil:                gitUtil,
 		Log:                    logger.Named("runner"),

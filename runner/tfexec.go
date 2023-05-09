@@ -48,7 +48,7 @@ func (r *Runner) NewTFRunner(
 		return nil, fmt.Errorf("unable to create tmp dir %w", err)
 	}
 
-	err = sysutil.CopyDir(filepath.Join(r.RepoPath, module.Spec.RepoName, module.Spec.Path), tmpWSDir)
+	err = sysutil.CopyDir(filepath.Join(r.ReposRootPath, module.Spec.RepoName, module.Spec.Path), tmpWSDir)
 	if err != nil {
 		return nil, fmt.Errorf("unable copy module's tf files to tmp dir err:%w", err)
 	}

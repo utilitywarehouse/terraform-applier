@@ -37,7 +37,7 @@ type Runner struct {
 	Recorder               record.EventRecorder
 	KubeClt                kubernetes.Interface
 	GitUtil                git.UtilInterface
-	RepoPath               string
+	ReposRootPath          string
 	Queue                  <-chan Request
 	Log                    hclog.Logger
 	Delegate               DelegateInterface

@@ -209,7 +209,7 @@ var _ = BeforeSuite(func() {
 		ClusterClt:             k8sManager.GetClient(),
 		Recorder:               k8sManager.GetEventRecorderFor("terraform-applier"),
 		KubeClt:                fakeClient,
-		RepoPath:               "src",
+		ReposRootPath:          "src",
 		Queue:                  testRunnerQueue,
 		GitUtil:                testGitUtil,
 		Delegate:               testDelegate,
