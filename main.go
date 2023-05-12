@@ -45,6 +45,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+	runTimeMetrics "sigs.k8s.io/controller-runtime/pkg/metrics"
 
 	tfaplv1beta1 "github.com/utilitywarehouse/terraform-applier/api/v1beta1"
 	"github.com/utilitywarehouse/terraform-applier/controllers"
@@ -452,6 +453,8 @@ func run(c *cli.Context) {
 		setupLog.Error("unable to parse tf applier config file", "err", err)
 		os.Exit(1)
 	}
+
+	git.EnableMetrics("terraform-applier", runTimeMetrics.Registry)
 
 	gitSyncPool, err := git.NewSyncPool(
 		ctx,

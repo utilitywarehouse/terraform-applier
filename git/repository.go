@@ -66,6 +66,7 @@ func (so SyncOptions) gitSSHCommand() string {
 // git-sync.
 type Repository struct {
 	lock             sync.RWMutex
+	name             string
 	path             string
 	repositoryConfig RepositoryConfig
 	running          bool
@@ -75,7 +76,10 @@ type Repository struct {
 }
 
 // NewRepository initialises a Repository struct.
-func NewRepository(path string, repositoryConfig RepositoryConfig, syncOptions *SyncOptions, log hclog.Logger) (*Repository, error) {
+func NewRepository(name, path string, repositoryConfig RepositoryConfig, syncOptions *SyncOptions, log hclog.Logger) (*Repository, error) {
+	if name == "" {
+		return nil, fmt.Errorf("cannot create Repository without name")
+	}
 	if path == "" {
 		return nil, fmt.Errorf("cannot create Repository with empty local path")
 	}
@@ -105,6 +109,7 @@ func NewRepository(path string, repositoryConfig RepositoryConfig, syncOptions *
 		syncOptions.Interval = time.Second * 30
 	}
 	return &Repository{
+		name:             name,
 		path:             path,
 		repositoryConfig: repositoryConfig,
 		syncOptions:      syncOptions,
@@ -155,8 +160,7 @@ func (r *Repository) syncLoop(ctx context.Context) {
 			if err != nil {
 				r.log.Error("could not sync git repository", "error", err)
 			}
-			// TODO: FIX ME
-			// metrics.RecordGitSync(err == nil)
+			recordGitSync(r.name, err == nil)
 			cancel()
 		case <-ctx.Done():
 			return
@@ -256,6 +260,8 @@ func (r *Repository) remoteHash(ctx context.Context) (string, error) {
 func (r *Repository) sync(ctx context.Context) error {
 	r.lock.Lock()
 	defer r.lock.Unlock()
+
+	defer updateSyncLatency(r.name, time.Now())
 
 	gitRepoPath := filepath.Join(r.path, ".git")
 	_, err := os.Stat(gitRepoPath)

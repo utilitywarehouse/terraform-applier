@@ -77,7 +77,7 @@ func (s *SyncPool) AddRepository(repoName string, repositoryConfig RepositoryCon
 		return fmt.Errorf("repository with repoName '%s' already exists", repoName)
 	}
 
-	repo, err := NewRepository(filepath.Join(s.root, repoName), repositoryConfig, syncOptions, s.log.Named(repoName))
+	repo, err := NewRepository(repoName, filepath.Join(s.root, repoName), repositoryConfig, syncOptions, s.log.Named(repoName))
 	if err != nil {
 		return err
 	}
