@@ -21,9 +21,9 @@ COPY . .
 # by leaving it empty we can ensure that the container and binary shipped on it will have the same platform.
 RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go generate ./... \
     && go test -v -cover ./... \
-    && go build -a -o manager main.go
+    && go build -a -o tf-applier main.go
 
-FROM alpine:3.17
+FROM alpine:3.18
 
 ENV USER_ID=65532
 
@@ -31,7 +31,7 @@ RUN adduser -S -H -u $USER_ID tf-applier \
       && apk --no-cache add ca-certificates git openssh-client
 
 WORKDIR /
-COPY --from=builder /workspace/manager .
+COPY --from=builder /workspace/tf-applier .
 
 ENV USER=tf-applier
 # Setting HOME ensures git can write config file .gitconfig.
@@ -39,4 +39,4 @@ ENV HOME=/tmp
 
 USER $USER_ID
 
-ENTRYPOINT ["/manager"]
+ENTRYPOINT ["/tf-applier"]
