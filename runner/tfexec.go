@@ -13,7 +13,6 @@ import (
 	"github.com/hashicorp/terraform-exec/tfexec"
 	tfaplv1beta1 "github.com/utilitywarehouse/terraform-applier/api/v1beta1"
 	"github.com/utilitywarehouse/terraform-applier/metrics"
-	"github.com/utilitywarehouse/terraform-applier/sysutil"
 )
 
 //go:generate go run github.com/golang/mock/mockgen -package runner -destination tfexec_mock.go github.com/utilitywarehouse/terraform-applier/runner TFExecuter
@@ -48,7 +47,7 @@ func (r *Runner) NewTFRunner(
 		return nil, fmt.Errorf("unable to create tmp dir %w", err)
 	}
 
-	err = sysutil.CopyDir(filepath.Join(r.ReposRootPath, module.Spec.RepoName, module.Spec.Path), tmpWSDir)
+	err = r.GitSyncPool.CopyPath(ctx, module.Spec.RepoName, module.Spec.Path, tmpWSDir)
 	if err != nil {
 		return nil, fmt.Errorf("unable copy module's tf files to tmp dir err:%w", err)
 	}

@@ -36,8 +36,7 @@ type Runner struct {
 	ClusterClt             client.Client
 	Recorder               record.EventRecorder
 	KubeClt                kubernetes.Interface
-	GitUtil                git.UtilInterface
-	ReposRootPath          string
+	GitSyncPool            git.SyncInterface
 	Queue                  <-chan Request
 	Log                    hclog.Logger
 	Delegate               DelegateInterface
@@ -131,13 +130,19 @@ func (r *Runner) process(req Request, cancelChan <-chan struct{}) bool {
 		}
 	}()
 
-	commitHash, commitLog, err := r.GitUtil.HeadCommitHashAndLog(module.Spec.RepoName, module.Spec.Path)
+	commitHash, err := r.GitSyncPool.HashForPath(ctx, module.Spec.RepoName, module.Spec.Path)
 	if err != nil {
-		log.Error("unable to get commit hash and log", "err", err)
+		log.Error("unable to get commit hash", "err", err)
 		return false
 	}
 
-	remoteURL, err := r.GitUtil.RemoteURL(module.Spec.RepoName)
+	commitLog, err := r.GitSyncPool.LogMsgForPath(ctx, module.Spec.RepoName, module.Spec.Path)
+	if err != nil {
+		log.Error("unable to get commit log subject", "err", err)
+		return false
+	}
+
+	repo, err := r.GitSyncPool.RepositoryConfig(module.Spec.RepoName)
 	if err != nil {
 		log.Error("unable to get repo's remote url", "err", err)
 	}
@@ -151,7 +156,7 @@ func (r *Runner) process(req Request, cancelChan <-chan struct{}) bool {
 	}
 
 	// Update Status
-	if err = r.SetRunStartedStatus(req, module, "preparing for TF run", commitHash, commitLog, remoteURL, r.Clock.Now()); err != nil {
+	if err = r.SetRunStartedStatus(req, module, "preparing for TF run", commitHash, commitLog, repo.Remote, r.Clock.Now()); err != nil {
 		log.Error("unable to set run starting status", "err", err)
 		return false
 	}

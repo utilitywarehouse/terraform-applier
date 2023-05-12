@@ -441,12 +441,19 @@ func run(c *cli.Context) {
 	metrics := &metrics.Prometheus{}
 	metrics.Init()
 
-	gitUtil := &git.Util{
-		RootPath: reposRootPath,
-	}
-
-	if err := git.SetupGlobalConfig(); err != nil {
-		setupLog.Error("unable to setup git config", "err", err)
+	gitSyncPool, err := git.NewSyncPool(
+		ctx,
+		reposRootPath,
+		git.SyncOptions{
+			GitSSHKeyPath:        c.String("git-ssh-key-file"),
+			GitSSHKnownHostsPath: c.String("git-ssh-known-hosts-file"),
+			Interval:             30 * time.Second,
+			WithCheckout:         true,
+		},
+		logger.Named("git-sync"),
+	)
+	if err != nil {
+		setupLog.Error("could not create git sync pool", "err", err)
 		os.Exit(1)
 	}
 
@@ -516,7 +523,7 @@ func run(c *cli.Context) {
 		Recorder:               mgr.GetEventRecorderFor("terraform-applier"),
 		Clock:                  clock,
 		Queue:                  wsQueue,
-		GitUtil:                gitUtil,
+		GitSyncPool:            gitSyncPool,
 		Log:                    logger.Named("manager"),
 		MinIntervalBetweenRuns: time.Duration(c.Int("min-interval-between-runs")) * time.Second,
 	}).SetupWithManager(mgr, filter); err != nil {
@@ -544,9 +551,8 @@ func run(c *cli.Context) {
 		ClusterClt:             mgr.GetClient(),
 		Recorder:               mgr.GetEventRecorderFor("terraform-applier"),
 		KubeClt:                kubeClient,
-		ReposRootPath:          reposRootPath,
 		Queue:                  wsQueue,
-		GitUtil:                gitUtil,
+		GitSyncPool:            gitSyncPool,
 		Log:                    logger.Named("runner"),
 		Metrics:                metrics,
 		TerraformExecPath:      execPath,
