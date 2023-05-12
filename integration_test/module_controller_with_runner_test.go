@@ -51,8 +51,8 @@ var _ = Describe("Module controller with Runner", func() {
 			testGitSyncPool.EXPECT().RepositoryConfig(gomock.Any()).Return(git.RepositoryConfig{Remote: "github.com/org/repo"}, nil).AnyTimes()
 			var dst string
 			testGitSyncPool.EXPECT().CopyPath(gomock.Any(), "modules", "hello", gomock.AssignableToTypeOf(dst)).
-				DoAndReturn(func(ctx context.Context, identifier string, subpath string, dst string) error {
-					return sysutil.CopyDir(filepath.Join("src", identifier, subpath), dst)
+				DoAndReturn(func(ctx context.Context, name string, subpath string, dst string) error {
+					return sysutil.CopyDir(filepath.Join("src", name, subpath), dst)
 				}).AnyTimes()
 
 			testMetrics.EXPECT().UpdateModuleRunDuration(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
