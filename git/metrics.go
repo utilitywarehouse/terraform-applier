@@ -52,8 +52,6 @@ func EnableMetrics(metricsNamespace string, registerer prometheus.Registerer) {
 		[]string{
 			// name of the repository
 			"repo",
-			// Whether the apply was successful or not
-			"success",
 		},
 	)
 
