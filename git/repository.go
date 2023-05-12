@@ -30,10 +30,10 @@ func init() {
 
 // RepositoryConfig defines a remote git repository.
 type RepositoryConfig struct {
-	Remote   string
-	Branch   string
-	Revision string
-	Depth    int
+	Remote   string `yaml:"remote"`
+	Branch   string `yaml:"branch"`
+	Revision string `yaml:"revision"`
+	Depth    int    `yaml:"depth"`
 }
 
 // SyncOptions encapsulates options about how a Repository should be fetched

@@ -1,0 +1,6 @@
+repositories:
+  terraform-applier:
+    remote: git@github.com:utilitywarehouse/terraform-applier.git
+    branch: master
+    revision: HEAD
+    depth: 0

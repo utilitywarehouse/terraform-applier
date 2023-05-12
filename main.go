@@ -84,6 +84,12 @@ var (
 			Usage: "Absolute path to the directory containing all repositories of the modules. " +
 				"The immediate subdirectories of this directory should contain the module repo directories and directory name should match repoName referenced in  module.",
 		},
+		&cli.StringFlag{
+			Name:    "config",
+			EnvVars: []string{"TF_APPLIER_CONFIG"},
+			Value:   "/config/config.yaml",
+			Usage:   "Absolute path to the config file.",
+		},
 		&cli.IntFlag{
 			Name:    "min-interval-between-runs",
 			EnvVars: []string{"MIN_INTERVAL_BETWEEN_RUNS"},
@@ -441,6 +447,12 @@ func run(c *cli.Context) {
 	metrics := &metrics.Prometheus{}
 	metrics.Init()
 
+	conf, err := parseConfigFile(c.String("config"))
+	if err != nil {
+		setupLog.Error("unable to parse tf applier config file", "err", err)
+		os.Exit(1)
+	}
+
 	gitSyncPool, err := git.NewSyncPool(
 		ctx,
 		reposRootPath,
@@ -455,6 +467,14 @@ func run(c *cli.Context) {
 	if err != nil {
 		setupLog.Error("could not create git sync pool", "err", err)
 		os.Exit(1)
+	}
+
+	for name, repoConfig := range conf.Repositories {
+		err := gitSyncPool.AddRepository(name, repoConfig, nil)
+		if err != nil {
+			setupLog.Error("unable to add repository to git sync pool", "name", name, "err", err)
+			os.Exit(1)
+		}
 	}
 
 	// Find the requested version of terraform and log the version
