@@ -454,7 +454,7 @@ func run(c *cli.Context) {
 		os.Exit(1)
 	}
 
-	git.EnableMetrics("terraform-applier", runTimeMetrics.Registry)
+	git.EnableMetrics("terraform_applier", runTimeMetrics.Registry)
 
 	gitSyncPool, err := git.NewSyncPool(
 		ctx,
