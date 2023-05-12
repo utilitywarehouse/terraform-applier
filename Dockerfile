@@ -21,7 +21,7 @@ COPY . .
 # by leaving it empty we can ensure that the container and binary shipped on it will have the same platform.
 RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go generate ./... \
     && go test -v -cover ./... \
-    && go build -a -o tf-applier main.go
+    && go build -a -o tf-applier
 
 FROM alpine:3.18
 
