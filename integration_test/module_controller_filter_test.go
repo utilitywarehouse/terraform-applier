@@ -4,9 +4,11 @@ import (
 	"context"
 	"time"
 
+	"github.com/golang/mock/gomock"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	tfaplv1beta1 "github.com/utilitywarehouse/terraform-applier/api/v1beta1"
+	"github.com/utilitywarehouse/terraform-applier/git"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
@@ -34,9 +36,11 @@ var _ = Describe("Module controller without runner with label selector", func() 
 			testFilter.LabelSelectorValue = "true"
 
 			// Trigger Job run as soon as module is created
-			testGitUtil.EXPECT().HeadCommitHashAndLog("modules", "hello-filter-test").
-				Return(commitHash, commitMsg, nil).AnyTimes()
-			testGitUtil.EXPECT().RemoteURL("modules").Return("github.com/org/repo", nil).AnyTimes()
+			testGitSyncPool.EXPECT().HashForPath(gomock.Any(), "modules", "hello-filter-test").
+				Return(commitHash, nil).AnyTimes()
+			testGitSyncPool.EXPECT().LogMsgForPath(gomock.Any(), "modules", "hello-filter-test").
+				Return(commitMsg, nil).AnyTimes()
+			testGitSyncPool.EXPECT().RepositoryConfig(gomock.Any()).Return(git.RepositoryConfig{Remote: "github.com/org/repo"}, nil).AnyTimes()
 		})
 
 		It("Should send module with valid selector label selector to job queue", func() {
