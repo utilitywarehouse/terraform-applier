@@ -31,7 +31,6 @@ type Prometheus struct {
 	moduleRunCount         *prometheus.CounterVec
 	moduleRunDuration      *prometheus.HistogramVec
 	moduleRunSuccess       *prometheus.GaugeVec
-	runningModuleCount     *prometheus.GaugeVec
 }
 
 // Init creates and registers the custom metrics for terraform-applier.
