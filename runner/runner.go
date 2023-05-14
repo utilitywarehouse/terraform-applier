@@ -71,9 +71,7 @@ func (r *Runner) Start(ctx context.Context, done chan bool) {
 			wg.Add(1)
 			go func(req Request) {
 				defer wg.Done()
-				defer r.Metrics.DecRunningModuleCount(req.Namespace)
 
-				r.Metrics.IncRunningModuleCount(req.Namespace)
 				start := time.Now()
 
 				r.Log.Info("starting run", "module", req.NamespacedName, "type", req.Type)

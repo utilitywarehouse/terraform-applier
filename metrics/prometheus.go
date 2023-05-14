@@ -18,8 +18,6 @@ type PrometheusInterface interface {
 	UpdateTerraformExitCodeCount(string, string, string, int)
 	UpdateModuleSuccess(string, string, bool)
 	UpdateModuleRunDuration(string, string, float64, bool)
-	IncRunningModuleCount(string)
-	DecRunningModuleCount(string)
 }
 
 // Prometheus implements instrumentation of metrics for terraform-applier.
@@ -97,24 +95,12 @@ func (p *Prometheus) Init() {
 		},
 	)
 
-	p.runningModuleCount = prometheus.NewGaugeVec(prometheus.GaugeOpts{
-		Namespace: metricsNamespace,
-		Name:      "running_module_count",
-		Help:      "The total number of modules in running state",
-	},
-		[]string{
-			// Namespace name of the module that was ran
-			"namespace",
-		},
-	)
-
 	// Register custom metrics with the global prometheus registry
 	metrics.Registry.MustRegister(
 		p.moduleRunCount,
 		p.moduleRunDuration,
 		p.moduleRunSuccess,
 		p.terraformExitCodeCount,
-		p.runningModuleCount,
 	)
 
 }
@@ -158,16 +144,4 @@ func (p *Prometheus) setApplySuccess(module, namespace string, success bool) {
 		"module":    module,
 		"namespace": namespace,
 	}).Set(as)
-}
-
-func (p *Prometheus) IncRunningModuleCount(namespace string) {
-	p.runningModuleCount.With(prometheus.Labels{
-		"namespace": namespace,
-	}).Inc()
-}
-
-func (p *Prometheus) DecRunningModuleCount(namespace string) {
-	p.runningModuleCount.With(prometheus.Labels{
-		"namespace": namespace,
-	}).Dec()
 }

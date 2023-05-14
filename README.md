@@ -205,4 +205,3 @@ In addition to the [controller-runtime](https://book.kubebuilder.io/reference/me
 - `terraform_applier_module_terraform_exit_code_count` - (tags: `module`,`namespace`, `command`, `exit_code`) A `Counter` for each exit code returned by executions of
   `terraform`, labelled with the command issued (`init`, `plan`,`apply`) and the exit code. It's worth noting that `plan` will
   return a code of `2` if there are changes to be made, which is not an error or a failure, so you may wish to account for this in your alerting.
-- `terraform_applier_running_module_count` - (tags: `namespace`) A `Gauge` which tracks number of modules in running state at a given time.
