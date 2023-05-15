@@ -3,12 +3,15 @@ package integration_test
 import (
 	"context"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/golang/mock/gomock"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	tfaplv1beta1 "github.com/utilitywarehouse/terraform-applier/api/v1beta1"
+	"github.com/utilitywarehouse/terraform-applier/git"
+	"github.com/utilitywarehouse/terraform-applier/sysutil"
 	"github.com/utilitywarehouse/terraform-applier/vault"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -39,16 +42,22 @@ var _ = Describe("Module controller with Runner", func() {
 			testFilter.LabelSelectorKey = ""
 			testFilter.LabelSelectorValue = ""
 
-			// Trigger Job run as soon as module is created
-			testGitUtil.EXPECT().HeadCommitHashAndLog("hello").
-				Return(commitHash, commitMsg, nil).AnyTimes()
-			testGitUtil.EXPECT().RemoteURL().Return("github.com/org/repo", nil).AnyTimes()
+			// all jobs will be triggered automatically as they do not have initial commit hash
+			// testGitSyncPool.EXPECT().HasChangesForPath(gomock.Any(), "modules", "hello", gomock.Any()).Return(true, nil).AnyTimes()
+			testGitSyncPool.EXPECT().HashForPath(gomock.Any(), "modules", "hello").
+				Return(commitHash, nil).AnyTimes()
+			testGitSyncPool.EXPECT().LogMsgForPath(gomock.Any(), "modules", "hello").
+				Return(commitMsg, nil).AnyTimes()
+			testGitSyncPool.EXPECT().RepositoryConfig(gomock.Any()).Return(git.RepositoryConfig{Remote: "github.com/org/repo"}, nil).AnyTimes()
+			var dst string
+			testGitSyncPool.EXPECT().CopyPath(gomock.Any(), "modules", "hello", gomock.AssignableToTypeOf(dst)).
+				DoAndReturn(func(ctx context.Context, name string, subpath string, dst string) error {
+					return sysutil.CopyDir(filepath.Join("src", name, subpath), dst)
+				}).AnyTimes()
 
 			testMetrics.EXPECT().UpdateModuleRunDuration(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 			testMetrics.EXPECT().UpdateModuleSuccess(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 			testMetrics.EXPECT().UpdateTerraformExitCodeCount(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-			testMetrics.EXPECT().IncRunningModuleCount(gomock.Any()).AnyTimes()
-			testMetrics.EXPECT().DecRunningModuleCount(gomock.Any()).AnyTimes()
 
 			// clear state file if exits
 			os.Remove(testStateFilePath)
@@ -57,6 +66,7 @@ var _ = Describe("Module controller with Runner", func() {
 		It("Should send module to job queue on commit change and runner should do plan & apply", func() {
 			const (
 				moduleName = "hello"
+				repo       = "modules"
 				path       = "hello"
 			)
 
@@ -73,6 +83,7 @@ var _ = Describe("Module controller with Runner", func() {
 				},
 				Spec: tfaplv1beta1.ModuleSpec{
 					Schedule: "50 * * * *",
+					RepoName: repo,
 					Path:     path,
 				},
 			}
@@ -125,11 +136,14 @@ var _ = Describe("Module controller with Runner", func() {
 			Expect(fetchedModule.Status.LastApplyInfo.Output).Should(ContainSubstring("Apply complete!"))
 			Expect(fetchedModule.Status.LastApplyInfo.Timestamp.UTC()).Should(Equal(fakeClock.T.UTC()))
 
+			// delete module to stopping requeue
+			Expect(k8sClient.Delete(ctx, module)).Should(Succeed())
 		})
 
 		It("Should send module to job queue on commit change and runner should only do plan", func() {
 			const (
 				moduleName = "hello-plan-only"
+				repo       = "modules"
 				path       = "hello"
 			)
 
@@ -146,6 +160,7 @@ var _ = Describe("Module controller with Runner", func() {
 				},
 				Spec: tfaplv1beta1.ModuleSpec{
 					Schedule: "50 * * * *",
+					RepoName: repo,
 					Path:     path,
 					PlanOnly: &boolTrue,
 				},
@@ -197,11 +212,15 @@ var _ = Describe("Module controller with Runner", func() {
 			Expect(fetchedModule.Status.LastApplyInfo.CommitHash).Should(Equal(""))
 			Expect(fetchedModule.Status.LastApplyInfo.Output).Should(ContainSubstring(""))
 			Expect(fetchedModule.Status.LastApplyInfo.Timestamp).Should(BeNil())
+
+			// delete module to stopping requeue
+			Expect(k8sClient.Delete(ctx, module)).Should(Succeed())
 		})
 
 		It("Should send module to job queue on commit change and runner should read configmaps and secrets before apply and setup local backend", func() {
 			const (
 				moduleName = "hello-with-var-env"
+				repo       = "modules"
 				path       = "hello"
 			)
 
@@ -218,6 +237,7 @@ var _ = Describe("Module controller with Runner", func() {
 				},
 				Spec: tfaplv1beta1.ModuleSpec{
 					Schedule: "50 * * * *",
+					RepoName: repo,
 					Path:     path,
 					Backend: []corev1.EnvVar{
 						{Name: "path", Value: testStateFilePath},
@@ -324,11 +344,15 @@ var _ = Describe("Module controller with Runner", func() {
 
 			// make sure state file is created by local backend
 			Expect(testStateFilePath).Should(BeAnExistingFile())
+
+			// delete module to stopping requeue
+			Expect(k8sClient.Delete(ctx, module)).Should(Succeed())
 		})
 
 		It("Should send module to job queue on commit change and runner should generate aws vault creds", func() {
 			const (
 				moduleName = "hello-with-aws-creds"
+				repo       = "modules"
 				path       = "hello"
 			)
 
@@ -350,6 +374,7 @@ var _ = Describe("Module controller with Runner", func() {
 				},
 				Spec: tfaplv1beta1.ModuleSpec{
 					Schedule:      "50 * * * *",
+					RepoName:      repo,
 					Path:          path,
 					VaultRequests: &vaultReq,
 				},
@@ -396,6 +421,9 @@ var _ = Describe("Module controller with Runner", func() {
 
 			// make sure all values are there in output
 			Expect(fetchedModule.Status.LastApplyInfo.Output).Should(ContainSubstring("AWS_KEY_ABCD1234"))
+
+			// delete module to stopping requeue
+			Expect(k8sClient.Delete(ctx, module)).Should(Succeed())
 		})
 	})
 

@@ -81,7 +81,7 @@ var (
 
 	// testRunnerQueue only used for send job to runner of runner testing
 	testRunnerQueue  chan runner.Request
-	testGitUtil      *git.MockUtilInterface
+	testGitSyncPool  *git.MockSyncInterface
 	testMetrics      *metrics.MockPrometheusInterface
 	testDelegate     *runner.MockDelegateInterface
 	testRunner       runner.Runner
@@ -154,7 +154,7 @@ var _ = BeforeSuite(func() {
 
 	goMockCtrl = gomock.NewController(RecoveringGinkgoT())
 
-	testGitUtil = git.NewMockUtilInterface(goMockCtrl)
+	testGitSyncPool = git.NewMockSyncInterface(goMockCtrl)
 	testMetrics = metrics.NewMockPrometheusInterface(goMockCtrl)
 	testDelegate = runner.NewMockDelegateInterface(goMockCtrl)
 
@@ -166,7 +166,7 @@ var _ = BeforeSuite(func() {
 		Recorder:               k8sManager.GetEventRecorderFor("terraform-applier"),
 		Clock:                  fakeClock,
 		Queue:                  testControllerQueue,
-		GitUtil:                testGitUtil,
+		GitSyncPool:            testGitSyncPool,
 		Log:                    testLogger.Named("manager"),
 		MinIntervalBetweenRuns: minIntervalBetweenRunsDuration,
 	}
@@ -209,9 +209,8 @@ var _ = BeforeSuite(func() {
 		ClusterClt:             k8sManager.GetClient(),
 		Recorder:               k8sManager.GetEventRecorderFor("terraform-applier"),
 		KubeClt:                fakeClient,
-		RepoPath:               "modules",
 		Queue:                  testRunnerQueue,
-		GitUtil:                testGitUtil,
+		GitSyncPool:            testGitSyncPool,
 		Delegate:               testDelegate,
 		Log:                    testLogger.Named("runner"),
 		Metrics:                testMetrics,
@@ -222,7 +221,7 @@ var _ = BeforeSuite(func() {
 
 	pwd, err := os.Getwd()
 	Expect(err).NotTo(HaveOccurred())
-	testStateFilePath = filepath.Join(pwd, "modules", "hello", "terraform.tfstate")
+	testStateFilePath = filepath.Join(pwd, "src", "modules", "hello", "terraform.tfstate")
 
 	go func() {
 		defer GinkgoRecover()

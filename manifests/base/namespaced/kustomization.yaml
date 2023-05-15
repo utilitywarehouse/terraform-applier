@@ -3,9 +3,9 @@ kind: Kustomization
 resources:
   - leader_election_role.yaml
   - leader_election_role_binding.yaml
-  - manager-with-git-sync.yaml
   - sa-rbac.yaml
   - service.yaml
+  - tf-applier.yaml
 
 images:
   - name: terraform-applier

@@ -33,30 +33,6 @@ func (m *MockPrometheusInterface) EXPECT() *MockPrometheusInterfaceMockRecorder 
 	return m.recorder
 }
 
-// DecRunningModuleCount mocks base method.
-func (m *MockPrometheusInterface) DecRunningModuleCount(arg0 string) {
-	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "DecRunningModuleCount", arg0)
-}
-
-// DecRunningModuleCount indicates an expected call of DecRunningModuleCount.
-func (mr *MockPrometheusInterfaceMockRecorder) DecRunningModuleCount(arg0 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DecRunningModuleCount", reflect.TypeOf((*MockPrometheusInterface)(nil).DecRunningModuleCount), arg0)
-}
-
-// IncRunningModuleCount mocks base method.
-func (m *MockPrometheusInterface) IncRunningModuleCount(arg0 string) {
-	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "IncRunningModuleCount", arg0)
-}
-
-// IncRunningModuleCount indicates an expected call of IncRunningModuleCount.
-func (mr *MockPrometheusInterfaceMockRecorder) IncRunningModuleCount(arg0 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IncRunningModuleCount", reflect.TypeOf((*MockPrometheusInterface)(nil).IncRunningModuleCount), arg0)
-}
-
 // UpdateModuleRunDuration mocks base method.
 func (m *MockPrometheusInterface) UpdateModuleRunDuration(arg0, arg1 string, arg2 float64, arg3 bool) {
 	m.ctrl.T.Helper()

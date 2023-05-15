@@ -3,7 +3,7 @@
 Heavily adapted from
 [kube-applier](https://github.com/utilitywarehouse/kube-applier),
 terraform-applier enables continuous deployment of Terraform code by applying
-modules from a Git repository. Only 1 repository is supported for all the modules.
+modules from a Git repository.
 
 ## Usage
 
@@ -19,6 +19,7 @@ kind: Module
 metadata:
   name: hello
 spec:
+  repoName: terraform-applier 
   path: dev/hello
   schedule: "00 */1 * * *"
   suspend: false
@@ -103,11 +104,28 @@ it will not do `apply` even if drift is detected.
 
 Controller will force shutdown on current stage run if it takes more time then `TERMINATION_GRACE_PERIOD` set on controller.
 
+### Git Sync
+
+Terraform-applier has built in git sync functionality, it will periodically pull files down from a repository and make it available for modules.
+it supports multiple repositories, use following config to add repositories. config is map of repository name and repo config.
+modules must use this repository name in CRD as `repoName` to reference a repository. git-sync only supports 1 branch and revision per repository.
+all repositories will be cloned to given `repos-root-path` path. 
+
+```yaml
+repositories:
+  terraform-applier:
+    remote: git@github.com:utilitywarehouse/terraform-applier.git
+    branch: master
+    revision: HEAD
+    depth: 0
+  another-repo:
+    remote: git@github.com/org/another-repo.git
+```
+
 ### Controller config
 
-- `--repo-path (REPO_PATH)` - (default: `/src/modules`) Absolute path to the directory containing the modules
-  to be applied. The immediate subdirectories of this directory should contain
-  the root modules which will be referenced by users in `module`.
+- `--repos-root-path (REPOS_ROOT_PATH)` - (default: `/src`) Absolute path to the directory containing all repositories of the modules. The immediate subdirectories of this directory should contain the module repo directories and directory name should match repoName referenced in  module.
+- `--config (TF_APPLIER_CONFIG)` - (default: `/config/config.yaml`) Path to the tf applier config file containing repository config.
 - `--min-interval-between-runs (MIN_INTERVAL_BETWEEN_RUNS)` - (default: `60`) The minimum interval in seconds, user can set between 2 consecutive runs. This value defines the frequency of runs.
 - `--termination-grace-period (TERMINATION_GRACE_PERIOD)` - (default: `60`) Termination grace period is the ime given to
   the running job to finish current run after 1st TERM signal is received. After this timeout runner will be forced to shutdown.
@@ -207,4 +225,6 @@ In addition to the [controller-runtime](https://book.kubebuilder.io/reference/me
 - `terraform_applier_module_terraform_exit_code_count` - (tags: `module`,`namespace`, `command`, `exit_code`) A `Counter` for each exit code returned by executions of
   `terraform`, labelled with the command issued (`init`, `plan`,`apply`) and the exit code. It's worth noting that `plan` will
   return a code of `2` if there are changes to be made, which is not an error or a failure, so you may wish to account for this in your alerting.
-- `terraform_applier_running_module_count` - (tags: `namespace`) A `Gauge` which tracks number of modules in running state at a given time.
+- `terraform_applier_git_last_sync_timestamp` - (tags: `repo`)  A Gauge that captures the Timestamp of the last successful git sync per repo.
+- `terraform_applier_git_sync_count` - (tags: `repo`,`success`) A Counter for each repo sync, incremented with each sync attempt and tagged with the result (`success=true|false`)
+- `terraform_applier_git_sync_latency_seconds` - (tags: `repo`) A Summary that keeps track of the git sync latency per repo.

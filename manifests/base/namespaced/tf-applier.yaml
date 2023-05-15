@@ -12,7 +12,7 @@ spec:
   template:
     metadata:
       annotations:
-        kubectl.kubernetes.io/default-container: manager
+        kubectl.kubernetes.io/default-container: tf-applier
       labels:
         control-plane: terraform-applier
     spec:
@@ -26,9 +26,9 @@ spec:
       serviceAccountName: terraform-applier
       terminationGracePeriodSeconds: 300
       containers:
-        - name: manager
+        - name: tf-applier
           command:
-            - /manager
+            - /tf-applier
           args:
             - --leader-elect
             - --termination-grace-period=240
@@ -60,34 +60,6 @@ spec:
           volumeMounts:
             - mountPath: /src
               name: git-repo
-              readOnly: true
-        - name: git-sync
-          image: registry.k8s.io/git-sync/git-sync:v3.6.3
-          env:
-            - name: GIT_SYNC_DEST
-              value: "modules"
-            - name: GIT_SYNC_SSH
-              value: "true"
-            - name: GIT_SYNC_MAX_SYNC_FAILURES
-              value: "5"
-            - name: GIT_SYNC_WAIT
-              value: "30"
-          volumeMounts:
-            - name: git-repo
-              mountPath: /tmp/git
-            - name: git-secret
-              mountPath: /etc/git-secret
-          resources:
-            requests:
-              cpu: 40m
-              memory: 48Mi
-            limits:
-              cpu: 500m
-              memory: 512Mi
       volumes:
         - name: git-repo
           emptyDir: {}
-        - name: git-secret
-          secret:
-            secretName: git-sync
-            defaultMode: 0440

@@ -3,6 +3,7 @@ package webserver
 import (
 	"fmt"
 	"html/template"
+	"strings"
 	"time"
 
 	tfaplv1beta1 "github.com/utilitywarehouse/terraform-applier/api/v1beta1"
@@ -51,5 +52,11 @@ func commitURL(remoteURL, hash string) string {
 	if remoteURL == "" {
 		return ""
 	}
+	remoteURL = strings.TrimSpace(remoteURL)
+	remoteURL = strings.TrimPrefix(remoteURL, "ssh://")
+	remoteURL = strings.TrimPrefix(remoteURL, "https://")
+	remoteURL = strings.TrimPrefix(remoteURL, "git@")
+	remoteURL = strings.TrimSuffix(remoteURL, ".git")
+	remoteURL = strings.ReplaceAll(remoteURL, ":", "/")
 	return fmt.Sprintf("https://%s/commit/%s", remoteURL, hash)
 }

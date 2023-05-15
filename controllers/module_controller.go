@@ -43,7 +43,7 @@ type ModuleReconciler struct {
 	Scheme                 *runtime.Scheme
 	Recorder               record.EventRecorder
 	Clock                  sysutil.ClockInterface
-	GitUtil                git.UtilInterface
+	GitSyncPool            git.SyncInterface
 	Queue                  chan<- runner.Request
 	Log                    hclog.Logger
 	MinIntervalBetweenRuns time.Duration
@@ -67,6 +67,8 @@ type ModuleReconciler struct {
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.14.1/pkg/reconcile
 func (r *ModuleReconciler) Reconcile(ctx context.Context, req reconcile.Request) (ctrl.Result, error) {
 	log := r.Log.With("module", req.NamespacedName)
+
+	log.Trace("reconciling...")
 
 	var module tfaplv1beta1.Module
 	if err := r.Get(ctx, req.NamespacedName, &module); err != nil {
@@ -96,18 +98,25 @@ func (r *ModuleReconciler) Reconcile(ctx context.Context, req reconcile.Request)
 		return ctrl.Result{RequeueAfter: pollIntervalDuration}, nil
 	}
 
-	// check for new commit on modules path
-	commitHash, _, err := r.GitUtil.HeadCommitHashAndLog(module.Spec.Path)
+	if module.Status.RunCommitHash == "" {
+		log.Info("starting initial run")
+		r.Queue <- runner.Request{NamespacedName: req.NamespacedName, Type: tfaplv1beta1.PollingRun}
+		// use next poll internal as minimum queue duration as status change will not trigger Reconcile
+		return ctrl.Result{RequeueAfter: pollIntervalDuration}, nil
+	}
+
+	// check for new changes on modules path
+	changed, err := r.GitSyncPool.HasChangesForPath(ctx, module.Spec.RepoName, module.Spec.Path, module.Status.RunCommitHash)
 	if err != nil {
-		msg := fmt.Sprintf("unable to get commit hash: err:%s", err)
+		msg := fmt.Sprintf("unable to determine changes in repo based on hash:%s err:%s", module.Status.RunCommitHash, err)
 		log.Error(msg)
 		r.setFailedStatus(req, &module, tfaplv1beta1.ReasonGitFailure, msg, r.Clock.Now())
 		// since issue is not related to module specs, requeue again in case its fixed
 		return ctrl.Result{RequeueAfter: pollIntervalDuration}, nil
 	}
 
-	if module.Status.RunCommitHash != commitHash {
-		log.Info("new commit is available starting run", "RunCommitHash", module.Status.RunCommitHash, "currentHash", commitHash)
+	if changed {
+		log.Info("new changes are available starting run")
 		r.Queue <- runner.Request{NamespacedName: req.NamespacedName, Type: tfaplv1beta1.PollingRun}
 		// use next poll internal as minimum queue duration as status change will not trigger Reconcile
 		return ctrl.Result{RequeueAfter: pollIntervalDuration}, nil

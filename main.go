@@ -45,6 +45,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+	runTimeMetrics "sigs.k8s.io/controller-runtime/pkg/metrics"
 
 	tfaplv1beta1 "github.com/utilitywarehouse/terraform-applier/api/v1beta1"
 	"github.com/utilitywarehouse/terraform-applier/controllers"
@@ -58,7 +59,7 @@ var (
 	scheme = runtime.NewScheme()
 
 	logLevel           string
-	repoPath           string
+	reposRootPath      string
 	labelSelectorKey   string
 	labelSelectorValue string
 	electionID         string
@@ -77,12 +78,18 @@ var (
 
 	flags = []cli.Flag{
 		&cli.StringFlag{
-			Name:        "repo-path",
-			EnvVars:     []string{"REPO_PATH"},
-			Value:       "/src/modules",
-			Destination: &repoPath,
-			Usage: "Absolute path to the directory containing the modules to be applied. " +
-				"The immediate subdirectories of this directory should contain the root modules which will be referenced in modules.",
+			Name:        "repos-root-path",
+			EnvVars:     []string{"REPOS_ROOT_PATH"},
+			Value:       "/src",
+			Destination: &reposRootPath,
+			Usage: "Absolute path to the directory containing all repositories of the modules. " +
+				"The immediate subdirectories of this directory should contain the module repo directories and directory name should match repoName referenced in  module.",
+		},
+		&cli.StringFlag{
+			Name:    "config",
+			EnvVars: []string{"TF_APPLIER_CONFIG"},
+			Value:   "/config/config.yaml",
+			Usage:   "Absolute path to the config file.",
 		},
 		&cli.IntFlag{
 			Name:    "min-interval-between-runs",
@@ -264,7 +271,7 @@ func validate(c *cli.Context) {
 		os.Exit(1)
 	}
 
-	logger.Info("config", "repoPath", repoPath)
+	logger.Info("config", "reposRootPath", reposRootPath)
 	logger.Info("config", "watchNamespaces", watchNamespaces)
 	logger.Info("config", "selectorLabel", fmt.Sprintf("%s:%s", labelSelectorKey, labelSelectorValue))
 	logger.Info("config", "minIntervalBetweenRunsDuration", c.Int("min-interval-between-runs"))
@@ -441,13 +448,36 @@ func run(c *cli.Context) {
 	metrics := &metrics.Prometheus{}
 	metrics.Init()
 
-	gitUtil := &git.Util{
-		Path: repoPath,
+	conf, err := parseConfigFile(c.String("config"))
+	if err != nil {
+		setupLog.Error("unable to parse tf applier config file", "err", err)
+		os.Exit(1)
 	}
 
-	if err := git.SetupGlobalConfig(); err != nil {
-		setupLog.Error("unable to setup git config", "err", err)
+	git.EnableMetrics("terraform_applier", runTimeMetrics.Registry)
+
+	gitSyncPool, err := git.NewSyncPool(
+		ctx,
+		reposRootPath,
+		git.SyncOptions{
+			GitSSHKeyPath:        c.String("git-ssh-key-file"),
+			GitSSHKnownHostsPath: c.String("git-ssh-known-hosts-file"),
+			Interval:             30 * time.Second,
+			WithCheckout:         true,
+		},
+		logger.Named("git-sync"),
+	)
+	if err != nil {
+		setupLog.Error("could not create git sync pool", "err", err)
 		os.Exit(1)
+	}
+
+	for name, repoConfig := range conf.Repositories {
+		err := gitSyncPool.AddRepository(name, repoConfig, nil)
+		if err != nil {
+			setupLog.Error("unable to add repository to git sync pool", "name", name, "err", err)
+			os.Exit(1)
+		}
 	}
 
 	// Find the requested version of terraform and log the version
@@ -516,7 +546,7 @@ func run(c *cli.Context) {
 		Recorder:               mgr.GetEventRecorderFor("terraform-applier"),
 		Clock:                  clock,
 		Queue:                  wsQueue,
-		GitUtil:                gitUtil,
+		GitSyncPool:            gitSyncPool,
 		Log:                    logger.Named("manager"),
 		MinIntervalBetweenRuns: time.Duration(c.Int("min-interval-between-runs")) * time.Second,
 	}).SetupWithManager(mgr, filter); err != nil {
@@ -544,9 +574,8 @@ func run(c *cli.Context) {
 		ClusterClt:             mgr.GetClient(),
 		Recorder:               mgr.GetEventRecorderFor("terraform-applier"),
 		KubeClt:                kubeClient,
-		RepoPath:               repoPath,
 		Queue:                  wsQueue,
-		GitUtil:                gitUtil,
+		GitSyncPool:            gitSyncPool,
 		Log:                    logger.Named("runner"),
 		Metrics:                metrics,
 		TerraformExecPath:      execPath,

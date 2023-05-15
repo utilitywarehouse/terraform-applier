@@ -29,6 +29,9 @@ type ModuleSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
+	// Name of the repository containing Terraform module directory.
+	RepoName string `json:"repoName"`
+
 	// Path to the directory containing Terraform Root Module (.tf) files.
 	Path string `json:"path"`
 
