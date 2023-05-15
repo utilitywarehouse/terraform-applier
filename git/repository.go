@@ -195,7 +195,6 @@ func (r *Repository) runGitCommand(ctx context.Context, environment []string, cw
 
 	env := []string{
 		fmt.Sprintf("PATH=%s", os.Getenv("PATH")),
-		fmt.Sprintf("SSH_AUTH_SOCK=%s", os.Getenv("SSH_AUTH_SOCK")),
 		r.syncOptions.gitSSHCommand(),
 	}
 
@@ -282,7 +281,7 @@ func (r *Repository) sync(ctx context.Context) error {
 			return err
 		}
 		if local == remote {
-			r.log.Info("no update required", "rev", r.repositoryConfig.Revision, "local", local, "remote", remote)
+			r.log.Debug("no update required", "rev", r.repositoryConfig.Revision, "local", local, "remote", remote)
 			return nil
 		}
 		r.log.Info("update required", "rev", r.repositoryConfig.Revision, "local", local, "remote", remote)
