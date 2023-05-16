@@ -182,7 +182,7 @@ func (r *Repository) StopSync() {
 
 func (r *Repository) runGitCommand(ctx context.Context, environment []string, cwd string, args ...string) (string, error) {
 	cmdStr := gitExecutablePath + " " + strings.Join(args, " ")
-	r.log.Debug("running command", "cwd", cwd, "cmd", cmdStr)
+	r.log.Trace("running command", "cwd", cwd, "cmd", cmdStr)
 
 	cmd := exec.CommandContext(ctx, gitExecutablePath, args...)
 	if cwd != "" {
@@ -212,7 +212,7 @@ func (r *Repository) runGitCommand(ctx context.Context, environment []string, cw
 	if err != nil {
 		return "", fmt.Errorf("Run(%s): %w: { stdout: %q, stderr: %q }", cmdStr, err, stdout, stderr)
 	}
-	r.log.Debug("command result", "stdout", stdout, "stderr", stderr)
+	r.log.Trace("command result", "stdout", stdout, "stderr", stderr)
 
 	return stdout, nil
 }
@@ -281,7 +281,7 @@ func (r *Repository) sync(ctx context.Context) error {
 			return err
 		}
 		if local == remote {
-			r.log.Debug("no update required", "rev", r.repositoryConfig.Revision, "local", local, "remote", remote)
+			r.log.Trace("no update required", "rev", r.repositoryConfig.Revision, "local", local, "remote", remote)
 			return nil
 		}
 		r.log.Info("update required", "rev", r.repositoryConfig.Revision, "local", local, "remote", remote)
