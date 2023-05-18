@@ -2,6 +2,7 @@ package metrics
 
 import (
 	"strconv"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"sigs.k8s.io/controller-runtime/pkg/metrics"
@@ -31,6 +32,7 @@ type Prometheus struct {
 	moduleRunCount         *prometheus.CounterVec
 	moduleRunDuration      *prometheus.HistogramVec
 	moduleRunSuccess       *prometheus.GaugeVec
+	moduleRunTimestamp     *prometheus.GaugeVec
 }
 
 // Init creates and registers the custom metrics for terraform-applier.
@@ -77,6 +79,17 @@ func (p *Prometheus) Init() {
 			"namespace",
 		},
 	)
+	p.moduleRunTimestamp = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Namespace: metricsNamespace,
+		Name:      "module_last_run_timestamp",
+		Help:      "Timestamp of the last successful module run",
+	},
+		[]string{
+			"module",
+			// Namespace name of the module that was ran
+			"namespace",
+		},
+	)
 	p.terraformExitCodeCount = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Namespace: metricsNamespace,
 		Name:      "module_terraform_exit_code_count",
@@ -116,12 +129,18 @@ func (p *Prometheus) UpdateTerraformExitCodeCount(module, namespace string, cmd 
 
 // UpdateModuleSuccess increments the given module's Counter for either successful or failed run attempts.
 func (p *Prometheus) UpdateModuleSuccess(module, namespace string, success bool) {
+	if success {
+		p.moduleRunTimestamp.With(prometheus.Labels{
+			"module":    module,
+			"namespace": namespace,
+		}).Set(float64(time.Now().Unix()))
+	}
 	p.moduleRunCount.With(prometheus.Labels{
 		"module":    module,
 		"namespace": namespace,
 		"success":   strconv.FormatBool(success),
 	}).Inc()
-	p.setApplySuccess(module, namespace, success)
+	p.setRunSuccess(module, namespace, success)
 }
 
 // UpdateModuleRunDuration adds a data point (latency of the most recent run) to the module_apply_duration_seconds Summary metric, with a tag indicating whether or not the run was successful.
@@ -133,8 +152,8 @@ func (p *Prometheus) UpdateModuleRunDuration(module, namespace string, runDurati
 	}).Observe(runDuration)
 }
 
-// setApplySuccess sets last run outcome for a module
-func (p *Prometheus) setApplySuccess(module, namespace string, success bool) {
+// setRunSuccess sets last run outcome for a module
+func (p *Prometheus) setRunSuccess(module, namespace string, success bool) {
 	as := float64(0)
 	if success {
 		as = 1
