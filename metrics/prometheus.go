@@ -112,6 +112,7 @@ func (p *Prometheus) Init() {
 		p.moduleRunCount,
 		p.moduleRunDuration,
 		p.moduleRunSuccess,
+		p.moduleRunTimestamp,
 		p.terraformExitCodeCount,
 	)
 
