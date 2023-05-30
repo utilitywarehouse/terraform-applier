@@ -43,6 +43,7 @@ import (
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	runTimeMetrics "sigs.k8s.io/controller-runtime/pkg/metrics"
@@ -263,12 +264,8 @@ func validate(c *cli.Context) {
 		labelSelectorValue = labelKV[1]
 	}
 
-	watchNamespaces = strings.Split(c.String("watch-namespaces"), ",")
-
-	// https://github.com/kubernetes-sigs/controller-runtime/issues/2273
-	if len(watchNamespaces) > 1 {
-		logger.Error("for now only 1 namespace is allowed in watch list WATCH_NAMESPACES")
-		os.Exit(1)
+	if c.IsSet("watch-namespaces") {
+		watchNamespaces = strings.Split(c.String("watch-namespaces"), ",")
 	}
 
 	logger.Info("config", "reposRootPath", reposRootPath)
@@ -513,20 +510,15 @@ func run(c *cli.Context) {
 		labelSelector = labels.Set{labelSelectorKey: labelSelectorValue}.AsSelector()
 	}
 
-	var watchNS string
-	if len(watchNamespaces) > 0 {
-		watchNS = watchNamespaces[0]
-	}
-
-	options.NewCache = cache.BuilderWithOptions(cache.Options{
-		Scheme:    scheme,
-		Namespace: watchNS,
-		SelectorsByObject: cache.SelectorsByObject{
+	options.Cache = cache.Options{
+		Scheme:     scheme,
+		Namespaces: watchNamespaces,
+		ByObject: map[client.Object]cache.ByObject{
 			&tfaplv1beta1.Module{}: {
 				Label: labelSelector,
 			},
 		},
-	})
+	}
 
 	filter := &controllers.Filter{
 		Log:                logger.Named("filter"),
