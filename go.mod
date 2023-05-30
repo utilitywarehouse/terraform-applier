@@ -15,7 +15,7 @@ require (
 	github.com/onsi/gomega v1.27.7
 	github.com/prometheus/client_golang v1.15.1
 	github.com/robfig/cron/v3 v3.0.1
-	github.com/urfave/cli/v2 v2.25.4
+	github.com/urfave/cli/v2 v2.25.5
 	github.com/utilitywarehouse/go-operational v0.0.0-20220413104526-79ce40a50281
 	go.uber.org/zap v1.24.0
 	golang.org/x/oauth2 v0.7.0
