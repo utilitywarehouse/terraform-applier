@@ -119,8 +119,8 @@ var (
 				"if not set, it will choose the latest available one. Ignored if `TERRAFORM_PATH` is set.",
 		},
 		&cli.BoolFlag{
-			Name:    "set-git-ssh-command",
-			EnvVars: []string{"SET_GIT_SSH_COMMAND"},
+			Name:    "set-git-ssh-command-global-env",
+			EnvVars: []string{"SET_GIT_SSH_COMMAND_GLOBAL_ENV"},
 			Value:   false,
 			Usage: "If set GIT_SSH_COMMAND env will be set as global env for all modules. " +
 				"This ssh command will be used by modules during terraform init to pull private remote modules.",
@@ -369,7 +369,7 @@ func setupGlobalEnv(c *cli.Context) {
 		globalRunEnv[env] = os.Getenv(env)
 	}
 
-	if c.Bool("set-git-ssh-command") {
+	if c.Bool("set-git-ssh-command-global-env") {
 		cmdStr, err := git.GitSSHCommand(
 			c.String("git-ssh-key-file"), c.String("git-ssh-known-hosts-file"), c.Bool("git-verify-known-hosts"),
 		)
