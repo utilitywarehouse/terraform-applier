@@ -233,6 +233,7 @@ func (r *ModuleReconciler) setFailedStatus(req ctrl.Request, module *tfaplv1beta
 
 	module.Status.CurrentState = string(tfaplv1beta1.StatusErrored)
 	module.Status.StateMessage = msg
+	module.Status.StateReason = reason
 	module.Status.RunStartedAt = nil
 	module.Status.RunDuration = nil
 	module.Status.ObservedGeneration = module.Generation
