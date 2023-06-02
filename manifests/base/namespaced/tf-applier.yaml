@@ -1,11 +1,12 @@
 apiVersion: apps/v1
-kind: Deployment
+kind: StatefulSet
 metadata:
   labels:
     control-plane: terraform-applier
   name: terraform-applier
 spec:
   replicas: 1
+  serviceName: terraform-applier
   selector:
     matchLabels:
       control-plane: terraform-applier
@@ -25,6 +26,16 @@ spec:
           type: RuntimeDefault
       serviceAccountName: terraform-applier
       terminationGracePeriodSeconds: 300
+      initContainers:
+        - name: init-tmp-cleanup
+          image: busybox:latest
+          command: ["sh", "-c", "rm -rf /tmp/*"] # clean up tmp pvc on re-start
+          volumeMounts:
+            - mountPath: /tmp
+              name: tmp
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
       containers:
         - name: tf-applier
           command:
@@ -60,6 +71,18 @@ spec:
           volumeMounts:
             - mountPath: /src
               name: git-repo
+            - mountPath: /tmp
+              name: tmp
       volumes:
         - name: git-repo
           emptyDir: {}
+  volumeClaimTemplates:
+    - metadata:
+        name: tmp
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 20Gi
+
