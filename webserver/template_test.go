@@ -31,6 +31,7 @@ func Test_ExecuteTemplate(t *testing.T) {
 				CurrentState: "Running",
 				RunStartedAt: getMetaTime(10, 30, 1),
 				StateMessage: "Initialising",
+				StateReason:  tfaplv1beta1.ReasonForcedRunTriggered,
 			},
 		},
 		{
@@ -43,6 +44,7 @@ func Test_ExecuteTemplate(t *testing.T) {
 			},
 			Status: tfaplv1beta1.ModuleStatus{
 				CurrentState: "Errored",
+				StateReason:  tfaplv1beta1.ReasonSpecsParsingFailure,
 				RunType:      tfaplv1beta1.PollingRun,
 				RunStartedAt: getMetaTime(10, 30, 1),
 				RunDuration:  &metav1.Duration{Duration: 60 * time.Second},
@@ -67,6 +69,7 @@ func Test_ExecuteTemplate(t *testing.T) {
 			},
 			Status: tfaplv1beta1.ModuleStatus{
 				CurrentState: "Ready",
+				StateReason:  tfaplv1beta1.ReasonApplied,
 				RunStartedAt: getMetaTime(2, 10, 1),
 				RunDuration:  &metav1.Duration{Duration: 60 * time.Second},
 
@@ -127,6 +130,7 @@ Apply complete! Resources: 7 added, 0 changed, 0 destroyed.`,
 			},
 			Status: tfaplv1beta1.ModuleStatus{
 				CurrentState: "Errored",
+				StateReason:  tfaplv1beta1.ReasonApplyFailed,
 				RunStartedAt: getMetaTime(10, 30, 1),
 				RunDuration:  &metav1.Duration{Duration: 120 * time.Second},
 				StateMessage: `unparseable schedule "*/04 * * * ": expected exactly 5 fields, found
