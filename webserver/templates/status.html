@@ -58,12 +58,23 @@
 {{define "module"}}
 <li class="list-group-item">
     <div
-        class='card {{if .IsSuspended}}border-warning{{else if eq .Status.CurrentState "Errored"}}border-danger{{else if eq .Status.CurrentState "Running"}}border-info{{end}}'>
+        class='card {{if eq .Status.CurrentState "Running"}}border-info{{end}}'>
         <div class="card-header bg-transparent">
             <div href="#{{ sanitizedUniqueName .}}-info" data-bs-toggle="collapse" role="button">
                 <div class="d-flex w-100 justify-content-between">
                     <h5 class="fw-normal">{{.Name}} {{ if .IsPlanOnly}}(plan only){{end}}</h5>
-                    <p class="fw-light">{{ if .IsSuspended}}Suspended{{else}}{{.Status.CurrentState}}{{end}}</p>
+                    <p {{if or (eq .Status.StateReason "PlanedDriftDetected") (eq .Status.StateReason "Applied")}} 
+                            class='badge rounded-pill bg-primary'
+                        {{else if eq .Status.CurrentState "Errored"}}
+                            class='badge rounded-pill bg-danger'
+                        {{else if .IsSuspended}}
+                            class='badge rounded-pill bg-warning text-dark'
+                        {{else}} 
+                            class='badge rounded-pill bg-light text-dark'
+                        {{end}}>
+                        {{ if .IsSuspended}}Suspended{{else}}{{.Status.CurrentState}} ({{.Status.StateReason}}){{end}}
+                    </p>
+                   
                 </div>
                 <div class="d-flex flex-row">
                     <div class="pe-4">Repo: {{ .Spec.RepoName }}</div>
@@ -79,7 +90,7 @@
                     <div class="d-flex flex-row justify-content-between">
                         <div class="d-flex flex-column mb-3">
                             <div class="d-flex flex-row">
-                                <div class="pe-4">Type: <small>{{.Status.Type}}</small></div>
+                                <div class="pe-4">Type: <small>{{.Status.RunType}}</small></div>
                                 <div>Started: 
                                     <small>{{ formattedTime .Status.RunStartedAt }} (took {{ duration .Status.RunDuration }})</small>
                                 </div>

@@ -31,6 +31,7 @@ func Test_ExecuteTemplate(t *testing.T) {
 				CurrentState: "Running",
 				RunStartedAt: getMetaTime(10, 30, 1),
 				StateMessage: "Initialising",
+				StateReason:  tfaplv1beta1.ReasonForcedRunTriggered,
 			},
 		},
 		{
@@ -43,7 +44,8 @@ func Test_ExecuteTemplate(t *testing.T) {
 			},
 			Status: tfaplv1beta1.ModuleStatus{
 				CurrentState: "Errored",
-				Type:         tfaplv1beta1.PollingRun,
+				StateReason:  tfaplv1beta1.ReasonSpecsParsingFailure,
+				RunType:      tfaplv1beta1.PollingRun,
 				RunStartedAt: getMetaTime(10, 30, 1),
 				RunDuration:  &metav1.Duration{Duration: 60 * time.Second},
 				StateMessage: `some very long error message with \n  Terraform has created a lock file .terraform.lock.hcl to record the provider selections it made above. Include this file in your version control repository so that Terraform can guarantee to make the same selections by default when you run "terraform init" in the future`,
@@ -67,6 +69,7 @@ func Test_ExecuteTemplate(t *testing.T) {
 			},
 			Status: tfaplv1beta1.ModuleStatus{
 				CurrentState: "Ready",
+				StateReason:  tfaplv1beta1.ReasonApplied,
 				RunStartedAt: getMetaTime(2, 10, 1),
 				RunDuration:  &metav1.Duration{Duration: 60 * time.Second},
 
@@ -74,7 +77,7 @@ func Test_ExecuteTemplate(t *testing.T) {
 				RemoteURL:     "github.com/org/repo",
 				RunCommitHash: "abcccf2a0f758ba0d8e88a834a2acdba5885577c",
 				RunCommitMsg:  `initial commit (john)`,
-				Type:          tfaplv1beta1.ScheduledRun,
+				RunType:       tfaplv1beta1.ScheduledRun,
 				RunOutput: `
 Terraform used the selected providers to generate the following execution
 plan. Resource actions are indicated with the following symbols:
@@ -127,6 +130,7 @@ Apply complete! Resources: 7 added, 0 changed, 0 destroyed.`,
 			},
 			Status: tfaplv1beta1.ModuleStatus{
 				CurrentState: "Errored",
+				StateReason:  tfaplv1beta1.ReasonApplyFailed,
 				RunStartedAt: getMetaTime(10, 30, 1),
 				RunDuration:  &metav1.Duration{Duration: 120 * time.Second},
 				StateMessage: `unparseable schedule "*/04 * * * ": expected exactly 5 fields, found

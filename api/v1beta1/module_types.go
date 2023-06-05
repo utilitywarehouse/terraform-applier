@@ -108,9 +108,13 @@ type ModuleStatus struct {
 	// +optional
 	StateMessage string `json:"stateMessage,omitempty"`
 
-	// Type is a short description of the kind of terraform run that was attempted.
+	// StateReason is potential reason associated with current state.
 	// +optional
-	Type string `json:"type"`
+	StateReason string `json:"stateReason,omitempty"`
+
+	// RunType is a short description of the kind of terraform run that was attempted.
+	// +optional
+	RunType string `json:"runType,omitempty"`
 
 	// Information when was the last time the run was started.
 	// +optional
@@ -148,6 +152,7 @@ type ModuleStatus struct {
 //+kubebuilder:printcolumn:name="State",type="string",JSONPath=".status.currentState",description=""
 //+kubebuilder:printcolumn:name="Started At",type="string",JSONPath=`.status.runStartedAt`,description=""
 //+kubebuilder:printcolumn:name="Took",type="string",JSONPath=`.status.runDuration`,description=""
+//+kubebuilder:printcolumn:name="Reason",type="string",JSONPath=".status.stateReason",description=""
 //+kubebuilder:printcolumn:name="Commit",type="string",JSONPath=`.status.runCommitHash`,description="",priority=10
 //+kubebuilder:printcolumn:name="Path",type="string",JSONPath=`.spec.path`,description="",priority=20
 //+kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp",description="",priority=20
@@ -217,12 +222,16 @@ type VaultAWSRequest struct {
 	RoleARN string `json:"roleARN,omitempty"`
 }
 
-// The potential reasons for events
+// The potential reasons for events and current state
 const (
+	ReasonRunTriggered          = "RunTriggered"
+	ReasonForcedRunTriggered    = "ForcedRunTriggered"
+	ReasonPollingRunTriggered   = "PollingRunTriggered"
+	ReasonScheduledRunTriggered = "ScheduledRunTriggered"
+
 	ReasonRunPreparationFailed = "RunPreparationFailed"
 	ReasonDelegationFailed     = "DelegationFailed"
 	ReasonControllerShutdown   = "ControllerShutdown"
-	ReasonRunTriggered         = "RunTriggered"
 	ReasonSpecsParsingFailure  = "SpecsParsingFailure"
 	ReasonGitFailure           = "GitFailure"
 
@@ -263,4 +272,16 @@ func (m *Module) IsSuspended() bool {
 
 func (m *Module) IsPlanOnly() bool {
 	return m.Spec.PlanOnly != nil && *m.Spec.PlanOnly
+}
+
+func GetRunReason(runType string) string {
+	switch runType {
+	case ScheduledRun:
+		return ReasonScheduledRunTriggered
+	case PollingRun:
+		return ReasonPollingRunTriggered
+	case ForcedRun:
+		return ReasonForcedRunTriggered
+	}
+	return ReasonRunTriggered
 }
