@@ -11,5 +11,3 @@ images:
   - name: terraform-applier
     newName: quay.io/utilitywarehouse/terraform-applier
     newTag: master
-  - name: registry.k8s.io/git-sync/git-sync
-    newTag: v3.6.3
