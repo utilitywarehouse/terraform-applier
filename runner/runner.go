@@ -392,6 +392,32 @@ func (r *Runner) setFailedStatus(req Request, module *tfaplv1beta1.Module, reaso
 }
 
 func (r *Runner) patchStatus(ctx context.Context, objectKey types.NamespacedName, newStatus tfaplv1beta1.ModuleStatus) error {
+	maxAttempt := 5
+	waitMultiplier := 5 //sec
+
+	log := r.Log.With("module", objectKey)
+
+	var attempt int
+	for {
+		attempt++
+
+		err := r.tryPatchStatus(ctx, objectKey, newStatus)
+		if err == nil {
+			return nil
+		}
+		if attempt > maxAttempt {
+			return fmt.Errorf("unable to set status, max attempted reached : err:%w", err)
+		}
+
+		retryAfter := attempt * waitMultiplier
+
+		log.Warn("unable to set status will try again", "attempt", attempt, "retryAfter", retryAfter, "err", err)
+
+		time.Sleep(time.Second * time.Duration(retryAfter))
+	}
+}
+
+func (r *Runner) tryPatchStatus(ctx context.Context, objectKey types.NamespacedName, newStatus tfaplv1beta1.ModuleStatus) error {
 	module := new(tfaplv1beta1.Module)
 	if err := r.ClusterClt.Get(ctx, objectKey, module); err != nil {
 		return err
