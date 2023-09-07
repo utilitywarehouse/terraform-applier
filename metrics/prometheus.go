@@ -22,7 +22,7 @@ type PrometheusInterface interface {
 }
 
 // Prometheus implements instrumentation of metrics for terraform-applier.
-// terrafromExitCodeCount is a Counter vector to increment the number of exit codes for each terraform execution
+// terraformExitCodeCount is a Counter vector to increment the number of exit codes for each terraform execution
 // moduleRunCount is a Counter vector to increment the number of successful and failed run attempts for each module.
 // moduleRunDuration is a Summary vector that keeps track of the duration for runs.
 // moduleRunSuccess is the last run outcome of the module run.

@@ -2,6 +2,7 @@ package integration_test
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"time"
@@ -31,6 +32,12 @@ var _ = Describe("Module controller with Runner", func() {
 	var (
 		boolTrue = true
 	)
+
+	sbKeyringData, err := os.ReadFile(".tests_strongbox_keyring")
+	if err != nil {
+		fmt.Println(err)
+		Panic()
+	}
 
 	Context("When creating Module", func() {
 		BeforeEach(func() {
@@ -85,6 +92,9 @@ var _ = Describe("Module controller with Runner", func() {
 					Schedule: "50 * * * *",
 					RepoName: repo,
 					Path:     path,
+					Env: []corev1.EnvVar{
+						{Name: "TF_APPLIER_STRONGBOX_KEYRING", Value: string(sbKeyringData)},
+					},
 				},
 			}
 			Expect(k8sClient.Create(ctx, module)).Should(Succeed())
@@ -136,6 +146,9 @@ var _ = Describe("Module controller with Runner", func() {
 			Expect(fetchedModule.Status.LastApplyInfo.Output).Should(ContainSubstring("Apply complete!"))
 			Expect(fetchedModule.Status.LastApplyInfo.Timestamp.UTC()).Should(Equal(fakeClock.T.UTC()))
 
+			// make sure secret values are there in output (strongbox decryption was successful)
+			Expect(fetchedModule.Status.LastApplyInfo.Output).Should(ContainSubstring("TOP_SECRET_VALUE"))
+
 			// delete module to stopping requeue
 			Expect(k8sClient.Delete(ctx, module)).Should(Succeed())
 		})
@@ -163,6 +176,9 @@ var _ = Describe("Module controller with Runner", func() {
 					RepoName: repo,
 					Path:     path,
 					PlanOnly: &boolTrue,
+					Env: []corev1.EnvVar{
+						{Name: "TF_APPLIER_STRONGBOX_KEYRING", Value: string(sbKeyringData)},
+					},
 				},
 			}
 			Expect(k8sClient.Create(ctx, module)).Should(Succeed())
@@ -243,6 +259,7 @@ var _ = Describe("Module controller with Runner", func() {
 						{Name: "path", Value: testStateFilePath},
 					},
 					Env: []corev1.EnvVar{
+						{Name: "TF_APPLIER_STRONGBOX_KEYRING", Value: string(sbKeyringData)},
 						{Name: "TF_ENV_1", Value: "ENV-VALUE1"},
 						{Name: "TF_ENV_2", ValueFrom: &corev1.EnvVarSource{
 							ConfigMapKeyRef: &corev1.ConfigMapKeySelector{
@@ -335,6 +352,7 @@ var _ = Describe("Module controller with Runner", func() {
 			Expect(fetchedModule.Status.LastApplyInfo.Timestamp.UTC()).Should(Equal(fakeClock.T.UTC()))
 
 			// make sure all values are there in output
+			Expect(fetchedModule.Status.LastApplyInfo.Output).Should(ContainSubstring("TOP_SECRET_VALUE"))
 			Expect(fetchedModule.Status.LastApplyInfo.Output).Should(ContainSubstring("ENV-VALUE1"))
 			Expect(fetchedModule.Status.LastApplyInfo.Output).Should(ContainSubstring("ENV-VALUE2"))
 			Expect(fetchedModule.Status.LastApplyInfo.Output).Should(ContainSubstring("ENV-VALUE3"))
@@ -377,6 +395,9 @@ var _ = Describe("Module controller with Runner", func() {
 					RepoName:      repo,
 					Path:          path,
 					VaultRequests: &vaultReq,
+					Env: []corev1.EnvVar{
+						{Name: "TF_APPLIER_STRONGBOX_KEYRING", Value: string(sbKeyringData)},
+					},
 				},
 			}
 			Expect(k8sClient.Create(ctx, module)).Should(Succeed())

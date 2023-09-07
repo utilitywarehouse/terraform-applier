@@ -45,6 +45,11 @@ spec:
         secretKeyRef:
           name: hello-module-secrets
           key: AWS_SECRET_KEY
+    - name: TF_APPLIER_STRONGBOX_KEYRING
+      valueFrom:
+        secretKeyRef:
+          name: hello-module-secrets
+          key: strongbox_keyring
   var:
     - name: image_id
       value: ami-abc123
@@ -93,6 +98,12 @@ module "storage" {
 }
 ```
 Since key is set on controller it can be used by ALL modules managed by the controller. Terraform applier doesn't support private key per module yet. 
+
+### Strongbox decryption
+
+Terraform applier supports strongbox decryption, its triggered if `TF_APPLIER_STRONGBOX_KEYRING` EVN is set on module.
+content of this ENV should be valid strongbox keyring file data which should include strongbox key used to encrypt secrets in the module.
+TF Applier will also configure Git and Strongbox Home before running `init` to decrypt any encrypted file from remote base as well. 
 
 ### Graceful shutdown
 

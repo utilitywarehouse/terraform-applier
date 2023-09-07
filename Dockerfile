@@ -3,6 +3,14 @@ FROM golang:1.21-alpine as builder
 ARG TARGETOS
 ARG TARGETARCH
 
+ENV STRONGBOX_VERSION=1.1.0
+
+RUN os=$(go env GOOS) && arch=$(go env GOARCH) \
+      && apk --no-cache add curl \
+      && curl -Ls https://github.com/uw-labs/strongbox/releases/download/v${STRONGBOX_VERSION}/strongbox_${STRONGBOX_VERSION}_${os}_${arch} \
+           > /usr/local/bin/strongbox \
+      && chmod +x /usr/local/bin/strongbox
+
 WORKDIR /workspace
 # Copy the Go Modules manifests
 COPY go.mod go.mod
@@ -29,6 +37,8 @@ ENV USER_ID=65532
 
 RUN adduser -S -H -u $USER_ID tf-applier \
       && apk --no-cache add ca-certificates git openssh-client
+
+COPY --from=build /usr/local/bin/strongbox /usr/local/bin/
 
 WORKDIR /
 COPY --from=builder /workspace/tf-applier .

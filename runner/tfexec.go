@@ -15,6 +15,8 @@ import (
 	"github.com/utilitywarehouse/terraform-applier/metrics"
 )
 
+const strongBoxEnv = "TF_APPLIER_STRONGBOX_KEYRING"
+
 //go:generate go run github.com/golang/mock/mockgen -package runner -destination tfexec_mock.go github.com/utilitywarehouse/terraform-applier/runner TFExecuter
 
 type TFExecuter interface {
@@ -66,6 +68,7 @@ func (r *Runner) NewTFRunner(
 	}
 
 	runEnv := make(map[string]string)
+	var strongboxKeyringData string
 
 	// first add Global ENV and then module ENVs
 	// this way user can override Global ENV if needed
@@ -73,7 +76,25 @@ func (r *Runner) NewTFRunner(
 		runEnv[key] = r.GlobalENV[key]
 	}
 	for key := range envs {
+		// get SB keyring data if corresponding ENV is set
+		if key == strongBoxEnv {
+			strongboxKeyringData = envs[key]
+			continue
+		}
 		runEnv[key] = envs[key]
+	}
+
+	// Set HOME to cwd, this means that SSH should not pick up any
+	// HOME is also used to setup git config in current dir
+	runEnv["HOME"] = tmpWSDir
+	//setup SB home for terraform remote module
+	runEnv["STRONGBOX_HOME"] = tmpWSDir
+
+	if strongboxKeyringData != "" {
+		err := ensureDecryption(ctx, tmpWSDir, strongboxKeyringData)
+		if err != nil {
+			return nil, fmt.Errorf("unable to setup strongbox err:%w", err)
+		}
 	}
 
 	tf.SetEnv(runEnv)
