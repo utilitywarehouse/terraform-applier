@@ -6,7 +6,7 @@ ARG TARGETARCH
 ENV STRONGBOX_VERSION=1.1.0
 
 RUN os=$(go env GOOS) && arch=$(go env GOARCH) \
-      && apk --no-cache add curl \
+      && apk --no-cache add curl git \
       && curl -Ls https://github.com/uw-labs/strongbox/releases/download/v${STRONGBOX_VERSION}/strongbox_${STRONGBOX_VERSION}_${os}_${arch} \
            > /usr/local/bin/strongbox \
       && chmod +x /usr/local/bin/strongbox
