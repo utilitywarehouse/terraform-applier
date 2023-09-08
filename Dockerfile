@@ -38,7 +38,7 @@ ENV USER_ID=65532
 RUN adduser -S -H -u $USER_ID tf-applier \
       && apk --no-cache add ca-certificates git openssh-client
 
-COPY --from=build /usr/local/bin/strongbox /usr/local/bin/
+COPY --from=builder /usr/local/bin/strongbox /usr/local/bin/
 
 WORKDIR /
 COPY --from=builder /workspace/tf-applier .
