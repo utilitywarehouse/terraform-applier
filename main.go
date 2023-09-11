@@ -47,6 +47,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	runTimeMetrics "sigs.k8s.io/controller-runtime/pkg/metrics"
+	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
 	tfaplv1beta1 "github.com/utilitywarehouse/terraform-applier/api/v1beta1"
 	"github.com/utilitywarehouse/terraform-applier/controllers"
@@ -498,8 +499,7 @@ func run(c *cli.Context) {
 
 	options := ctrl.Options{
 		Scheme:                 scheme,
-		MetricsBindAddress:     c.String("metrics-bind-address"),
-		Port:                   9443,
+		Metrics:                metricsserver.Options{BindAddress: c.String("metrics-bind-address")},
 		HealthProbeBindAddress: c.String("health-probe-bind-address"),
 		LeaderElection:         c.Bool("leader-elect"),
 		LeaderElectionID:       electionID,
@@ -510,13 +510,20 @@ func run(c *cli.Context) {
 		labelSelector = labels.Set{labelSelectorKey: labelSelectorValue}.AsSelector()
 	}
 
+	// if watchNamespaces specified only watch/cache modules form those namespaces
+	var namespaces map[string]cache.Config
+	if len(watchNamespaces) > 0 {
+		namespaces = make(map[string]cache.Config)
+		for _, wn := range watchNamespaces {
+			namespaces[wn] = cache.Config{}
+		}
+	}
+
 	options.Cache = cache.Options{
-		Scheme:     scheme,
-		Namespaces: watchNamespaces,
+		Scheme:               scheme,
+		DefaultLabelSelector: labelSelector,
 		ByObject: map[client.Object]cache.ByObject{
-			&tfaplv1beta1.Module{}: {
-				Label: labelSelector,
-			},
+			&tfaplv1beta1.Module{}: {Namespaces: namespaces},
 		},
 	}
 
