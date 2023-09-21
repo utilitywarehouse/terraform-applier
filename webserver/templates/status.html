@@ -67,12 +67,10 @@
                             class='badge rounded-pill bg-primary'
                         {{else if eq .Status.CurrentState "Errored"}}
                             class='badge rounded-pill bg-danger'
-                        {{else if .IsSuspended}}
-                            class='badge rounded-pill bg-warning text-dark'
                         {{else}} 
                             class='badge rounded-pill bg-light text-dark'
                         {{end}}>
-                        {{ if .IsSuspended}}Suspended{{else}}{{.Status.CurrentState}} ({{.Status.StateReason}}){{end}}
+                        {{.Status.CurrentState}} ({{.Status.StateReason}})
                     </p>
                    
                 </div>
@@ -132,7 +130,8 @@
                                 <div>At: <small>{{ formattedTime .Status.LastApplyInfo.Timestamp }}</small></div>
                             </div>
                             <pre class="file-output font-monospace p-3" style="max-height: 40em; background-color: #f5f5f5;">
-                                <small>{{.Status.LastApplyInfo.Output}}</small>
+<!-- to remove left margin on first line -->
+<small>{{.Status.LastApplyInfo.Output}}</small>
                             </pre>
                         </div>
                     </div>

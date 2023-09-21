@@ -77,12 +77,6 @@ func (r *ModuleReconciler) Reconcile(ctx context.Context, req reconcile.Request)
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	// Do not requeue if suspended
-	if module.Spec.Suspend != nil && *module.Spec.Suspend {
-		log.Debug("module suspended, skipping")
-		return ctrl.Result{}, nil
-	}
-
 	// Do not requeue if module is being deleted
 	if !module.ObjectMeta.DeletionTimestamp.IsZero() {
 		// TODO: what if module is in running state?

@@ -3,7 +3,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.12.1
+    controller-gen.kubebuilder.io/version: v0.13.0
   name: modules.terraform-applier.uw.systems
 spec:
   group: terraform-applier.uw.systems
@@ -17,9 +17,6 @@ spec:
   - additionalPrinterColumns:
     - jsonPath: .spec.schedule
       name: Schedule
-      type: string
-    - jsonPath: .spec.suspend
-      name: Suspend
       type: string
     - jsonPath: .spec.planOnly
       name: PlanOnly
@@ -312,6 +309,37 @@ spec:
                   repository must be checked.
                 minimum: 60
                 type: integer
+              rbac:
+                description: List of roles and subjects assigned to that role for
+                  the module.
+                items:
+                  properties:
+                    role:
+                      description: Name of the role. Allowed value at the moment is
+                        just "Admin"
+                      enum:
+                      - Admin
+                      type: string
+                    subjects:
+                      description: Subjects holds references to the objects the role
+                        applies to.
+                      items:
+                        properties:
+                          kind:
+                            description: Kind of object being referenced. Allowed
+                              values are "User" & "Group"
+                            enum:
+                            - User
+                            - Group
+                            type: string
+                          name:
+                            description: Name of the object being referenced. For
+                              "User" kind value should be email
+                            type: string
+                        type: object
+                      type: array
+                  type: object
+                type: array
               repoName:
                 description: Name of the repository containing Terraform module directory.
                 type: string
@@ -326,10 +354,6 @@ spec:
                   run for a given schedule if no schedule provided then module will
                   only run if new PRs are added to given module path
                 type: string
-              suspend:
-                description: This flag tells the controller to suspend all subsequent
-                  runs, it does not apply to already started run. Defaults to false.
-                type: boolean
               var:
                 description: List of input variables passed to the Terraform execution.
                 items:

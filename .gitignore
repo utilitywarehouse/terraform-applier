@@ -4,3 +4,4 @@ terraform-applier
 bin
 # test state files
 *.tfstate
+webserver/index.html
