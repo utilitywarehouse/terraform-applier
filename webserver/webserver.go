@@ -9,6 +9,7 @@ import (
 	"html/template"
 	"io"
 	"net/http"
+	"sync"
 
 	"github.com/gorilla/mux"
 	"github.com/hashicorp/go-hclog"
@@ -35,6 +36,7 @@ type WebServer struct {
 	ClusterClt    client.Client
 	KubeClient    kubernetes.Interface
 	RunQueue      chan<- runner.Request
+	RunStatus     *sync.Map
 	Log           hclog.Logger
 }
 
@@ -92,6 +94,7 @@ type ForceRunHandler struct {
 	ClusterClt    client.Client
 	KubeClt       kubernetes.Interface
 	RunQueue      chan<- runner.Request
+	RunStatus     *sync.Map
 	Log           hclog.Logger
 }
 
@@ -203,6 +206,16 @@ func (f *ForceRunHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		f.Log.Info("force run triggered", "module", namespacedName, "user", user.Email)
 	}
 
+	// make sure module is not already running
+	_, ok := f.RunStatus.Load(namespacedName.String())
+	if ok {
+		data.Result = "error"
+		data.Message = fmt.Sprintf("module %s is currently running", namespacedName)
+		f.Log.Error("force run rejected as module is already running", "module", namespacedName)
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
 	f.RunQueue <- runner.Request{NamespacedName: namespacedName, Type: tfaplv1beta1.ForcedRun}
 
 	data.Result = "success"
@@ -234,6 +247,7 @@ func (ws *WebServer) Start(ctx context.Context) error {
 		ws.ClusterClt,
 		ws.KubeClient,
 		ws.RunQueue,
+		ws.RunStatus,
 		ws.Log,
 	}
 	m.PathPrefix("/static/").Handler(http.FileServer(http.FS(staticFiles)))

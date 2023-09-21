@@ -9,6 +9,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -438,6 +439,9 @@ func run(c *cli.Context) {
 	}
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
+	// runStatus keeps track of currently running modules
+	runStatus := new(sync.Map)
+
 	wsQueue := make(chan runner.Request)
 	done := make(chan bool, 1)
 
@@ -548,6 +552,7 @@ func run(c *cli.Context) {
 		GitSyncPool:            gitSyncPool,
 		Log:                    logger.Named("manager"),
 		MinIntervalBetweenRuns: time.Duration(c.Int("min-interval-between-runs")) * time.Second,
+		RunStatus:              runStatus,
 	}).SetupWithManager(mgr, filter); err != nil {
 		setupLog.Error("unable to create module controller", "err", err)
 		os.Exit(1)
@@ -584,6 +589,7 @@ func run(c *cli.Context) {
 			AuthPath:       c.String("vault-kube-auth-path"),
 		},
 		GlobalENV: globalRunEnv,
+		RunStatus: runStatus,
 	}
 
 	if c.IsSet("oidc-issuer") {
@@ -606,6 +612,7 @@ func run(c *cli.Context) {
 		ClusterClt:    mgr.GetClient(),
 		KubeClient:    kubeClient,
 		RunQueue:      wsQueue,
+		RunStatus:     runStatus,
 		Log:           logger.Named("webserver"),
 	}
 
