@@ -29,7 +29,11 @@ function forceRun(namespace, module) {
   })
     .then((response) => response.json())
     .then((data) => {
-      showForceAlert(true, data.message)
+      if (data.result == "success") {
+        showForceAlert(true, data.message)
+      } else {
+        showForceAlert(false, data.message)
+      }
 
       setForcedButtonDisabled(false)
     })
@@ -44,7 +48,7 @@ function forceRun(namespace, module) {
 }
 
 function showForceAlert(success, message) {
-  type = success ? "success" : "warning"
+  type = success ? "success" : "danger"
   const alertPlaceholder = document.getElementById("force-alert-container")
   const wrapper = document.createElement("div")
   wrapper.innerHTML = [

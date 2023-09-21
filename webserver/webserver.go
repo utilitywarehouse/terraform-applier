@@ -98,7 +98,7 @@ type ForceRunHandler struct {
 // ServeHTTP handles requests for forcing a run by attempting to add to the
 // runQueue, and writes a response including the result and a relevant message.
 func (f *ForceRunHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	f.Log.Info("Force run requested")
+	f.Log.Debug("force run requested")
 	var data struct {
 		Result  string `json:"result"`
 		Message string `json:"message"`
@@ -116,12 +116,11 @@ func (f *ForceRunHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var (
-		userEmail string
-		err       error
-	)
+	var user *oidc.UserInfo
+	var err error
+
 	if f.Authenticator != nil {
-		userEmail, err = f.Authenticator.UserEmail(r.Context(), r)
+		user, err = f.Authenticator.UserInfo(r.Context(), r)
 		if err != nil {
 			data.Result = "error"
 			data.Message = "not authenticated"
@@ -166,23 +165,42 @@ func (f *ForceRunHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	err = f.ClusterClt.Get(r.Context(), namespacedName, &module)
 	if err != nil {
 		data.Result = "error"
-		data.Message = fmt.Sprintf("cannot find Waybills in namespace '%s' with name '%s'", payload["namespace"], payload["module"])
+		data.Message = fmt.Sprintf("cannot find module '%s'", namespacedName)
+		f.Log.Error(data.Message, "error", err)
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
 	if f.Authenticator != nil {
-		// if the user can patch the Waybill, they are allowed to force a run
-		hasAccess, err := hasAccess(r.Context(), f.KubeClt, &module, userEmail, "patch")
-		if !hasAccess {
+		// this should not happen but just in case
+		if user == nil {
 			data.Result = "error"
-			data.Message = fmt.Sprintf("user %s is not allowed to force a run module on %s/%s", userEmail, module.Namespace, module.Name)
-			if err != nil {
-				f.Log.Error(data.Message, "error", err)
-			}
+			data.Message = "logged in user's details not found"
+			f.Log.Error(data.Message, "module", namespacedName)
 			w.WriteHeader(http.StatusForbidden)
 			return
 		}
+
+		// just to give useful error message to user
+		if len(module.Spec.RBAC) == 0 {
+			data.Result = "error"
+			data.Message = fmt.Sprintf("force run is not allowed because RBAC is not set on module %s", namespacedName)
+			f.Log.Error("RBAC is not set", "module", namespacedName)
+			w.WriteHeader(http.StatusForbidden)
+			return
+		}
+
+		// check if logged in user allowed to do force run on the module
+		hasAccess := tfaplv1beta1.CanForceRun(user.Email, user.Groups, &module)
+		if !hasAccess {
+			data.Result = "error"
+			data.Message = fmt.Sprintf("user %s is not allowed to force run module %s", user.Email, namespacedName)
+			f.Log.Error("force run denied", "module", namespacedName, "user", user.Email)
+			w.WriteHeader(http.StatusForbidden)
+			return
+		}
+
+		f.Log.Info("force run triggered", "module", namespacedName, "user", user.Email)
 	}
 
 	f.RunQueue <- runner.Request{NamespacedName: namespacedName, Type: tfaplv1beta1.ForcedRun}

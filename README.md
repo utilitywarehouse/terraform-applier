@@ -27,6 +27,13 @@ spec:
   pollInterval: 60
   runTimeout: 900
   delegateServiceAccountSecretRef: terraform-applier-delegate-token
+  rbac:
+  - role: Admin
+    subjects:
+    - name: user@email.com
+      kind: User
+    - name: some_group_name
+      kind: Group
   backend:
     - name: bucket
       value: dev-terraform-state
@@ -104,6 +111,25 @@ Since key is set on controller it can be used by ALL modules managed by the cont
 Terraform applier supports strongbox decryption, its triggered if `TF_APPLIER_STRONGBOX_KEYRING` EVN is set on module.
 content of this ENV should be valid strongbox keyring file data which should include strongbox key used to encrypt secrets in the module.
 TF Applier will also configure Git and Strongbox Home before running `init` to decrypt any encrypted file from remote base as well. 
+
+### RBAC
+
+Terraform applier does user authentication using OIDC flow (see Controller config).
+during oidc flow it requests `openid, email, groups` scopes to get user's email and groups info as part of `id_token`.
+`rbac` section of module crd can be use to set list of Admins who's allowed to do `force run`.
+
+```
+rbac:
+- role: Admin
+  subjects:
+  - name: user@email.com
+    kind: User
+  - name: some_group_name
+    kind: Group
+```
+At the moment only "Admin" role is supported, value of subjects can be either `email address` of users as kind `User` or the group name as kind `Group`.
+
+**If  `OIDC Issuer` is not set then web server will skip authentication and all `force run` requests will be allowed.**
 
 ### Graceful shutdown
 

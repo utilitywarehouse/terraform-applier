@@ -58,10 +58,16 @@ func randString(n int) (string, error) {
 	return base64.RawURLEncoding.EncodeToString(b), nil
 }
 
+type UserInfo struct {
+	Email  string   `json:"email"`
+	Groups []string `json:"groups"`
+}
+
 type idTokenPayload struct {
-	Email string `json:"email"`
-	Iss   string `json:"iss"`
-	Nonce string `json:"nonce"`
+	Email  string   `json:"email"`
+	Iss    string   `json:"iss"`
+	Nonce  string   `json:"nonce"`
+	Groups []string `json:"groups"`
 }
 
 type userSession struct {
@@ -248,7 +254,7 @@ func NewAuthenticator(issuer, clientID, clientSecret, redirectURL string) (*Auth
 	oa.config = &oauth2.Config{
 		ClientID:     clientID,
 		ClientSecret: clientSecret,
-		Scopes:       []string{"openid", "email"},
+		Scopes:       []string{"openid", "email", "groups"},
 		RedirectURL:  redirectURL,
 		Endpoint: oauth2.Endpoint{
 			AuthURL:  oa.discoveredConfig.AuthorizationEndpoint,
@@ -262,12 +268,12 @@ func NewAuthenticator(issuer, clientID, clientSecret, redirectURL string) (*Auth
 // It will detect and handle the oauth2 callback or otherwise try to validate
 // an existing user session in order to do so. Ultimately, it will initiate a
 // new authentication flow if required.
-func (o *Authenticator) Authenticate(ctx context.Context, w http.ResponseWriter, r *http.Request) (string, error) {
+func (o *Authenticator) Authenticate(ctx context.Context, w http.ResponseWriter, r *http.Request) (*UserInfo, error) {
 	// this is handling authentication flow callbacks
 	if r.FormValue("state") != "" {
 		session, err := o.processCallback(ctx, w, r)
 		if err != nil {
-			return "", fmt.Errorf("invalid callback: %w", err)
+			return nil, fmt.Errorf("invalid callback: %w", err)
 		}
 		redirectPath := ""
 		if v := session.RedirectPath; v != "" {
@@ -276,46 +282,46 @@ func (o *Authenticator) Authenticate(ctx context.Context, w http.ResponseWriter,
 		}
 		session.Domain = o.domain
 		if err := session.Save(w); err != nil {
-			return "", fmt.Errorf("cannot save session: %w", err)
+			return nil, fmt.Errorf("cannot save session: %w", err)
 		}
 		if redirectPath != "" {
 			http.Redirect(w, r, redirectPath, http.StatusSeeOther)
-			return "", ErrRedirectRequired
+			return nil, ErrRedirectRequired
 		}
-		email, err := o.userEmail(ctx, session)
+		u, err := o.userInfo(ctx, session)
 		if err != nil {
-			return "", fmt.Errorf("cannot get user's email: %w", err)
+			return nil, fmt.Errorf("cannot get user's email: %w", err)
 		}
-		return email, nil
+		return u, nil
 	}
 	// the user is already authenticated
-	if email, err := o.UserEmail(ctx, r); err == nil {
-		return email, nil
+	if u, err := o.UserInfo(ctx, r); err == nil {
+		return u, nil
 	}
 	// we should initiate a new authentication flow
 	session, err := newUserSession(w, r)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	session.Domain = o.domain
 	if err := session.Save(w); err != nil {
-		return "", fmt.Errorf("cannot save session: %w", err)
+		return nil, fmt.Errorf("cannot save session: %w", err)
 	}
 	http.Redirect(w, r, o.config.AuthCodeURL(session.State, session.codeChallengeOptions()...), http.StatusSeeOther)
-	return "", ErrRedirectRequired
+	return nil, ErrRedirectRequired
 }
 
-// UserEmail returns the email address of the user from their session, if they
+// UserInfo returns the details of the user from their session, if they
 // are already authenticated. It works similarly to Authenticate but does not
 // handle oauth2 callbacks and will not initiate a new authentication flow.
-func (o *Authenticator) UserEmail(ctx context.Context, r *http.Request) (string, error) {
+func (o *Authenticator) UserInfo(ctx context.Context, r *http.Request) (*UserInfo, error) {
 	session, err := newUserSessionFromRequest(r)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	email, err := o.userEmail(ctx, session)
+	user, err := o.userInfo(ctx, session)
 	if err != nil {
-		return "", fmt.Errorf("cannot get user's email: %w", err)
+		return nil, fmt.Errorf("cannot get user's email: %w", err)
 	}
 	// We simply use the introspection endpoint to validate the token.
 	// Although that's an extra HTTP call for each connection, it reduces
@@ -325,28 +331,32 @@ func (o *Authenticator) UserEmail(ctx context.Context, r *http.Request) (string,
 	// eg.: https://developer.okta.com/docs/guides/validate-id-tokens/overview/
 	ir, err := o.introspectToken(ctx, session.IDToken, "id_token")
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	if !ir.Active {
-		return "", fmt.Errorf("session contains inactive id token")
+		return nil, fmt.Errorf("session contains inactive id token")
 	}
-	return email, nil
+	return user, nil
 }
 
-// userEmail parses and validates the idToken stored in a userSession and
-// returns the email address stored in it.
-func (o *Authenticator) userEmail(ctx context.Context, session *userSession) (string, error) {
+// userInfo parses and validates the idToken stored in a userSession and
+// returns the user details (email,groups) stored in it.
+func (o *Authenticator) userInfo(ctx context.Context, session *userSession) (*UserInfo, error) {
 	idt, err := session.ParseIDToken()
 	if err != nil {
-		return "", fmt.Errorf("cannot parse id token: %w", err)
+		return nil, fmt.Errorf("cannot parse id token: %w", err)
 	}
 	if idt.Nonce != session.Nonce {
-		return "", fmt.Errorf("token nonce does not match state")
+		return nil, fmt.Errorf("token nonce does not match state")
 	}
 	if idt.Iss != o.issuer.String() {
-		return "", fmt.Errorf("invalid token issuer")
+		return nil, fmt.Errorf("invalid token issuer")
 	}
-	return idt.Email, nil
+
+	return &UserInfo{
+		Email:  idt.Email,
+		Groups: idt.Groups,
+	}, nil
 }
 
 func (o *Authenticator) processCallback(ctx context.Context, w http.ResponseWriter, r *http.Request) (*userSession, error) {

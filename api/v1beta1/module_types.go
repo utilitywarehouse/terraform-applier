@@ -24,6 +24,50 @@ import (
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
+// The potential reasons for events and current state
+const (
+	ReasonRunTriggered          = "RunTriggered"
+	ReasonForcedRunTriggered    = "ForcedRunTriggered"
+	ReasonPollingRunTriggered   = "PollingRunTriggered"
+	ReasonScheduledRunTriggered = "ScheduledRunTriggered"
+
+	ReasonRunPreparationFailed = "RunPreparationFailed"
+	ReasonDelegationFailed     = "DelegationFailed"
+	ReasonControllerShutdown   = "ControllerShutdown"
+	ReasonSpecsParsingFailure  = "SpecsParsingFailure"
+	ReasonGitFailure           = "GitFailure"
+
+	ReasonInitialiseFailed = "InitialiseFailed"
+	ReasonPlanFailed       = "PlanFailed"
+	ReasonApplyFailed      = "ApplyFailed"
+
+	ReasonInitialised           = "Initialised"
+	ReasonPlanedDriftDetected   = "PlanedDriftDetected"
+	ReasonPlanedNoDriftDetected = "PlanedNoDriftDetected"
+	ReasonApplied               = "Applied"
+)
+
+const (
+	// ScheduledRun indicates a scheduled, regular terraform run.
+	ScheduledRun = "ScheduledRun"
+	// PollingRun indicated a run triggered by changes in the git repository.
+	PollingRun = "PollingRun"
+	// ForcedRun indicates a forced (triggered on the UI) terraform run.
+	ForcedRun = "ForcedRun"
+)
+
+// Overall state of Module run
+type state string
+
+const (
+	// 'Running' -> module is in running state
+	StatusRunning state = "Running"
+	// 'Ready' -> last run finished successfully and its waiting on next run/event
+	StatusReady state = "Ready"
+	// 'Errored' -> last run finished with Error and its waiting on next run/event
+	StatusErrored state = "Errored"
+)
+
 // ModuleSpec defines the desired state of Module
 type ModuleSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
@@ -86,6 +130,10 @@ type ModuleSpec struct {
 	// +kubebuilder:default=900
 	// +kubebuilder:validation:Maximum=1800
 	RunTimeout int `json:"runTimeout,omitempty"`
+
+	// List of roles and subjects assigned to that role for the module.
+	// +optional
+	RBAC []RBAC `json:"rbac,omitempty"`
 }
 
 // ModuleStatus defines the observed state of Module
@@ -222,49 +270,24 @@ type VaultAWSRequest struct {
 	RoleARN string `json:"roleARN,omitempty"`
 }
 
-// The potential reasons for events and current state
-const (
-	ReasonRunTriggered          = "RunTriggered"
-	ReasonForcedRunTriggered    = "ForcedRunTriggered"
-	ReasonPollingRunTriggered   = "PollingRunTriggered"
-	ReasonScheduledRunTriggered = "ScheduledRunTriggered"
-
-	ReasonRunPreparationFailed = "RunPreparationFailed"
-	ReasonDelegationFailed     = "DelegationFailed"
-	ReasonControllerShutdown   = "ControllerShutdown"
-	ReasonSpecsParsingFailure  = "SpecsParsingFailure"
-	ReasonGitFailure           = "GitFailure"
-
-	ReasonInitialiseFailed = "InitialiseFailed"
-	ReasonPlanFailed       = "PlanFailed"
-	ReasonApplyFailed      = "ApplyFailed"
-
-	ReasonInitialised           = "Initialised"
-	ReasonPlanedDriftDetected   = "PlanedDriftDetected"
-	ReasonPlanedNoDriftDetected = "PlanedNoDriftDetected"
-	ReasonApplied               = "Applied"
-)
-
-const (
-	// ScheduledRun indicates a scheduled, regular terraform run.
-	ScheduledRun = "ScheduledRun"
-	// PollingRun indicated a run triggered by changes in the git repository.
-	PollingRun = "PollingRun"
-	// ForcedRun indicates a forced (triggered on the UI) terraform run.
-	ForcedRun = "ForcedRun"
-)
-
-// Overall state of Module run
-type state string
-
-const (
-	// 'Running' -> module is in running state
-	StatusRunning state = "Running"
-	// 'Ready' -> last run finished successfully and its waiting on next run/event
-	StatusReady state = "Ready"
-	// 'Errored' -> last run finished with Error and its waiting on next run/event
-	StatusErrored state = "Errored"
-)
+type RBAC struct {
+	// Name of the role. Allowed value at the moment is just "Admin"
+	// +required
+	// +kubebuilder:validation:Enum=Admin
+	Role string `json:"role,omitempty"`
+	// Subjects holds references to the objects the role applies to.
+	// +required
+	Subjects []Subject `json:"subjects,omitempty"`
+}
+type Subject struct {
+	// Kind of object being referenced. Allowed values are "User" & "Group"
+	// +required
+	// +kubebuilder:validation:Enum=User;Group
+	Kind string `json:"kind,omitempty"`
+	// Name of the object being referenced. For "User" kind value should be email
+	// +required
+	Name string `json:"name,omitempty"`
+}
 
 func (m *Module) IsSuspended() bool {
 	return m.Spec.Suspend != nil && *m.Spec.Suspend
