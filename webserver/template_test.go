@@ -53,15 +53,6 @@ func Test_ExecuteTemplate(t *testing.T) {
 		},
 		{
 			TypeMeta:   metav1.TypeMeta{APIVersion: "terraform-applier.uw.systems/v1beta1", Kind: "Module"},
-			ObjectMeta: metav1.ObjectMeta{Name: "application", Namespace: "bar"},
-			Spec: tfaplv1beta1.ModuleSpec{
-				Schedule: "00 06 * * *",
-				Path:     "dev/application",
-				Suspend:  &boolTrue,
-			},
-		},
-		{
-			TypeMeta:   metav1.TypeMeta{APIVersion: "terraform-applier.uw.systems/v1beta1", Kind: "Module"},
 			ObjectMeta: metav1.ObjectMeta{Name: "groups", Namespace: "bar"},
 			Spec: tfaplv1beta1.ModuleSpec{
 				Schedule: "00 */2 * * *",
@@ -160,9 +151,9 @@ Apply complete! Resources: 7 added, 0 changed, 0 destroyed.`,
 		return
 	}
 
-	// // uncomment to load index.html file locally after running test
-	// if err := os.WriteFile("index.html", rendered.Bytes(), 0666); err != nil {
-	// 	t.Errorf("error reading test file:  %v\n", err)
-	// 	return
-	// }
+	// open index.html in browser to view test output
+	if err := os.WriteFile("index.html", rendered.Bytes(), 0666); err != nil {
+		t.Errorf("error reading test file:  %v\n", err)
+		return
+	}
 }

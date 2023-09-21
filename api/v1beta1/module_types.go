@@ -84,11 +84,6 @@ type ModuleSpec struct {
 	// +optional
 	Schedule string `json:"schedule,omitempty"`
 
-	// This flag tells the controller to suspend all subsequent runs, it does
-	// not apply to already started run. Defaults to false.
-	// +optional
-	Suspend *bool `json:"suspend,omitempty"`
-
 	// +optional
 	PlanOnly *bool `json:"planOnly,omitempty"`
 
@@ -195,7 +190,6 @@ type ModuleStatus struct {
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
 //+kubebuilder:printcolumn:name="Schedule",type="string",JSONPath=".spec.schedule",description=""
-//+kubebuilder:printcolumn:name="Suspend",type="string",JSONPath=".spec.suspend",description=""
 //+kubebuilder:printcolumn:name="PlanOnly",type="string",JSONPath=".spec.planOnly",description=""
 //+kubebuilder:printcolumn:name="State",type="string",JSONPath=".status.currentState",description=""
 //+kubebuilder:printcolumn:name="Started At",type="string",JSONPath=`.status.runStartedAt`,description=""
@@ -287,10 +281,6 @@ type Subject struct {
 	// Name of the object being referenced. For "User" kind value should be email
 	// +required
 	Name string `json:"name,omitempty"`
-}
-
-func (m *Module) IsSuspended() bool {
-	return m.Spec.Suspend != nil && *m.Spec.Suspend
 }
 
 func (m *Module) IsPlanOnly() bool {

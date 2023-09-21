@@ -18,9 +18,6 @@ spec:
     - jsonPath: .spec.schedule
       name: Schedule
       type: string
-    - jsonPath: .spec.suspend
-      name: Suspend
-      type: string
     - jsonPath: .spec.planOnly
       name: PlanOnly
       type: string
@@ -357,10 +354,6 @@ spec:
                   run for a given schedule if no schedule provided then module will
                   only run if new PRs are added to given module path
                 type: string
-              suspend:
-                description: This flag tells the controller to suspend all subsequent
-                  runs, it does not apply to already started run. Defaults to false.
-                type: boolean
               var:
                 description: List of input variables passed to the Terraform execution.
                 items:

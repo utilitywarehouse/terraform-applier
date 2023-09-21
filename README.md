@@ -22,7 +22,6 @@ spec:
   repoName: terraform-applier 
   path: dev/hello
   schedule: "00 */1 * * *"
-  suspend: false
   planOnly: false
   pollInterval: 60
   runTimeout: 900
