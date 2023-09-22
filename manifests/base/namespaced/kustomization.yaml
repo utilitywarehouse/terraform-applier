@@ -10,4 +10,4 @@ resources:
 images:
   - name: terraform-applier
     newName: quay.io/utilitywarehouse/terraform-applier
-    newTag: master
+    newTag: v2.0.1
