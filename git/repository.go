@@ -393,6 +393,19 @@ func (r *Repository) CopyPath(ctx context.Context, subpath, dst string) error {
 	return sysutil.CopyDir(filepath.Join(r.path, subpath), dst)
 }
 
+// CopyRepo get read lock and then copies full repository to new location.
+// unlike CloneLocal CopyRepo checks out all the dir in repo hence 'WithCheckout' must be set to use this function
+func (r *Repository) CopyRepo(ctx context.Context, dst string) error {
+	r.lock.RLock()
+	defer r.lock.RUnlock()
+
+	if !r.syncOptions.WithCheckout {
+		return fmt.Errorf("'WithCheckout' option is disabled there are no sub paths on the repo to copy. use 'CloneLocal()'")
+	}
+
+	return sysutil.CopyDir(r.path, dst)
+}
+
 // HashForPath returns the hash of the configured revision for the specified path.
 func (r *Repository) HashForPath(ctx context.Context, path string) (string, error) {
 	r.lock.RLock()
