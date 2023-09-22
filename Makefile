@@ -46,9 +46,9 @@ update-bootstrap-js:
 	cp /tmp/bootstrap-$(BJS_VERSION)-dist/css/bootstrap.min.css.map webserver/static/bootstrap/css/bootstrap.min.css.map
 
 release:
-	@sd "master" "$(VERSION)" manifests/base/namespaced/kustomization.yaml
-	@git add -- manifests/base/namespaced/kustomization.yaml
+	@sd "master" "$(VERSION)" manifests/base/namespaced/tf-applier.yaml
+	@git add -- manifests/base/namespaced/tf-applier.yaml
 	@git commit -m "Release $(VERSION)"
-	@sd "$(VERSION)" "master" manifests/base/namespaced/kustomization.yaml
-	@git add -- manifests/base/namespaced/kustomization.yaml
+	@sd "$(VERSION)" "master" manifests/base/namespaced/tf-applier.yaml
+	@git add -- manifests/base/namespaced/tf-applier.yaml
 	@git commit -m "Clean up release $(VERSION)"
