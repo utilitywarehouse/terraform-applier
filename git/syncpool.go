@@ -20,6 +20,7 @@ type SyncInterface interface {
 
 	CloneLocal(ctx context.Context, repoName string, subpath string, dst string, envs []string) (string, error)
 	CopyPath(ctx context.Context, repoName string, subpath string, dst string) error
+	CopyRepo(ctx context.Context, repoName string, dst string) error
 
 	HasChangesForPath(ctx context.Context, repoName string, path, sinceHash string) (bool, error)
 	HashForPath(ctx context.Context, repoName string, path string) (string, error)
@@ -124,6 +125,16 @@ func (s *SyncPool) CopyPath(ctx context.Context, repoName string, subpath string
 		return fmt.Errorf("repository with repoName '%s' is not yet added by admin", repoName)
 	}
 	return repo.CopyPath(ctx, subpath, dst)
+}
+
+// CopyRepo get read lock and then copies given repository to new location.
+// unlike CloneLocal CopyRepo checks out all the dir in repo hence 'WithCheckout' must be set to use this function
+func (s *SyncPool) CopyRepo(ctx context.Context, repoName string, dst string) error {
+	repo, ok := s.repos[repoName]
+	if !ok {
+		return fmt.Errorf("repository with repoName '%s' is not yet added by admin", repoName)
+	}
+	return repo.CopyRepo(ctx, dst)
 }
 
 // HasChangesForPath returns true if there are changes that have been committed

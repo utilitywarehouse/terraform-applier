@@ -77,6 +77,20 @@ func (mr *MockSyncInterfaceMockRecorder) CopyPath(arg0, arg1, arg2, arg3 interfa
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CopyPath", reflect.TypeOf((*MockSyncInterface)(nil).CopyPath), arg0, arg1, arg2, arg3)
 }
 
+// CopyRepo mocks base method.
+func (m *MockSyncInterface) CopyRepo(arg0 context.Context, arg1, arg2 string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CopyRepo", arg0, arg1, arg2)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// CopyRepo indicates an expected call of CopyRepo.
+func (mr *MockSyncInterfaceMockRecorder) CopyRepo(arg0, arg1, arg2 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CopyRepo", reflect.TypeOf((*MockSyncInterface)(nil).CopyRepo), arg0, arg1, arg2)
+}
+
 // HasChangesForPath mocks base method.
 func (m *MockSyncInterface) HasChangesForPath(arg0 context.Context, arg1, arg2, arg3 string) (bool, error) {
 	m.ctrl.T.Helper()

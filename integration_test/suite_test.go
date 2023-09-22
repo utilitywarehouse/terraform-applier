@@ -21,6 +21,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 
@@ -147,6 +148,8 @@ var _ = BeforeSuite(func() {
 		T: time.Date(01, 01, 01, 0, 0, 0, 0, time.UTC),
 	}
 
+	runStatus := new(sync.Map)
+
 	minIntervalBetweenRunsDuration := 1 * time.Minute
 	testControllerQueue = make(chan runner.Request)
 	testFilterControllerQueue = make(chan runner.Request)
@@ -169,6 +172,7 @@ var _ = BeforeSuite(func() {
 		GitSyncPool:            testGitSyncPool,
 		Log:                    testLogger.Named("manager"),
 		MinIntervalBetweenRuns: minIntervalBetweenRunsDuration,
+		RunStatus:              runStatus,
 	}
 
 	testFilter = &controllers.Filter{
@@ -217,6 +221,7 @@ var _ = BeforeSuite(func() {
 		TerraformExecPath:      execPath,
 		AWSSecretsEngineConfig: testVaultAWSConf,
 		TerminationGracePeriod: 10 * time.Second,
+		RunStatus:              runStatus,
 	}
 
 	pwd, err := os.Getwd()

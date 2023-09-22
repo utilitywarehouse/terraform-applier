@@ -36,6 +36,7 @@ const (
 	ReasonControllerShutdown   = "ControllerShutdown"
 	ReasonSpecsParsingFailure  = "SpecsParsingFailure"
 	ReasonGitFailure           = "GitFailure"
+	ReasonUnknown              = "Unknown"
 
 	ReasonInitialiseFailed = "InitialiseFailed"
 	ReasonPlanFailed       = "PlanFailed"

@@ -19,6 +19,7 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -47,6 +48,7 @@ type ModuleReconciler struct {
 	Queue                  chan<- runner.Request
 	Log                    hclog.Logger
 	MinIntervalBetweenRuns time.Duration
+	RunStatus              *sync.Map
 }
 
 //+kubebuilder:rbac:groups="",resources=events,verbs=create;patch
@@ -87,9 +89,20 @@ func (r *ModuleReconciler) Reconcile(ctx context.Context, req reconcile.Request)
 	// pollIntervalDuration is used as minimum duration for the next run
 	pollIntervalDuration := time.Duration(module.Spec.PollInterval) * time.Second
 
-	// if module is in running state, use next poll internal as minimum queue duration
+	// check module's run status
 	if module.Status.CurrentState == string(tfaplv1beta1.StatusRunning) {
-		return ctrl.Result{RequeueAfter: pollIntervalDuration}, nil
+		// make sure module is actually running at the moment
+		// it is possible that process got killed before it could update module status or
+		// module status update could have failed and hence it stayed in running state
+		_, ok := r.RunStatus.Load(req.NamespacedName.String())
+		if ok {
+			// it is running so use next poll internal as minimum queue duration
+			return ctrl.Result{RequeueAfter: pollIntervalDuration}, nil
+		}
+		// module is not currently running so change status and continue
+		msg := "wrong status found, module is not currently running"
+		log.Error(msg)
+		r.setFailedStatus(req, &module, tfaplv1beta1.ReasonUnknown, msg, r.Clock.Now())
 	}
 
 	if module.Status.RunCommitHash == "" {

@@ -9,6 +9,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -438,7 +439,10 @@ func run(c *cli.Context) {
 	}
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
-	wsQueue := make(chan runner.Request)
+	// runStatus keeps track of currently running modules
+	runStatus := new(sync.Map)
+
+	moduleQueue := make(chan runner.Request)
 	done := make(chan bool, 1)
 
 	clock := &sysutil.Clock{}
@@ -544,10 +548,11 @@ func run(c *cli.Context) {
 		Scheme:                 mgr.GetScheme(),
 		Recorder:               mgr.GetEventRecorderFor("terraform-applier"),
 		Clock:                  clock,
-		Queue:                  wsQueue,
+		Queue:                  moduleQueue,
 		GitSyncPool:            gitSyncPool,
 		Log:                    logger.Named("manager"),
 		MinIntervalBetweenRuns: time.Duration(c.Int("min-interval-between-runs")) * time.Second,
+		RunStatus:              runStatus,
 	}).SetupWithManager(mgr, filter); err != nil {
 		setupLog.Error("unable to create module controller", "err", err)
 		os.Exit(1)
@@ -573,7 +578,7 @@ func run(c *cli.Context) {
 		ClusterClt:             mgr.GetClient(),
 		Recorder:               mgr.GetEventRecorderFor("terraform-applier"),
 		KubeClt:                kubeClient,
-		Queue:                  wsQueue,
+		Queue:                  moduleQueue,
 		GitSyncPool:            gitSyncPool,
 		Log:                    logger.Named("runner"),
 		Metrics:                metrics,
@@ -584,6 +589,7 @@ func run(c *cli.Context) {
 			AuthPath:       c.String("vault-kube-auth-path"),
 		},
 		GlobalENV: globalRunEnv,
+		RunStatus: runStatus,
 	}
 
 	if c.IsSet("oidc-issuer") {
@@ -605,7 +611,8 @@ func run(c *cli.Context) {
 		ListenAddress: c.String("webserver-bind-address"),
 		ClusterClt:    mgr.GetClient(),
 		KubeClient:    kubeClient,
-		RunQueue:      wsQueue,
+		RunQueue:      moduleQueue,
+		RunStatus:     runStatus,
 		Log:           logger.Named("webserver"),
 	}
 

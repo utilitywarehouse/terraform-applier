@@ -30,6 +30,7 @@ type TFExecuter interface {
 type tfRunner struct {
 	moduleName      string
 	moduleNamespace string
+	rootDir         string
 	workingDir      string
 	planFileName    string
 
@@ -44,12 +45,15 @@ func (r *Runner) NewTFRunner(
 	vars map[string]string,
 ) (TFExecuter, error) {
 	// Copy repo path to a temporary directory
-	tmpWSDir, err := os.MkdirTemp("", module.Namespace+"-"+module.Name+"-*")
+	tmpRoot, err := os.MkdirTemp("", module.Namespace+"-"+module.Name+"-*")
 	if err != nil {
 		return nil, fmt.Errorf("unable to create tmp dir %w", err)
 	}
 
-	err = r.GitSyncPool.CopyPath(ctx, module.Spec.RepoName, module.Spec.Path, tmpWSDir)
+	// clone repo to new temp dir so that file doesn't change during run.
+	// copy whole repository because module might contain relative path to modules/files
+	// which are outside of its path
+	err = r.GitSyncPool.CopyRepo(ctx, module.Spec.RepoName, tmpRoot)
 	if err != nil {
 		return nil, fmt.Errorf("unable copy module's tf files to tmp dir err:%w", err)
 	}
@@ -58,11 +62,12 @@ func (r *Runner) NewTFRunner(
 		moduleName:      module.Name,
 		moduleNamespace: module.Namespace,
 		metrics:         r.Metrics,
-		workingDir:      tmpWSDir,
+		rootDir:         tmpRoot,
+		workingDir:      filepath.Join(tmpRoot, module.Spec.Path),
 		planFileName:    "plan.out",
 	}
 
-	tf, err := tfexec.NewTerraform(tmpWSDir, r.TerraformExecPath)
+	tf, err := tfexec.NewTerraform(tfr.workingDir, r.TerraformExecPath)
 	if err != nil {
 		return nil, err
 	}
@@ -86,12 +91,13 @@ func (r *Runner) NewTFRunner(
 
 	// Set HOME to cwd, this means that SSH should not pick up any
 	// HOME is also used to setup git config in current dir
-	runEnv["HOME"] = tmpWSDir
+	runEnv["HOME"] = tfr.workingDir
 	//setup SB home for terraform remote module
-	runEnv["STRONGBOX_HOME"] = tmpWSDir
+	runEnv["STRONGBOX_HOME"] = tfr.workingDir
 
 	if strongboxKeyringData != "" {
-		err := ensureDecryption(ctx, tmpWSDir, strongboxKeyringData)
+		// TODO: should we be decrypting whole repo with given key?
+		err := ensureDecryption(ctx, tfr.workingDir, strongboxKeyringData)
 		if err != nil {
 			return nil, fmt.Errorf("unable to setup strongbox err:%w", err)
 		}
@@ -105,7 +111,7 @@ func (r *Runner) NewTFRunner(
 		return nil, fmt.Errorf("unable to json encode variables err:%w", err)
 	}
 
-	tfvarFile := filepath.Join(tmpWSDir, "terraform-applier-generated.auto.tfvars.json")
+	tfvarFile := filepath.Join(tfr.workingDir, "terraform-applier-generated.auto.tfvars.json")
 	if err := os.WriteFile(tfvarFile, jsonBytes, 0644); err != nil {
 		return nil, fmt.Errorf("unable to write the data to file %s err:%s", tfvarFile, err)
 	}
@@ -115,7 +121,7 @@ func (r *Runner) NewTFRunner(
 }
 
 func (te *tfRunner) cleanUp() {
-	os.RemoveAll(te.workingDir)
+	os.RemoveAll(te.rootDir)
 }
 
 func (te *tfRunner) init(ctx context.Context, backendConf map[string]string) (string, error) {
