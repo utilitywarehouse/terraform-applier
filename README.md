@@ -19,7 +19,7 @@ kind: Module
 metadata:
   name: hello
 spec:
-  repoName: terraform-applier 
+  repoName: terraform-applier
   path: dev/hello
   schedule: "00 */1 * * *"
   planOnly: false
@@ -27,12 +27,12 @@ spec:
   runTimeout: 900
   delegateServiceAccountSecretRef: terraform-applier-delegate-token
   rbac:
-  - role: Admin
-    subjects:
-    - name: user@email.com
-      kind: User
-    - name: some_group_name
-      kind: Group
+    - role: Admin
+      subjects:
+        - name: user@email.com
+          kind: User
+        - name: some_group_name
+          kind: Group
   backend:
     - name: bucket
       value: dev-terraform-state
@@ -90,7 +90,7 @@ Please note `backend` doesn't setup new backend it only configures existing back
 
 ### Private Module Source
 
-Terraform installs modules from Git repositories by running `git clone`, and so it will respect any local Git configuration set on your system, including credentials. 
+Terraform installs modules from Git repositories by running `git clone`, and so it will respect any local Git configuration set on your system, including credentials.
 Terraform applier supports SSH credentials to fetch modules from private repository. Admin can enable this by setting `--set-git-ssh-command` flag and mounting SSH key on controller (please see `Controller config`).
 once this flag is enabled controller configures `GIT_SSH_COMMAND` env with correct private key and known-hosts file path. this env will be used by `git` to fetch private repo using SSH.
 Since only SSH auth method is supported module source URL should indicate SSH protocol as shown...
@@ -103,13 +103,14 @@ module "storage" {
   source = "git::ssh://username@example.com/storage.git"
 }
 ```
-Since key is set on controller it can be used by ALL modules managed by the controller. Terraform applier doesn't support private key per module yet. 
+
+Since key is set on controller it can be used by ALL modules managed by the controller. Terraform applier doesn't support private key per module yet.
 
 ### Strongbox decryption
 
 Terraform applier supports strongbox decryption, its triggered if `TF_APPLIER_STRONGBOX_KEYRING` EVN is set on module.
 content of this ENV should be valid strongbox keyring file data which should include strongbox key used to encrypt secrets in the module.
-TF Applier will also configure Git and Strongbox Home before running `init` to decrypt any encrypted file from remote base as well. 
+TF Applier will also configure Git and Strongbox Home before running `init` to decrypt any encrypted file from remote base as well.
 
 ### RBAC
 
@@ -126,17 +127,18 @@ rbac:
   - name: some_group_name
     kind: Group
 ```
+
 At the moment only "Admin" role is supported, value of subjects can be either `email address` of users as kind `User` or the group name as kind `Group`.
 
-**If  `OIDC Issuer` is not set then web server will skip authentication and all `force run` requests will be allowed.**
+**If `OIDC Issuer` is not set then web server will skip authentication and all `force run` requests will be allowed.**
 
 ### Graceful shutdown
 
 To make sure all terraform module run does complete in finite time `runTimeout` is added to the module spec.
 default value is `900s` and MAX value is `1800s`. Terraform run `(init,plan and apply if required)` should finish in this time otherwise it will be forced shutdown.
 
-If controller received TERM signal during a module run, then it will try and finish current stage of the run (either `init`, `plan` or `apply`) without the force shutdown. during this case it will not process next stage. eg. if TERM signal received during `plan` stage then 
-it will not do `apply` even if drift is detected. 
+If controller received TERM signal during a module run, then it will try and finish current stage of the run (either `init`, `plan` or `apply`) without the force shutdown. during this case it will not process next stage. eg. if TERM signal received during `plan` stage then
+it will not do `apply` even if drift is detected.
 
 Controller will force shutdown on current stage run if it takes more time then `TERMINATION_GRACE_PERIOD` set on controller.
 
@@ -145,7 +147,7 @@ Controller will force shutdown on current stage run if it takes more time then `
 Terraform-applier has built in git sync functionality, it will periodically pull files down from a repository and make it available for modules.
 it supports multiple repositories, use following config to add repositories. config is map of repository name and repo config.
 modules must use this repository name in CRD as `repoName` to reference a repository. git-sync only supports 1 branch and revision per repository.
-all repositories will be cloned to given `repos-root-path` path. 
+all repositories will be cloned to given `repos-root-path` path.
 
 ```yaml
 repositories:
@@ -160,7 +162,7 @@ repositories:
 
 ### Controller config
 
-- `--repos-root-path (REPOS_ROOT_PATH)` - (default: `/src`) Absolute path to the directory containing all repositories of the modules. The immediate subdirectories of this directory should contain the module repo directories and directory name should match repoName referenced in  module.
+- `--repos-root-path (REPOS_ROOT_PATH)` - (default: `/src`) Absolute path to the directory containing all repositories of the modules. The immediate subdirectories of this directory should contain the module repo directories and directory name should match repoName referenced in module.
 - `--config (TF_APPLIER_CONFIG)` - (default: `/config/config.yaml`) Path to the tf applier config file containing repository config.
 - `--min-interval-between-runs (MIN_INTERVAL_BETWEEN_RUNS)` - (default: `60`) The minimum interval in seconds, user can set between 2 consecutive runs. This value defines the frequency of runs.
 - `--termination-grace-period (TERMINATION_GRACE_PERIOD)` - (default: `60`) Termination grace period is the ime given to
@@ -178,35 +180,43 @@ repositories:
 - `--git-verify-known-hosts (GIT_VERIFY_KNOWN_HOSTS)` - (default: `true`) The local path to the known hosts file used to setup GIT_SSH_COMMAND env.
 - `--controller-runtime-env (CONTROLLER_RUNTIME_ENV)` - (default: `""`) The comma separated list of ENVs which will be passed from controller to all terraform run process. The envs should be set on the controller.
 ---
-- `--module-label-selector (MODULE_LABEL_SELECTOR)` - (default: `""`) If present controller will only watch and process modules with this label. 
-Env value string should be in the form of 'label-key=label-value'. if multiple terraform-applier is running in same cluster 
-and if any 1 of them is in cluster scope mode then this env `must` be set otherwise it will watch ALL modules and interfere 
-with other controllers run.
-- `--watch-namespaces (WATCH_NAMESPACES)` - (default: `""`) if set controller will only watch given namespaces for modules. it will operate 
-in namespace scope mode and controller will not need any cluster permissions. if `label selector` also set then it will
-only watch modules with selector label in a given namespace.
+
+- `--module-label-selector (MODULE_LABEL_SELECTOR)` - (default: `""`) If present controller will only watch and process modules with this label.
+  Env value string should be in the form of 'label-key=label-value'. if multiple terraform-applier is running in same cluster
+  and if any 1 of them is in cluster scope mode then this env `must` be set otherwise it will watch ALL modules and interfere
+  with other controllers run.
+- `--watch-namespaces (WATCH_NAMESPACES)` - (default: `""`) if set controller will only watch given namespaces for modules. it will operate
+  in namespace scope mode and controller will not need any cluster permissions. if `label selector` also set then it will
+  only watch modules with selector label in a given namespace.
 - `--leader-elect (LEADER_ELECT)` - (default: `false`) Enable leader election for controller manager. Enabling this will ensure there is only one active controller manager.
 - `--election-id (ELECTION_ID)` - (default: `auto generated`) it determines the name of the resource that leader election will use for holding the leader lock. if multiple controllers are running with same label selector and watch namespace value then they belong to same stack. if election enabled, ELECTION_ID needs to be unique per stack. If this is not unique to the stack then only one stack will be working concurrently. if not set value will be auto generated based on given label selector and watch namespace value.
+
 ---
+
 - `--log-level (LOG_LEVEL)` - (default: `INFO`) `TRACE|DEBUG|INFO|WARN|ERROR`, case insensitive.
 - `--webserver-bind-address` - (default: `8080`) The address the web server binds to.
 - `--metrics-bind-address` - (default: `8081`) The address the metric endpoint binds to.
 - `--health-probe-bind-address` - (default: `8082`) The address the probe endpoint binds to.
+
 ---
+
 - `(VAULT_ADDR)` - (default: `""`) The Address of the Vault server expressed as a URL and port
 - `(VAULT_CACERT)` - (default: `""`) The path to a PEM-encoded CA certificate file.
 - `(VAULT_CAPATH)` - (default: `""`) The Path to a directory of PEM-encoded CA certificate files on the local disk.
 - `--vault-aws-secret-engine-path (VAULT_AWS_SEC_ENG_PATH)` - (default: `/aws`) The path where AWS secrets engine is enabled.
-- `--vault-kube-auth-path (VAULT_KUBE_AUTH_PATH)` - (default: `/auth/kubernetes`) The path where kubernetes auth method is mounted. 
+- `--vault-kube-auth-path (VAULT_KUBE_AUTH_PATH)` - (default: `/auth/kubernetes`) The path where kubernetes auth method is mounted.
+
 ---
+
 - `--oidc-callback-url (OIDC_CALLBACK_URL)` - (default: `""`) The callback url used for OIDC auth flow, this should be the terraform-applier url.
 - `--oidc-client-id (OIDC_CLIENT_ID)` - (default: `""`) The client ID of the OIDC app.
 - `--oidc-client-secret (OIDC_CLIENT_SECRET)` - (default: `""`) The client secret of the OIDC app.
-- `--oidc-issuer (OIDC_ISSUER)` - (default: `""`) The url of the IDP where OIDC app is created. 
+- `--oidc-issuer (OIDC_ISSUER)` - (default: `""`) The url of the IDP where OIDC app is created.
 
-**If  `OIDC Issuer` is not set then web server will skip authentication and all `force run` requests will be allowed.**
+**If `OIDC Issuer` is not set then web server will skip authentication and all `force run` requests will be allowed.**
 
 ## Kube backend
+
 For modules using kubernetes backend or provider, ideally module should be using its own SA's token (terraform-applier-delegate-token) for authentication with kube cluster and not depend on default in cluster config of controller's SA but kube provider ignores `host` and `token` backend attributes if kube config is not set. [related issue](https://github.com/hashicorp/terraform/issues/31275)
 
 controller creates a kube config at temp location and sets `KUBE_CONFIG_PATH` ENV for the module. this generated config contains server URL as well as cluster CA cert.
@@ -230,6 +240,7 @@ spec:
 ```
 
 ## Vault integration
+
 terraform-applier supports fetching (generating) secrets from the vault. Module's delegated service account's jwt (secret:terraform-applier-delegate-token) will be used for vault login for given `vaultRole`. at the moment only aws secrets engine is supported.
 
 ```yaml
@@ -244,6 +255,7 @@ spec:
       // Optional if the Vault role only allows a single AWS role ARN.
       roleARN: arn:aws:iam::00000000:role/sys-tf-applier-example
 ```
+
 ## Monitoring
 
 ### Metrics
@@ -262,6 +274,6 @@ In addition to the [controller-runtime](https://book.kubebuilder.io/reference/me
 - `terraform_applier_module_terraform_exit_code_count` - (tags: `module`,`namespace`, `command`, `exit_code`) A `Counter` for each exit code returned by executions of
   `terraform`, labelled with the command issued (`init`, `plan`,`apply`) and the exit code. It's worth noting that `plan` will
   return a code of `2` if there are changes to be made, which is not an error or a failure, so you may wish to account for this in your alerting.
-- `terraform_applier_git_last_sync_timestamp` - (tags: `repo`)  A Gauge that captures the Timestamp of the last successful git sync per repo.
+- `terraform_applier_git_last_sync_timestamp` - (tags: `repo`) A Gauge that captures the Timestamp of the last successful git sync per repo.
 - `terraform_applier_git_sync_count` - (tags: `repo`,`success`) A Counter for each repo sync, incremented with each sync attempt and tagged with the result (`success=true|false`)
 - `terraform_applier_git_sync_latency_seconds` - (tags: `repo`) A Summary that keeps track of the git sync latency per repo.
