@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"os/signal"
 	"path/filepath"
 	"strings"
@@ -151,7 +152,12 @@ var (
 			Usage: "The comma separated list of ENVs which will be passed from controller to its managed modules during terraform run. " +
 				"The values should be set on the controller.",
 		},
-
+		&cli.BoolFlag{
+			Name:  "cleanup-temp-dir",
+			Value: false,
+			Usage: "If set, the OS temporary directory will be removed and re-created. This can help removing redundant terraform" +
+				"binaries and avoiding temp directory growing in size with every restart.",
+		},
 		&cli.StringFlag{
 			Name:    "module-label-selector",
 			EnvVars: []string{"MODULE_LABEL_SELECTOR"},
@@ -411,6 +417,18 @@ preferences: {}
 
 }
 
+func cleanupTmpDir() {
+	tmpDir := os.TempDir()
+
+	tmpDirCleanupCommand := fmt.Sprintf("rm -rf %s/* %s/*", tmpDir, reposRootPath)
+
+	cmd := exec.Command("sh", "-c", tmpDirCleanupCommand)
+	err := cmd.Run()
+	if err != nil {
+		fmt.Printf("Error: %v\n", err)
+	}
+}
+
 func main() {
 	app := &cli.App{
 		Name: "terraform-applier",
@@ -419,6 +437,10 @@ func main() {
 		Flags: flags,
 		Action: func(cCtx *cli.Context) error {
 			validate(cCtx)
+			// Cleanup temp directory if the corresponding flag is set
+			if cCtx.Bool("cleanup-temp-dir") {
+				cleanupTmpDir()
+			}
 			setupGlobalEnv(cCtx)
 			run(cCtx)
 			return nil

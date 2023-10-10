@@ -26,16 +26,6 @@ spec:
           type: RuntimeDefault
       serviceAccountName: terraform-applier
       terminationGracePeriodSeconds: 300
-      initContainers:
-        - name: init-tmp-cleanup
-          image: busybox:latest
-          command: ["sh", "-c", "rm -rf /tmp/*"] # clean up tmp pvc on re-start
-          volumeMounts:
-            - mountPath: /tmp
-              name: tmp
-          securityContext:
-            runAsNonRoot: true
-            runAsUser: 1000
       containers:
         - name: tf-applier
           command:
@@ -87,4 +77,3 @@ spec:
         resources:
           requests:
             storage: 20Gi
-

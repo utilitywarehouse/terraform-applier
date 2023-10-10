@@ -179,6 +179,8 @@ repositories:
 - `--git-ssh-known-hosts-file (GIT_SSH_KNOWN_HOSTS_FILE)` - (default: `/etc/git-secret/known_hosts`) The local path to the known hosts file used to setup GIT_SSH_COMMAND env.
 - `--git-verify-known-hosts (GIT_VERIFY_KNOWN_HOSTS)` - (default: `true`) The local path to the known hosts file used to setup GIT_SSH_COMMAND env.
 - `--controller-runtime-env (CONTROLLER_RUNTIME_ENV)` - (default: `""`) The comma separated list of ENVs which will be passed from controller to all terraform run process. The envs should be set on the controller.
+- `--cleanup-temp-dir` - (default: `false`) If set, the contents of the OS temporary directory and `/src` will be removed. This can help removing redundant terraform binaries and avoiding the directories growing in size with every restart.
+
 ---
 
 - `--module-label-selector (MODULE_LABEL_SELECTOR)` - (default: `""`) If present controller will only watch and process modules with this label.
