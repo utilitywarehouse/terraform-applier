@@ -228,9 +228,6 @@ func NextSchedule(module *tfaplv1beta1.Module, now time.Time, minIntervalBetween
 		// of this controller. In that case, we want to not try to list
 		// all the missed start times.
 		numOfMissedRuns++
-		if numOfMissedRuns > 100 {
-			return 0, time.Time{}, fmt.Errorf("too many missed start times (%d) check clock skew", numOfMissedRuns)
-		}
 	}
 
 	return numOfMissedRuns, sched.Next(now), nil
