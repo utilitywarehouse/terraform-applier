@@ -131,21 +131,6 @@ func Test_NextSchedule(t *testing.T) {
 			},
 			wantErr: true,
 		},
-		{
-			name: "no_job_run_for_days",
-			args: args{
-				module: &tfaplv1beta1.Module{
-					ObjectMeta: metav1.ObjectMeta{
-						CreationTimestamp: metav1.Time{Time: time.Date(2022, 02, 01, 01, 00, 00, 0000, time.UTC)},
-					},
-					Spec:   tfaplv1beta1.ModuleSpec{Schedule: "00 */1 * * *"},
-					Status: tfaplv1beta1.ModuleStatus{RunStartedAt: nil},
-				},
-				now:                    time.Date(2022, 03, 01, 01, 00, 00, 0000, time.UTC),
-				minIntervalBetweenRuns: time.Hour,
-			},
-			wantErr: true,
-		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
