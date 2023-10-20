@@ -22,6 +22,7 @@ const strongBoxEnv = "TF_APPLIER_STRONGBOX_KEYRING"
 type TFExecuter interface {
 	init(ctx context.Context, backendConf map[string]string) (string, error)
 	plan(ctx context.Context) (bool, string, error)
+	showPlanFileRaw(ctx context.Context) (string, error)
 	apply(ctx context.Context) (string, error)
 	cleanUp()
 }
@@ -174,6 +175,13 @@ func (te *tfRunner) plan(ctx context.Context) (bool, string, error) {
 	}
 
 	return changes, out.String(), nil
+}
+
+// showPlanFileRaw reads a given plan file and outputs the plan in a
+// human-friendly, opaque format.
+func (te *tfRunner) showPlanFileRaw(ctx context.Context) (string, error) {
+	planOut := filepath.Join(te.workingDir, te.planFileName)
+	return te.tf.ShowPlanFileRaw(ctx, planOut)
 }
 
 func (te *tfRunner) apply(ctx context.Context) (string, error) {

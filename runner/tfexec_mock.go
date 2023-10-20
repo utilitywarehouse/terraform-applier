@@ -91,3 +91,18 @@ func (mr *MockTFExecuterMockRecorder) plan(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "plan", reflect.TypeOf((*MockTFExecuter)(nil).plan), arg0)
 }
+
+// showPlanFileRaw mocks base method.
+func (m *MockTFExecuter) showPlanFileRaw(arg0 context.Context) (string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "showPlanFileRaw", arg0)
+	ret0, _ := ret[0].(string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// showPlanFileRaw indicates an expected call of showPlanFileRaw.
+func (mr *MockTFExecuterMockRecorder) showPlanFileRaw(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "showPlanFileRaw", reflect.TypeOf((*MockTFExecuter)(nil).showPlanFileRaw), arg0)
+}
