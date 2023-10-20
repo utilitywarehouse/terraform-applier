@@ -33,7 +33,7 @@ spec:
           args:
             - --leader-elect
             - --termination-grace-period=240
-          image: quay.io/utilitywarehouse/terraform-applier:v2.0.3
+          image: quay.io/utilitywarehouse/terraform-applier:master
           livenessProbe:
             httpGet:
               path: /healthz
