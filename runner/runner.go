@@ -79,8 +79,11 @@ func (r *Runner) Start(ctx context.Context, done chan bool) {
 
 				success := r.process(req, cancelChan)
 
-				r.Log.Info("run finished", "module", req.NamespacedName, "success", success)
-
+				if success {
+					r.Log.Info("run completed successfully", "module", req.NamespacedName)
+				} else {
+					r.Log.Error("run completed with error", "module", req.NamespacedName)
+				}
 				r.Metrics.UpdateModuleSuccess(req.Name, req.Namespace, success)
 				r.Metrics.UpdateModuleRunDuration(req.Name, req.Namespace, time.Since(start).Seconds(), success)
 			}(req)
@@ -254,7 +257,7 @@ func (r *Runner) runTF(
 		return false
 	}
 
-	initOut, err := te.init(ctx, backendConf)
+	_, err := te.init(ctx, backendConf)
 	if err != nil {
 		msg := fmt.Sprintf("unable to init module: err:%s", err)
 		log.Error(msg)
@@ -262,7 +265,7 @@ func (r *Runner) runTF(
 		return false
 	}
 
-	log.Info("initialised", "output", initOut)
+	log.Info("Initialised successfully")
 	r.Recorder.Event(module, corev1.EventTypeNormal, tfaplv1beta1.ReasonInitialised, "Initialised successfully")
 
 	// Start Planing
@@ -280,8 +283,8 @@ func (r *Runner) runTF(
 	}
 
 	diffDetected, planOut, err := te.plan(ctx)
-	module.Status.RunOutput = planOut
 	if err != nil {
+		module.Status.RunOutput = planOut
 		msg := fmt.Sprintf("unable to plan module: err:%s", err)
 		log.Error(msg)
 		r.setFailedStatus(req, module, tfaplv1beta1.ReasonPlanFailed, msg, r.Clock.Now())
@@ -295,6 +298,16 @@ func (r *Runner) runTF(
 	planStatus := rePlanStatus.FindString(planOut)
 
 	log.Info("planed", "status", planStatus)
+
+	// get saved plan to update status
+	savedPlan, err := te.showPlanFileRaw(ctx)
+	if err != nil {
+		msg := fmt.Sprintf("unable to get saved plan: err:%s", err)
+		log.Error(msg)
+		r.setFailedStatus(req, module, tfaplv1beta1.ReasonPlanFailed, msg, r.Clock.Now())
+		return false
+	}
+	module.Status.RunOutput = savedPlan
 
 	// return if no drift detected
 	if !diffDetected {
@@ -329,15 +342,15 @@ func (r *Runner) runTF(
 	}
 
 	applyOut, err := te.apply(ctx)
-	module.Status.RunOutput = planOut + applyOut
 	if err != nil {
+		module.Status.RunOutput = savedPlan + applyOut
 		msg := fmt.Sprintf("unable to apply module: err:%s", err)
 		log.Error(msg)
 		r.setFailedStatus(req, module, tfaplv1beta1.ReasonApplyFailed, msg, r.Clock.Now())
 		return false
 	}
 
-	module.Status.LastApplyInfo = tfaplv1beta1.OutputStats{Timestamp: &metav1.Time{Time: r.Clock.Now()}, CommitHash: commitHash, Output: planOut + applyOut}
+	module.Status.LastApplyInfo = tfaplv1beta1.OutputStats{Timestamp: &metav1.Time{Time: r.Clock.Now()}, CommitHash: commitHash, Output: savedPlan + applyOut}
 
 	// extract last line of output
 	// Apply complete! Resources: 1 added, 0 changed, 0 destroyed.
