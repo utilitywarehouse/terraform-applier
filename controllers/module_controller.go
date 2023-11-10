@@ -105,9 +105,14 @@ func (r *ModuleReconciler) Reconcile(ctx context.Context, req reconcile.Request)
 		r.setFailedStatus(req, &module, tfaplv1beta1.ReasonUnknown, msg, r.Clock.Now())
 	}
 
+	var isPlanOnly bool
+	if module.Spec.PlanOnly != nil && *module.Spec.PlanOnly {
+		isPlanOnly = true
+	}
+
 	if module.Status.RunCommitHash == "" {
 		log.Info("starting initial run")
-		r.Queue <- runner.Request{NamespacedName: req.NamespacedName, Type: tfaplv1beta1.PollingRun}
+		r.Queue <- runner.Request{NamespacedName: req.NamespacedName, Type: tfaplv1beta1.PollingRun, PlanOnly: isPlanOnly}
 		// use next poll internal as minimum queue duration as status change will not trigger Reconcile
 		return ctrl.Result{RequeueAfter: pollIntervalDuration}, nil
 	}
@@ -124,7 +129,7 @@ func (r *ModuleReconciler) Reconcile(ctx context.Context, req reconcile.Request)
 
 	if changed {
 		log.Info("new changes are available starting run")
-		r.Queue <- runner.Request{NamespacedName: req.NamespacedName, Type: tfaplv1beta1.PollingRun}
+		r.Queue <- runner.Request{NamespacedName: req.NamespacedName, Type: tfaplv1beta1.PollingRun, PlanOnly: isPlanOnly}
 		// use next poll internal as minimum queue duration as status change will not trigger Reconcile
 		return ctrl.Result{RequeueAfter: pollIntervalDuration}, nil
 	}
