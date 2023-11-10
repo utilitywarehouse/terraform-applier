@@ -27,7 +27,8 @@ import (
 // The potential reasons for events and current state
 const (
 	ReasonRunTriggered          = "RunTriggered"
-	ReasonForcedRunTriggered    = "ForcedRunTriggered"
+	ReasonForcedPlanTriggered   = "ForcedPlanTriggered"
+	ReasonForcedApplyTriggered  = "ForcedApplyTriggered"
 	ReasonPollingRunTriggered   = "PollingRunTriggered"
 	ReasonScheduledRunTriggered = "ScheduledRunTriggered"
 
@@ -53,8 +54,10 @@ const (
 	ScheduledRun = "ScheduledRun"
 	// PollingRun indicated a run triggered by changes in the git repository.
 	PollingRun = "PollingRun"
-	// ForcedRun indicates a forced (triggered on the UI) terraform run.
-	ForcedRun = "ForcedRun"
+	// ForcedPlan indicates a forced (triggered on the UI) terraform plan.
+	ForcedPlan = "ForcedPlan"
+	// ForcedApply indicates a forced (triggered on the UI) terraform apply.
+	ForcedApply = "ForcedApply"
 )
 
 // Overall state of Module run
@@ -294,8 +297,10 @@ func GetRunReason(runType string) string {
 		return ReasonScheduledRunTriggered
 	case PollingRun:
 		return ReasonPollingRunTriggered
-	case ForcedRun:
-		return ReasonForcedRunTriggered
+	case ForcedPlan:
+		return ReasonForcedPlanTriggered
+	case ForcedApply:
+		return ReasonForcedApplyTriggered
 	}
 	return ReasonRunTriggered
 }

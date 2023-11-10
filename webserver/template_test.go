@@ -31,7 +31,7 @@ func Test_ExecuteTemplate(t *testing.T) {
 				CurrentState: "Running",
 				RunStartedAt: getMetaTime(10, 30, 1),
 				StateMessage: "Initialising",
-				StateReason:  tfaplv1beta1.ReasonForcedRunTriggered,
+				StateReason:  tfaplv1beta1.ReasonForcedPlanTriggered,
 			},
 		},
 		{

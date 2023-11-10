@@ -9,6 +9,13 @@
     <link rel="stylesheet" href="static/stylesheets/main.css">
     <link rel="stylesheet" href="static/bootstrap/css/bootstrap.min.css">
     <script src="static/bootstrap/js/bootstrap.min.js"></script>
+    <style>
+        .list-group {
+            --bs-list-group-active-color: #550091;
+            --bs-list-group-active-bg: #f5f0f8;
+            --bs-list-group-active-border-color: #f5f0f8;
+        }
+    </style>
 </head>
 
 <body onload="init();">
@@ -20,116 +27,180 @@
         <div id="force-alert-container" class="col-md-4"></div>
     </div>
 
-    <div class="row">
-        <div class="col-md-1"></div>
-        <div class="col-md-9">
-            <div class="card">
-                <h5 class="card-header">Namespaces</h5>
-                <div class="list-group list-group-flush">
-                    {{range $k, $v := . }}
-                    <div class="list-group-item">
-                        <a href="#{{$k}}" class="list-group-item-action text-decoration-none" data-bs-toggle="collapse" role="button">
-                            <div class="d-flex w-100 justify-content-between">
+    <div class="container-fluid">
+        <div class="card">
+            <div class="row g-0">
+
+                <div class="col-md-2 border-end">
+                    <div class="card-header">
+                        <a href="#" class="d-flex justify-content-center p-1 link-body-emphasis text-decoration-none">
+                            <span class="fs-5 fw-semibold text-dark">Namespaces</span>
+                        </a>
+                    </div>
+                    <div id="namespace-list" class="list-group list-group-flush overflow-auto"
+                        style="max-height: 90vh;">
+                        {{range $k, $v := . }}
+                        <a href="#{{$k}}" id="{{$k}}-list" data-filter="{{$k}}"
+                            class=" list-group-item list-group-item-action py-3 lh-sm">
+                            <div class="d-flex align-items-center justify-content-between">
                                 <h4 class="mb-1">{{$k}}</h4>
                                 <small>{{len $v.Modules}}</small>
                             </div>
                         </a>
-                        <ul id="{{$k}}" class="list-group list-group-flush collapse">
-                            {{ range $i, $m := $v.Modules }}
-                                {{template "module" $m}}
-                            {{end}}
-                        </ul>
+                        {{end}}
                     </div>
-                    {{end}}
+                </div>
+
+                <div class="col-md-3 border-end">
+                    <div class="card-header">
+                        <a href="#" class="d-flex justify-content-center p-1 link-body-emphasis text-decoration-none">
+                            <span class="fs-5 fw-semibold text-dark">Modules</span>
+                        </a>
+                    </div>
+                    <div id="module-list" class="list-group list-group-flush overflow-auto" style="max-height: 90vh;">
+                        {{range $k, $v := . }}
+                        {{ range $i, $m := $v.Modules }}
+                        <a href="#{{ sanitizedUniqueName .}}" id="{{ sanitizedUniqueName .}}-list" data-filter="{{$k}}"
+                            class="list-group-item list-group-item-action py-3 lh-sm d-none">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <h4 class="mb-1">{{$m.Name}}</h4>
+                                <div class="d-flex flex-column align-items-end">
+                                    {{ if .IsPlanOnly}}
+                                    <h6><span class='badge rounded-pill text-bg-secondary'>plan only</span></h6>
+                                    {{end}}
+                                    <h6>
+                                        <span {{if or (eq .Status.StateReason "PlanedDriftDetected" ) (eq
+                                            .Status.StateReason "Applied" ) }} class='badge rounded-pill bg-primary'
+                                            {{else if eq .Status.CurrentState "Errored" }}
+                                            class='badge rounded-pill bg-danger' {{else}}
+                                            class='badge rounded-pill bg-light text-dark' {{end}}>
+                                            {{$m.Status.CurrentState}} ({{$m.Status.StateReason}})
+                                        </span>
+                                    </h6>
+                                </div>
+                            </div>
+                        </a>
+                        {{end}}
+                        {{end}}
+                    </div>
+                </div>
+
+                <div class="col-md-7">
+                    <div class="card-header">
+                        <a href="#" class="d-flex justify-content-center p-1 link-body-emphasis text-decoration-none">
+                            <span class="fs-5 fw-semibold text-dark">Module Info</span>
+                        </a>
+                    </div>
+                    <div class="card-body">
+                        <div id="module-info-list" class="scrollarea">
+                            {{range $k, $v := . }}
+                            {{ range $i, $m := $v.Modules }}
+                            {{template "module" $m}}
+                            {{end}}
+                            {{end}}
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 
+
     {{ else }}
     <h3 class="text-center">Waiting for information about the first run...</h3>
-    <h4 class="text-center">Refresh for updates and check the status and logs for the terraform-applier container to make
+    <h4 class="text-center">Refresh for updates and check the status and logs for the terraform-applier container to
+        make
         sure it is running properly.</h4>
     {{ end }}
 </body>
+
 </html>
 
 <!-- modules -->
 {{define "module"}}
-<li class="list-group-item">
-    <div
-        class='card {{if eq .Status.CurrentState "Running"}}border-info{{end}}'>
+<div id="{{sanitizedUniqueName .}}" class="d-none">
+    <div class='card {{if eq .Status.CurrentState "Running"}}border-info{{end}}'>
         <div class="card-header bg-transparent">
-            <div href="#{{ sanitizedUniqueName .}}-info" data-bs-toggle="collapse" role="button">
-                <div class="d-flex w-100 justify-content-between">
-                    <h5 class="fw-normal">{{.Name}} {{ if .IsPlanOnly}}(plan only){{end}}</h5>
-                    <p {{if or (eq .Status.StateReason "PlanedDriftDetected") (eq .Status.StateReason "Applied")}} 
-                            class='badge rounded-pill bg-primary'
-                        {{else if eq .Status.CurrentState "Errored"}}
-                            class='badge rounded-pill bg-danger'
-                        {{else}} 
-                            class='badge rounded-pill bg-light text-dark'
-                        {{end}}>
+            <div href="#{{ sanitizedUniqueName .}}-info">
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                    <h3 class="fw-bold" style="color: #550091;">{{.Name}}
+                        {{ if .IsPlanOnly}}
+                        <span class='badge rounded-pill text-bg-secondary'>plan only</span>
+                        {{end}}
+                    </h3>
+                    <div class="">
+                        <button data-namespace="{{ .Namespace }}" data-name="{{ .Name }}" data-plan-only="true"
+                            class="force-button force-module-button btn btn-info btn-s">
+                            <strong>Force Plan</strong>
+                        </button>
+                        <button data-namespace="{{ .Namespace }}" data-name="{{ .Name }}" data-plan-only="false"
+                            class="force-button force-module-button btn btn-warning btn-s">
+                            <strong>Force Apply</strong>
+                        </button>
+                    </div>
+                </div>
+                <p class="fw-semibold">Status:
+                    <span {{if or (eq .Status.StateReason "PlanedDriftDetected" ) (eq .Status.StateReason "Applied" ) }}
+                        class='text-primary' {{else if eq .Status.CurrentState "Errored" }} class='text-danger' {{end}}>
                         {{.Status.CurrentState}} ({{.Status.StateReason}})
-                    </p>
-                   
-                </div>
+                    </span>
+                </p>
                 <div class="d-flex flex-row">
-                    <div class="pe-4">Repo: {{ .Spec.RepoName }}</div>
-                    <div class="pe-4">Path: {{ .Spec.Path }}</div>
-                    <div>Schedule: {{ .Spec.Schedule }}</div>
+                    <div class="pe-4"><span class="fw-semibold">Repo:</span> {{ .Spec.RepoName }}</div>
+                    <div class="pe-4"><span class="fw-semibold">Path:</span> {{ .Spec.Path }}</div>
                 </div>
-                Message: <small class="text-muted">{{.Status.StateMessage}}</small>
+                <p><span class="fw-semibold">Schedule:</span> {{ .Spec.Schedule }}</p>
+                <p><span class="fw-semibold">Message:</span> {{.Status.StateMessage}}</p>
             </div>
         </div>
-        <div id="{{sanitizedUniqueName .}}-info" class="collapse" aria-labelledby="heading-example">
+        <div id="{{sanitizedUniqueName .}}-info">
             <div class="card-body">
                 <div>
                     <div class="d-flex flex-row justify-content-between">
                         <div class="d-flex flex-column mb-3">
                             <div class="d-flex flex-row">
-                                <div class="pe-4">Type: <small>{{.Status.RunType}}</small></div>
-                                <div>Started: 
-                                    <small>{{ formattedTime .Status.RunStartedAt }} (took {{ duration .Status.RunDuration }})</small>
-                                </div>
+                                <p class="pe-4"><span class="fw-semibold">Type:</span> {{.Status.RunType}}</p>
+                                <p><span class="fw-semibold">Started:</span> {{ formattedTime .Status.RunStartedAt }}
+                                    (took {{ duration
+                                    .Status.RunDuration }})
+                                </p>
                             </div>
-                            
-                            <div class="">Commit Hash: 
-                                <small><a href="{{ commitURL .Status.RemoteURL .Status.RunCommitHash}}">{{.Status.RunCommitHash}}</a></small>
+                            <div class=""><span class="fw-semibold">Commit Hash:</span>
+                                <a href="{{ commitURL .Status.RemoteURL .Status.RunCommitHash}}">
+                                    {{.Status.RunCommitHash}}</a>
                             </div>
-                            <div class="">Commit Message: <small>{{.Status.RunCommitMsg}}</small></div>
-                        </div>
-                        <div class="">
-                            <button 
-                                data-namespace="{{ .Namespace }}"
-                                data-name="{{ .Name }}"
-                                class="force-button force-module-button btn btn-warning btn-s">
-                                <strong>Force Run</strong>
-                            </button>
+                            <div class=""><span class="fw-semibold">Commit Message:</span> {{.Status.RunCommitMsg}}
+                            </div>
                         </div>
                     </div>
                 </div>
                 <div>
                     <nav>
                         <div class="nav nav-tabs" role="tablist">
-                            <a class="nav-link active" href="#{{sanitizedUniqueName .}}-nav-plan" data-bs-toggle="tab" role="tab">Last Run Output</a>
-                            <a class="nav-link" href="#{{sanitizedUniqueName .}}-nav-apply" data-bs-toggle="tab" role="tab">Last Apply Output</a>
+                            <a class="nav-link active" href="#{{sanitizedUniqueName .}}-nav-plan" data-bs-toggle="tab"
+                                role="tab">Last Run Output</a>
+                            <a class="nav-link" href="#{{sanitizedUniqueName .}}-nav-apply" data-bs-toggle="tab"
+                                role="tab">Last Apply Output</a>
                         </div>
                     </nav>
                     <div class="tab-content">
                         <div class="tab-pane fade show active" id="{{sanitizedUniqueName .}}-nav-plan" role="tabpanel">
-                            <pre class="file-output font-monospace p-3" style="max-height: 40em; background-color: #f5f5f5;">
+                            <pre class="file-output font-monospace p-3"
+                                style="max-height: 40em; background-color: #f5f5f5;">
                                 <small>{{.Status.RunOutput}}</small>
                             </pre>
                         </div>
                         <div class="tab-pane fade" id="{{sanitizedUniqueName .}}-nav-apply" role="tabpanel">
                             <div class="d-flex flex-row m-2">
-                                <div class="pe-4">Commit: 
-                                    <small><a href="{{ commitURL .Status.RemoteURL .Status.LastApplyInfo.CommitHash}}">{{.Status.LastApplyInfo.CommitHash}}</a></small>
+                                <div class="pe-4"><span class="fw-semibold">Commit:</span>
+                                    <a
+                                        href="{{ commitURL .Status.RemoteURL .Status.LastApplyInfo.CommitHash}}">{{.Status.LastApplyInfo.CommitHash}}</a>
                                 </div>
-                                <div>At: <small>{{ formattedTime .Status.LastApplyInfo.Timestamp }}</small></div>
+                                <div><span class="fw-semibold">At:</span> {{ formattedTime
+                                    .Status.LastApplyInfo.Timestamp }}</div>
                             </div>
-                            <pre class="file-output font-monospace p-3" style="max-height: 40em; background-color: #f5f5f5;">
+                            <pre class="file-output font-monospace p-3"
+                                style="max-height: 40em; background-color: #f5f5f5;">
 <!-- to remove left margin on first line -->
 <small>{{.Status.LastApplyInfo.Output}}</small>
                             </pre>
@@ -139,6 +210,5 @@
             </div>
         </div>
     </div>
-</li>
+</div>
 {{end}}
-

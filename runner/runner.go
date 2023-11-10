@@ -28,7 +28,8 @@ var (
 
 type Request struct {
 	types.NamespacedName
-	Type string
+	Type     string
+	PlanOnly bool
 }
 
 type Runner struct {
@@ -319,7 +320,7 @@ func (r *Runner) runTF(
 	}
 
 	// return if plan only mode
-	if module.Spec.PlanOnly != nil && *module.Spec.PlanOnly {
+	if req.PlanOnly {
 		if err = r.SetRunFinishedStatus(req.NamespacedName, module, tfaplv1beta1.ReasonPlanedDriftDetected, "PlanOnly/"+planStatus, r.Clock.Now()); err != nil {
 			log.Error("unable to set drift status", "err", err)
 			return false

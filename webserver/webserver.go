@@ -164,6 +164,11 @@ func (f *ForceRunHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		Namespace: payload["namespace"],
 		Name:      payload["module"],
 	}
+	isPlanOnly := true
+	if payload["planOnly"] == "false" {
+		isPlanOnly = false
+	}
+
 	var module tfaplv1beta1.Module
 	err = f.ClusterClt.Get(r.Context(), namespacedName, &module)
 	if err != nil {
@@ -203,7 +208,7 @@ func (f *ForceRunHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		f.Log.Info("force run triggered", "module", namespacedName, "user", user.Email)
+		f.Log.Info("force run triggered", "module", namespacedName, "isPlanOnly", isPlanOnly, "user", user.Email)
 	}
 
 	// make sure module is not already running
@@ -216,7 +221,16 @@ func (f *ForceRunHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	f.RunQueue <- runner.Request{NamespacedName: namespacedName, Type: tfaplv1beta1.ForcedRun}
+	req := runner.Request{
+		NamespacedName: namespacedName,
+		Type:           tfaplv1beta1.ForcedPlan,
+		PlanOnly:       isPlanOnly,
+	}
+	if !isPlanOnly {
+		req.Type = tfaplv1beta1.ForcedApply
+	}
+
+	f.RunQueue <- req
 
 	data.Result = "success"
 	data.Message = "Run queued"
