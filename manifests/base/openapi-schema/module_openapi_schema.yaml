@@ -1,0 +1,198 @@
+definitions:
+  systems.uw.terraform-applier.v1beta1.Module:
+    properties:
+      apiVersion:
+        type: string
+      kind:
+        type: string
+      metadata:
+        type: object
+      spec:
+        properties:
+          backend:
+            items:
+              properties:
+                name:
+                  type: string
+                value:
+                  type: string
+                valueFrom:
+                  properties:
+                    configMapKeyRef:
+                      properties:
+                        key:
+                          type: string
+                        name:
+                          type: string
+                        optional:
+                          type: boolean
+                      required:
+                        - key
+                      type: object
+                      x-kubernetes-map-type: atomic
+                    secretKeyRef:
+                      properties:
+                        key:
+                          type: string
+                        name:
+                          type: string
+                        optional:
+                          type: boolean
+                      required:
+                        - key
+                      type: object
+                      x-kubernetes-map-type: atomic
+                  type: object
+              required:
+                - name
+              type: object
+            type: array
+            x-kubernetes-patch-merge-key: name
+            x-kubernetes-patch-strategy: merge
+          delegateServiceAccountSecretRef:
+            minLength: 1
+            type: string
+          env:
+            items:
+              properties:
+                name:
+                  type: string
+                value:
+                  type: string
+                valueFrom:
+                  properties:
+                    configMapKeyRef:
+                      properties:
+                        key:
+                          type: string
+                        name:
+                          type: string
+                        optional:
+                          type: boolean
+                      required:
+                        - key
+                      type: object
+                      x-kubernetes-map-type: atomic
+                    secretKeyRef:
+                      properties:
+                        key:
+                          type: string
+                        name:
+                          type: string
+                        optional:
+                          type: boolean
+                      required:
+                        - key
+                      type: object
+                      x-kubernetes-map-type: atomic
+                  type: object
+              required:
+                - name
+              type: object
+            type: array
+            x-kubernetes-patch-merge-key: name
+            x-kubernetes-patch-strategy: merge
+          path:
+            type: string
+          planOnly:
+            type: boolean
+          pollInterval:
+            minimum: 60
+            type: integer
+          rbac:
+            items:
+              properties:
+                role:
+                  enum:
+                    - Admin
+                  type: string
+                subjects:
+                  items:
+                    properties:
+                      kind:
+                        enum:
+                          - User
+                          - Group
+                        type: string
+                      name:
+                        type: string
+                    type: object
+                  type: array
+                  x-kubernetes-patch-merge-key: name
+                  x-kubernetes-patch-strategy: merge
+              type: object
+            type: array
+            x-kubernetes-patch-merge-key: role
+            x-kubernetes-patch-strategy: merge
+          repoName:
+            type: string
+          runTimeout:
+            maximum: 1800
+            type: integer
+          schedule:
+            type: string
+          var:
+            items:
+              properties:
+                name:
+                  type: string
+                value:
+                  type: string
+                valueFrom:
+                  properties:
+                    configMapKeyRef:
+                      properties:
+                        key:
+                          type: string
+                        name:
+                          type: string
+                        optional:
+                          type: boolean
+                      required:
+                        - key
+                      type: object
+                      x-kubernetes-map-type: atomic
+                    secretKeyRef:
+                      properties:
+                        key:
+                          type: string
+                        name:
+                          type: string
+                        optional:
+                          type: boolean
+                      required:
+                        - key
+                      type: object
+                      x-kubernetes-map-type: atomic
+                  type: object
+              required:
+                - name
+              type: object
+            type: array
+            x-kubernetes-patch-merge-key: name
+            x-kubernetes-patch-strategy: merge
+          vaultRequests:
+            properties:
+              aws:
+                properties:
+                  credentialType:
+                    enum:
+                      - iam_user
+                      - assumed_role
+                      - federation_token
+                    type: string
+                  roleARN:
+                    type: string
+                  vaultRole:
+                    type: string
+                type: object
+            type: object
+        required:
+          - path
+          - repoName
+        type: object
+    type: object
+    x-kubernetes-group-version-kind:
+      - group: terraform-applier.uw.systems
+        kind: Module
+        version: v1beta1
