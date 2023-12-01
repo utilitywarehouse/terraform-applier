@@ -11,7 +11,7 @@ require (
 	github.com/hashicorp/hc-install v0.6.1
 	github.com/hashicorp/terraform-exec v0.19.0
 	github.com/hashicorp/vault/api v1.10.0
-	github.com/onsi/ginkgo/v2 v2.13.0
+	github.com/onsi/ginkgo/v2 v2.13.2
 	github.com/onsi/gomega v1.30.0
 	github.com/prometheus/client_golang v1.17.0
 	github.com/robfig/cron/v3 v3.0.1
@@ -43,7 +43,7 @@ require (
 	github.com/fatih/color v1.15.0 // indirect
 	github.com/fsnotify/fsnotify v1.6.0 // indirect
 	github.com/go-jose/go-jose/v3 v3.0.1 // indirect
-	github.com/go-logr/logr v1.2.4 // indirect
+	github.com/go-logr/logr v1.3.0 // indirect
 	github.com/go-logr/zapr v1.2.4 // indirect
 	github.com/go-openapi/jsonpointer v0.20.0 // indirect
 	github.com/go-openapi/jsonreference v0.20.2 // indirect
@@ -101,7 +101,7 @@ require (
 	golang.org/x/term v0.15.0 // indirect
 	golang.org/x/text v0.14.0 // indirect
 	golang.org/x/time v0.3.0 // indirect
-	golang.org/x/tools v0.13.0 // indirect
+	golang.org/x/tools v0.14.0 // indirect
 	gomodules.xyz/jsonpatch/v2 v2.4.0 // indirect
 	google.golang.org/appengine v1.6.8 // indirect
 	google.golang.org/protobuf v1.31.0 // indirect
