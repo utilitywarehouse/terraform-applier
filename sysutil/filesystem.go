@@ -3,7 +3,6 @@ package sysutil
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
@@ -12,7 +11,7 @@ import (
 // ListDirs walks the directory tree rooted at the path and adds all non-directory file paths to a []string.
 func ListDirs(rootPath string) ([]string, error) {
 	var dirs []string
-	files, err := ioutil.ReadDir(rootPath)
+	files, err := os.ReadDir(rootPath)
 	if err != nil {
 		return dirs, fmt.Errorf("Could not read %s error=(%v)", rootPath, err)
 	}
@@ -54,7 +53,7 @@ func CopyFile(src, dst string) error {
 // CopyDir copies a dir recursively
 func CopyDir(src string, dst string) error {
 	var err error
-	var fileDescriptors []os.FileInfo
+	var fileDescriptors []os.DirEntry
 	var srcInfo os.FileInfo
 
 	if srcInfo, err = os.Stat(src); err != nil {
@@ -65,12 +64,16 @@ func CopyDir(src string, dst string) error {
 		return err
 	}
 
-	if fileDescriptors, err = ioutil.ReadDir(src); err != nil {
+	if fileDescriptors, err = os.ReadDir(src); err != nil {
 		return err
 	}
 	for _, fd := range fileDescriptors {
 		srcPath := path.Join(src, fd.Name())
 		dstPath := path.Join(dst, fd.Name())
+
+		if fd.Name() == ".git" {
+			continue // Exclude .git dir
+		}
 
 		if fd.IsDir() {
 			if err = CopyDir(srcPath, dstPath); err != nil {
