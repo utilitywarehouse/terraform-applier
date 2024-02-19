@@ -42,6 +42,18 @@ type WebServer struct {
 	Log           *slog.Logger
 }
 
+
+type EventsPageHandler struct {
+	Template      *template.Template
+	Authenticator *oidc.Authenticator
+	ClusterClt    client.Client
+	Log           hclog.Logger
+}
+func (s *EventsPageHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+
+	s.Log.Trace("[DL TEST] Request received at /events")
+}
+
 // StatusPageHandler implements the http.Handler interface and serves a status page with info about the most recent applier run.
 type StatusPageHandler struct {
 	Template      *template.Template
@@ -258,6 +270,12 @@ func (ws *WebServer) Start(ctx context.Context) error {
 		ws.ClusterClt,
 		ws.Log,
 	}
+  eventsPageHandler := &EventsPageHandler{
+		template,
+		ws.Authenticator,
+		ws.ClusterClt,
+		ws.Log,
+	}
 	forceRunHandler := &ForceRunHandler{
 		ws.Authenticator,
 		ws.ClusterClt,
@@ -269,6 +287,7 @@ func (ws *WebServer) Start(ctx context.Context) error {
 	m.PathPrefix("/static/").Handler(http.FileServer(http.FS(staticFiles)))
 	m.PathPrefix("/api/v1/forceRun").Handler(forceRunHandler)
 	m.PathPrefix("/").Handler(statusPageHandler)
+	m.PathPrefix("/events").Handler(eventsPageHandler)
 
 	return http.ListenAndServe(ws.ListenAddress, m)
 }
