@@ -44,12 +44,20 @@ func (r *Runner) NewTFRunner(
 	module *tfaplv1beta1.Module,
 	envs map[string]string,
 	vars map[string]string,
-) (TFExecuter, error) {
+) (te TFExecuter, err error) {
 	// Copy repo path to a temporary directory
 	tmpRoot, err := os.MkdirTemp("", module.Namespace+"-"+module.Name+"-*")
 	if err != nil {
 		return nil, fmt.Errorf("unable to create tmp dir %w", err)
 	}
+
+	defer func() {
+		// calling function can only run cleanUp() if TFExecuter is successfully created
+		// hence cleanup temp repo dir if errored
+		if err != nil {
+			os.RemoveAll(tmpRoot)
+		}
+	}()
 
 	// clone repo to new temp dir so that file doesn't change during run.
 	// copy whole repository because module might contain relative path to modules/files
