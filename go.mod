@@ -13,7 +13,7 @@ require (
 	github.com/hashicorp/vault/api v1.12.0
 	github.com/onsi/ginkgo/v2 v2.15.0
 	github.com/onsi/gomega v1.31.1
-	github.com/prometheus/client_golang v1.18.0
+	github.com/prometheus/client_golang v1.19.0
 	github.com/robfig/cron/v3 v3.0.1
 	github.com/urfave/cli/v2 v2.27.1
 	github.com/utilitywarehouse/go-operational v0.0.0-20220413104526-79ce40a50281
