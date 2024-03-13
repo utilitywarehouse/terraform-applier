@@ -1,6 +1,7 @@
 package webserver
 
 import (
+	"bytes"
 	"context"
 	"embed"
 	"encoding/json"
@@ -10,6 +11,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"os"
 	"sync"
 
 	"github.com/gorilla/mux"
@@ -42,16 +44,102 @@ type WebServer struct {
 	Log           *slog.Logger
 }
 
-
 type EventsPageHandler struct {
-	Template      *template.Template
 	Authenticator *oidc.Authenticator
 	ClusterClt    client.Client
+	KubeClt       kubernetes.Interface
+	RunQueue      chan<- runner.Request
+	RunStatus     *sync.Map
 	Log           hclog.Logger
 }
+
+type Comment struct {
+	Body string `json:"body"`
+}
+
 func (s *EventsPageHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
-	s.Log.Trace("[DL TEST] Request received at /events")
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		http.Error(w, "Error reading request body", http.StatusInternalServerError)
+		return
+	}
+	
+	// Parse JSON payload
+	var payload map[string]interface{}
+	err = json.Unmarshal(body, &payload)
+	if err != nil {
+		http.Error(w, "Error decoding JSON payload", http.StatusBadRequest)
+		return
+	}
+ 
+	// Collect necessary values from the payload
+	repoName, ok := payload["repository"].(map[string]interface{})["full_name"].(string)
+	if !ok {
+		http.Error(w, "Error retrieving repository name", http.StatusBadRequest)
+		return
+	}
+	prNumberFloat, ok := payload["pull_request"].(map[string]interface{})["number"].(float64)
+	if !ok {
+		http.Error(w, "Error retrieving pull request number", http.StatusBadRequest)
+		return
+	}
+	prNumber := fmt.Sprint(prNumberFloat)
+	// branchName, ok
+	_, ok = payload["pull_request"].(map[string]interface{})["head"].(map[string]interface{})["ref"].(string)
+	if !ok {
+		http.Error(w, "Error retrieving branch name", http.StatusBadRequest)
+		return
+	}
+
+  s.PostToGitHub(repoName, prNumber)
+
+}
+
+
+func (s *EventsPageHandler) PostToGitHub(repoName, prNumber string) {
+  username:="DTLP"
+	token:=os.Getenv("GITHUB_TOKEN")
+
+	url := fmt.Sprintf("https://api.github.com/repos/%s/issues/%s/comments", repoName, prNumber)
+
+	comment := Comment{
+		Body: "Hello from terraform-applier",
+	}
+
+	// Marshal the comment object to JSON
+	commentJSON, err := json.Marshal(comment)
+	if err != nil {
+		fmt.Println("Error marshalling comment to JSON:", err)
+	}
+
+	// Create a new HTTP request
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer(commentJSON))
+	if err != nil {
+	  fmt.Println("Error creating HTTP request:", err)
+	  return
+  } 
+
+  // Set headers
+	req.Header.Set("Content-Type", "application/json")
+	req.SetBasicAuth(username, token)
+
+	// Send the HTTP request
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		fmt.Println("Error sending HTTP request:", err)
+		return
+	}
+	defer resp.Body.Close()
+
+	// Check the response status
+	if resp.StatusCode != http.StatusCreated {
+    fmt.Println("Error:", resp.Status)
+		return
+	}
+
+	fmt.Println("Comment posted successfully.")
 }
 
 // StatusPageHandler implements the http.Handler interface and serves a status page with info about the most recent applier run.
@@ -270,10 +358,12 @@ func (ws *WebServer) Start(ctx context.Context) error {
 		ws.ClusterClt,
 		ws.Log,
 	}
-  eventsPageHandler := &EventsPageHandler{
-		template,
+	eventsPageHandler := &EventsPageHandler{
 		ws.Authenticator,
 		ws.ClusterClt,
+		ws.KubeClient,
+		ws.RunQueue,
+		ws.RunStatus,
 		ws.Log,
 	}
 	forceRunHandler := &ForceRunHandler{
@@ -286,8 +376,8 @@ func (ws *WebServer) Start(ctx context.Context) error {
 	}
 	m.PathPrefix("/static/").Handler(http.FileServer(http.FS(staticFiles)))
 	m.PathPrefix("/api/v1/forceRun").Handler(forceRunHandler)
-	m.PathPrefix("/").Handler(statusPageHandler)
 	m.PathPrefix("/events").Handler(eventsPageHandler)
+	m.PathPrefix("/").Handler(statusPageHandler)
 
 	return http.ListenAndServe(ws.ListenAddress, m)
 }

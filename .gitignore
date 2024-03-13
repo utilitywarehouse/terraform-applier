@@ -5,3 +5,5 @@ bin
 # test state files
 *.tfstate
 webserver/index.html
+payload.json
+tf-applier.yaml

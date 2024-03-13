@@ -33,7 +33,8 @@ spec:
           env:
             - name: TERMINATION_GRACE_PERIOD
               value: "240"
-          image: quay.io/utilitywarehouse/terraform-applier:master
+          image: terraform-applier:latest
+          # image: quay.io/utilitywarehouse/terraform-applier:master
           livenessProbe:
             httpGet:
               path: /healthz
