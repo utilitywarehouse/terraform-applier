@@ -6,4 +6,5 @@ bin
 *.tfstate
 webserver/index.html
 payload.json
-tf-applier.yaml
+comment.json
+tf-applier*.yaml

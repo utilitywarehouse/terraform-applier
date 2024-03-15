@@ -30,6 +30,8 @@ type Request struct {
 	types.NamespacedName
 	Type     string
 	PlanOnly bool
+	GitHub   bool
+	PlanOutput chan<- string
 }
 
 type Runner struct {
@@ -53,6 +55,8 @@ type Runner struct {
 func (r *Runner) Start(ctx context.Context, done chan bool) {
 	wg := &sync.WaitGroup{}
 
+  fmt.Println("§§§ WaitGroup:", wg)
+
 	if r.Delegate == nil {
 		r.Delegate = &Delegate{}
 	}
@@ -70,12 +74,14 @@ func (r *Runner) Start(ctx context.Context, done chan bool) {
 			return
 
 		case req := <-r.Queue:
+			fmt.Println("§§§ req:", req)
 			wg.Add(1)
 			go func(req Request) {
 				defer wg.Done()
 
 				start := time.Now()
 
+				fmt.Println("§§§ req.NamespacedName:", req.NamespacedName)
 				r.Log.Info("starting run", "module", req.NamespacedName, "type", req.Type)
 
 				success := r.process(req, cancelChan)
@@ -113,6 +119,7 @@ func (r *Runner) process(req Request, cancelChan <-chan struct{}) bool {
 	// get Object
 	module := new(tfaplv1beta1.Module)
 	if err := r.ClusterClt.Get(ctx, req.NamespacedName, module); err != nil {
+		fmt.Println("§§§ module:", module)
 		log.Error("unable to fetch terraform module", "err", err)
 		return false
 	}
@@ -144,17 +151,30 @@ func (r *Runner) process(req Request, cancelChan <-chan struct{}) bool {
 	}()
 
 	commitHash, err := r.Repos.Hash(ctx, module.Spec.RepoURL, module.Spec.RepoRef, module.Spec.Path)
+  fmt.Println("§§§ Debug runner 1")
+	fmt.Println("§§§ module:", module)
+	fmt.Println("§§§ module.Spec:", module.Spec)
+	fmt.Println("§§§ module.Spec.RepoName:", module.Spec.RepoName)
+	fmt.Println("§§§ module.Spec.Path:", module.Spec.Path)
 	if err != nil {
 		log.Error("unable to get commit hash", "err", err)
 		return false
 	}
 
 	commitLog, err := r.Repos.LogMsg(ctx, module.Spec.RepoURL, module.Spec.RepoRef, module.Spec.Path)
+  fmt.Println("§§§ Debug runner 2")
 	if err != nil {
 		log.Error("unable to get commit log subject", "err", err)
 		return false
 	}
 
+	fmt.Println("§§§ Debug runner 3")
+	repo, err := r.GitSyncPool.RepositoryConfig(module.Spec.RepoName)
+	if err != nil {
+		log.Error("unable to get repo's remote url", "err", err)
+	}
+
+	fmt.Println("§§§ Debug runner 4")
 	// if termination signal received its safe to return here
 	if isChannelClosed(cancelChan) {
 		msg := "terraform run interrupted as runner is shutting down"
@@ -165,11 +185,13 @@ func (r *Runner) process(req Request, cancelChan <-chan struct{}) bool {
 
 	// Update Status
 	if err = r.SetRunStartedStatus(req, module, "preparing for TF run", commitHash, commitLog, module.Spec.RepoURL, r.Clock.Now()); err != nil {
+	fmt.Println("§§§ Debug runner 5")
 		log.Error("unable to set run starting status", "err", err)
 		return false
 	}
 
 	// Setup Delegation and get vars and envs
+	fmt.Println("§§§ Debug runner 6")
 	jwt, err := r.Delegate.DelegateToken(ctx, r.KubeClt, module)
 	if err != nil {
 		msg := fmt.Sprintf("unable to get service account token: err:%s", err)
@@ -178,6 +200,7 @@ func (r *Runner) process(req Request, cancelChan <-chan struct{}) bool {
 		return false
 	}
 
+	fmt.Println("§§§ Debug runner 7")
 	delegatedClient, err := r.Delegate.SetupDelegation(ctx, jwt)
 	if err != nil {
 		msg := fmt.Sprintf("unable to create kube client: err:%s", err)
@@ -186,6 +209,7 @@ func (r *Runner) process(req Request, cancelChan <-chan struct{}) bool {
 		return false
 	}
 
+	fmt.Println("§§§ Debug runner 8")
 	backendConf, err := fetchEnvVars(ctx, delegatedClient, module, module.Spec.Backend)
 	if err != nil {
 		msg := fmt.Sprintf("unable to get backend config: err:%s", err)
@@ -288,6 +312,9 @@ func (r *Runner) runTF(
 		r.setFailedStatus(req, module, tfaplv1beta1.ReasonPlanFailed, msg, r.Clock.Now())
 		return false
 	}
+
+  fmt.Println("§§§ planOut (runner):", planOut)
+  req.PlanOutput <- planOut
 
 	// extract last line of output
 	// Plan: X to add, 0 to change, 0 to destroy.

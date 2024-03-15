@@ -12,10 +12,16 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	// "path/filepath"
 	"sync"
+	"time"
 
 	"github.com/gorilla/mux"
+	// "github.com/go-git/go-git/v5"
+	// "github.com/go-git/go-git/v5/plumbing"
+	"github.com/hashicorp/go-hclog"
 	tfaplv1beta1 "github.com/utilitywarehouse/terraform-applier/api/v1beta1"
+	"github.com/utilitywarehouse/terraform-applier/git"
 	"github.com/utilitywarehouse/terraform-applier/runner"
 	"github.com/utilitywarehouse/terraform-applier/webserver/oidc"
 	"k8s.io/apimachinery/pkg/types"
@@ -59,52 +65,171 @@ type Comment struct {
 
 func (s *EventsPageHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
-	body, err := io.ReadAll(r.Body)
-	if err != nil {
-		http.Error(w, "Error reading request body", http.StatusInternalServerError)
+  // Make sure the request method is POST
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	
-	// Parse JSON payload
-	var payload map[string]interface{}
-	err = json.Unmarshal(body, &payload)
-	if err != nil {
-		http.Error(w, "Error decoding JSON payload", http.StatusBadRequest)
+
+	// Get event header and action from the payload
+  eventType := r.Header.Get("X-GitHub-Event")
+  var payload map[string]interface{}
+	err := json.NewDecoder(r.Body).Decode(&payload)
+  if err != nil {
+		http.Error(w, "Bad request", http.StatusBadRequest)
+		return
+	}
+	var action string
+  if a, ok := payload["action"].(string); ok {
+		action = a
+	}
+
+	if eventType == "issue_comment" && action == "created" {
+		// New comment posted in PR
+		// pass
+	} else if eventType == "pull_request" && action == "opened" {
+		// New PR created
+		// pass
+	} else if eventType == "pull_request" && action == "synchronize" {
+		// New commit added to the PR
+		// pass
+  } else {
+		http.Error(w, "Unsupported payload type", http.StatusBadRequest)
 		return
 	}
  
-	// Collect necessary values from the payload
-	repoName, ok := payload["repository"].(map[string]interface{})["full_name"].(string)
-	if !ok {
-		http.Error(w, "Error retrieving repository name", http.StatusBadRequest)
+  // Get repository name, PR number and name of the branch
+  var repoName string
+	var prNumberFloat float64
+	var prNumber string
+	var branchName string
+	if repository, ok := payload["repository"].(map[string]interface{}); ok {
+		if name, ok := repository["full_name"].(string); ok {
+	    repoName = name
+	  }
+	}
+
+	// Get PR number
+	if eventType == "pull_request" {
+		if pr, ok := payload["pull_request"].(map[string]interface{}); ok {
+			if number, ok := pr["number"].(float64); ok {
+				prNumberFloat = number
+			}
+			if head, ok := pr["head"].(map[string]interface{}); ok {
+				if ref, ok := head["ref"].(string); ok {
+					branchName = ref
+				}
+			}
+		}
+	}
+	if eventType == "issue_comment" {
+		if issue, ok := payload["issue"].(map[string]interface{}); ok {
+			if number, ok := issue["number"].(float64); ok {
+				prNumberFloat = number
+			}
+		}
+	}
+	prNumber = fmt.Sprint(prNumberFloat)
+  fmt.Println("§§§ prNumber:", prNumber)
+
+	// Respond only to 'make plan' comments
+	if eventType == "issue_comment" {
+		commentBody, ok := payload["comment"].(map[string]interface{})["body"].(string)
+		if !ok {
+			http.Error(w, "Error retrieving repository name", http.StatusBadRequest)
+			return
+		}
+
+		if commentBody == "make plan" {
+			// Clone Git repo, run terraform plan, post PR comment
+	  }
+	}
+
+	// Todo:
+	// create lock file before plan
+  // run terraform plan
+  // get the output and post it below
+	// delete lock file
+
+
+	ctx := context.Background()
+  logger := hclog.New(nil)
+
+	syncOptions := git.SyncOptions{
+		GitSSHKeyPath: "/etc/git-secret/ssh",
+		WithCheckout: true,
+    CloneTimeout: time.Minute * 5,
+		Interval: time.Second * 30,
+	}
+
+	rootPath := "/src"
+	syncPool, err := git.NewSyncPool(ctx, rootPath, syncOptions, logger)
+	if err != nil {
+		logger.Error("Error initializing SyncPool", "error", err)
 		return
 	}
-	prNumberFloat, ok := payload["pull_request"].(map[string]interface{})["number"].(float64)
-	if !ok {
-		http.Error(w, "Error retrieving pull request number", http.StatusBadRequest)
-		return
+  url := fmt.Sprintf("git@github.com:%s.git", repoName)
+	repoConfig := git.RepositoryConfig{
+		Remote: url,
+		Branch: branchName,
+		Revision: "HEAD",
+		Depth: 0,
 	}
-	prNumber := fmt.Sprint(prNumberFloat)
-	// branchName, ok
-	_, ok = payload["pull_request"].(map[string]interface{})["head"].(map[string]interface{})["ref"].(string)
-	if !ok {
-		http.Error(w, "Error retrieving branch name", http.StatusBadRequest)
+	err = syncPool.AddRepository(repoName, repoConfig, nil)
+	if err != nil {
+		logger.Error("Error adding repository to SyncPool", "error", err)
 		return
 	}
 
-  s.PostToGitHub(repoName, prNumber)
+	fmt.Println("§§§ syncPool:", syncPool)
 
+	err = s.runTerraformPlan(repoName, branchName, prNumber)
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	// TODO: Get planOutput
+	
 }
 
+func (s *EventsPageHandler) runTerraformPlan(repoName, branchName, prNumber string) error {
 
-func (s *EventsPageHandler) PostToGitHub(repoName, prNumber string) {
+	planOutput := make(chan string)
+
+	// TODO: get these values dynamically 
+	request := runner.Request{
+		NamespacedName: types.NamespacedName{
+			Name: "one",
+			Namespace: "exp-1-aws",
+		},
+		Type: "plan",
+		PlanOnly: true,
+		GitHub: true,
+		PlanOutput: planOutput,
+	}
+
+  s.RunQueue <- request
+
+  select {
+	case planOut := <-planOutput:
+		fmt.Println("§§§ planOut (web):", planOut)
+		s.PostToGitHub(repoName, prNumber, planOut)
+	default:
+		fmt.Println("§§§ No plan output available yet...")
+  }
+
+	return nil
+}
+
+// Temporarily using my own github token
+func (s *EventsPageHandler) PostToGitHub(repoName, prNumber, message string) {
   username:="DTLP"
 	token:=os.Getenv("GITHUB_TOKEN")
 
 	url := fmt.Sprintf("https://api.github.com/repos/%s/issues/%s/comments", repoName, prNumber)
 
 	comment := Comment{
-		Body: "Hello from terraform-applier",
+		Body: message,
 	}
 
 	// Marshal the comment object to JSON
@@ -139,7 +264,7 @@ func (s *EventsPageHandler) PostToGitHub(repoName, prNumber string) {
 		return
 	}
 
-	fmt.Println("Comment posted successfully.")
+	fmt.Println("§§§ Comment posted successfully.")
 }
 
 // StatusPageHandler implements the http.Handler interface and serves a status page with info about the most recent applier run.

@@ -76,6 +76,7 @@ func (r *ModuleReconciler) Reconcile(ctx context.Context, req reconcile.Request)
 
 	var module tfaplv1beta1.Module
 	if err := r.Get(ctx, req.NamespacedName, &module); err != nil {
+		fmt.Println("§§§ module:", module)
 		log.Error("unable to fetch terraform module", "err", err)
 		// we'll ignore not-found errors, since they can't be fixed by an immediate requeue
 		return ctrl.Result{}, client.IgnoreNotFound(err)
