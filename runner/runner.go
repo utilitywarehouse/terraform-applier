@@ -38,6 +38,7 @@ type Runner struct {
 	Recorder               record.EventRecorder
 	KubeClt                kubernetes.Interface
 	GitSyncPool            git.SyncInterface
+	Repos                  git.Repositories
 	Queue                  <-chan Request
 	Log                    hclog.Logger
 	Delegate               DelegateInterface

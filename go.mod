@@ -1,6 +1,6 @@
 module github.com/utilitywarehouse/terraform-applier
 
-go 1.22
+go 1.22.0
 
 require (
 	github.com/golang/mock v1.6.0
@@ -16,6 +16,7 @@ require (
 	github.com/prometheus/client_golang v1.19.0
 	github.com/robfig/cron/v3 v3.0.1
 	github.com/urfave/cli/v2 v2.27.1
+	github.com/utilitywarehouse/git-mirror v0.0.0-20240318153415-d32e140c89cf
 	github.com/utilitywarehouse/go-operational v0.0.0-20220413104526-79ce40a50281
 	go.uber.org/zap v1.27.0
 	golang.org/x/oauth2 v0.17.0

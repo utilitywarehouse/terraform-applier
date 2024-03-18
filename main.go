@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -25,6 +26,7 @@ import (
 	"github.com/urfave/cli/v2"
 	"go.uber.org/zap/zapcore"
 
+	"github.com/utilitywarehouse/git-mirror/pkg/mirror"
 	"github.com/utilitywarehouse/terraform-applier/git"
 	"github.com/utilitywarehouse/terraform-applier/metrics"
 	"github.com/utilitywarehouse/terraform-applier/runner"
@@ -429,6 +431,29 @@ func cleanupTmpDir() {
 	}
 }
 
+func applyGitDefaults(c *cli.Context, mirrorConf mirror.RepoPoolConfig) mirror.RepoPoolConfig {
+	// always override root as we use root path passed as argument on controller
+	mirrorConf.Defaults.Root = reposRootPath
+
+	if mirrorConf.Defaults.GitGC == "" {
+		mirrorConf.Defaults.GitGC = "always"
+	}
+
+	if mirrorConf.Defaults.Interval == 0 {
+		mirrorConf.Defaults.Interval = 30 * time.Second
+	}
+
+	if mirrorConf.Defaults.Auth.SSHKeyPath == "" {
+		mirrorConf.Defaults.Auth.SSHKeyPath = c.String("git-ssh-key-file")
+	}
+
+	if mirrorConf.Defaults.Auth.SSHKnownHostsPath == "" {
+		mirrorConf.Defaults.Auth.SSHKnownHostsPath = c.String("git-ssh-known-hosts-file")
+	}
+
+	return mirrorConf
+}
+
 func main() {
 	app := &cli.App{
 		Name: "terraform-applier",
@@ -475,6 +500,19 @@ func run(c *cli.Context) {
 	conf, err := parseConfigFile(c.String("config"))
 	if err != nil {
 		setupLog.Error("unable to parse tf applier config file", "err", err)
+		os.Exit(1)
+	}
+
+	// setup git-mirror
+	conf.GitMirror = applyGitDefaults(c, conf.GitMirror)
+
+	mirror.EnableMetrics("terraform_applier", runTimeMetrics.Registry)
+
+	// path to resolve strongbox
+	gitENV := []string{fmt.Sprintf("PATH=%s", os.Getenv("PATH"))}
+	repos, err := mirror.NewRepoPool(conf.GitMirror, slog.Default(), gitENV)
+	if err != nil {
+		setupLog.Error("could not create git mirror pool", "err", err)
 		os.Exit(1)
 	}
 
@@ -572,6 +610,7 @@ func run(c *cli.Context) {
 		Clock:                  clock,
 		Queue:                  moduleQueue,
 		GitSyncPool:            gitSyncPool,
+		Repos:                  repos,
 		Log:                    logger.Named("manager"),
 		MinIntervalBetweenRuns: time.Duration(c.Int("min-interval-between-runs")) * time.Second,
 		RunStatus:              runStatus,
@@ -602,6 +641,7 @@ func run(c *cli.Context) {
 		KubeClt:                kubeClient,
 		Queue:                  moduleQueue,
 		GitSyncPool:            gitSyncPool,
+		Repos:                  repos,
 		Log:                    logger.Named("runner"),
 		Metrics:                metrics,
 		TerraformExecPath:      execPath,

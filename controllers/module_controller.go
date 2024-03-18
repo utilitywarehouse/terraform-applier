@@ -45,6 +45,7 @@ type ModuleReconciler struct {
 	Recorder               record.EventRecorder
 	Clock                  sysutil.ClockInterface
 	GitSyncPool            git.SyncInterface
+	Repos                  git.Repositories
 	Queue                  chan<- runner.Request
 	Log                    hclog.Logger
 	MinIntervalBetweenRuns time.Duration
