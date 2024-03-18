@@ -80,6 +80,16 @@ type ModuleSpec struct {
 	// Name of the repository containing Terraform module directory.
 	RepoName string `json:"repoName"`
 
+	// URL to the repository containing Terraform module source code.
+	// +optional
+	RepoURL string `json:"repoURL"`
+
+	// The RepoRef specifies the revision of the repository for the module source code.
+	// this can be tag or branch. If not specified, this defaults to "HEAD" (repo's default branch)
+	// +optional
+	// +kubebuilder:default=HEAD
+	RepoRef string `json:"repoRef,omitempty"`
+
 	// Path to the directory containing Terraform Root Module (.tf) files.
 	Path string `json:"path"`
 
