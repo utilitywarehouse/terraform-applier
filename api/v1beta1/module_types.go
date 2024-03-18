@@ -78,6 +78,7 @@ type ModuleSpec struct {
 	// Important: Run "make" to regenerate code after modifying this file
 
 	// Name of the repository containing Terraform module directory.
+	// +optional
 	RepoName string `json:"repoName"`
 
 	// URL to the repository containing Terraform module source code.
