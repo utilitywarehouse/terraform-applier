@@ -35,7 +35,7 @@ var _ = Describe("Module controller without runner", func() {
 		It("Should send module to job queue on schedule", func() {
 			const (
 				moduleName = "test-module"
-				repo       = "modules"
+				repoURL    = "https://host.xy/dummy/repo.git"
 				path       = "dev/" + moduleName
 			)
 
@@ -52,7 +52,7 @@ var _ = Describe("Module controller without runner", func() {
 				},
 				Spec: tfaplv1beta1.ModuleSpec{
 					Schedule: "1 * * * *",
-					RepoName: repo,
+					RepoURL:  repoURL,
 					Path:     path,
 				},
 			}
@@ -93,7 +93,7 @@ var _ = Describe("Module controller without runner", func() {
 			module.Status.RunStartedAt = &metav1.Time{Time: time.Date(2022, 02, 01, 01, 00, 30, 0000, time.UTC)}
 			Expect(k8sClient.Status().Update(ctx, module)).Should(Succeed())
 
-			testGitSyncPool.EXPECT().HasChangesForPath(gomock.Any(), repo, path, "CommitAbc123").Return(false, nil)
+			testRepos.EXPECT().Hash(gomock.Any(), repoURL, "HEAD", path).Return("CommitAbc123", nil)
 
 			By("By making sure job is not sent to job queue before schedule")
 			fakeClock.T = time.Date(2022, 02, 01, 01, 00, 40, 0000, time.UTC)
@@ -130,7 +130,7 @@ var _ = Describe("Module controller without runner", func() {
 		It("Should send module to job queue on commit change", func() {
 			const (
 				moduleName = "test-module2"
-				repo       = "modules2"
+				repoURL    = "https://host.xy/dummy/repo2.git"
 				path       = "dev/" + moduleName
 			)
 
@@ -147,7 +147,7 @@ var _ = Describe("Module controller without runner", func() {
 				},
 				Spec: tfaplv1beta1.ModuleSpec{
 					Schedule: "1 * * * *",
-					RepoName: repo,
+					RepoURL:  repoURL,
 					Path:     path,
 				},
 			}
@@ -174,7 +174,7 @@ var _ = Describe("Module controller without runner", func() {
 			Expect(k8sClient.Status().Update(ctx, module)).Should(Succeed())
 
 			By("By making sure job was sent to jobQueue when commit hash is changed")
-			testGitSyncPool.EXPECT().HasChangesForPath(gomock.Any(), repo, path, "CommitAbc123").Return(true, nil)
+			testRepos.EXPECT().Hash(gomock.Any(), repoURL, "HEAD", path).Return("CommitAbc456", nil)
 
 			// wait for just about 60 sec default poll interval
 			Eventually(func() types.NamespacedName {
@@ -195,7 +195,7 @@ var _ = Describe("Module controller without runner", func() {
 		It("Should not trigger run for module with invalid schedule", func() {
 			const (
 				moduleName = "test-module3"
-				repo       = "modules"
+				repoURL    = "https://host.xy/dummy/repo.git"
 				path       = "dev/" + moduleName
 			)
 
@@ -212,7 +212,7 @@ var _ = Describe("Module controller without runner", func() {
 				},
 				Spec: tfaplv1beta1.ModuleSpec{
 					Schedule: "1 * * *",
-					RepoName: repo,
+					RepoURL:  repoURL,
 					Path:     path,
 				},
 			}
@@ -236,7 +236,7 @@ var _ = Describe("Module controller without runner", func() {
 			module.Status.RunCommitHash = "CommitAbc123"
 			Expect(k8sClient.Status().Update(ctx, module)).Should(Succeed())
 
-			testGitSyncPool.EXPECT().HasChangesForPath(gomock.Any(), repo, path, "CommitAbc123").Return(false, nil)
+			testRepos.EXPECT().Hash(gomock.Any(), repoURL, "HEAD", path).Return("CommitAbc123", nil)
 
 			// wait for next reconcile loop
 			time.Sleep(15 * time.Second)
@@ -258,7 +258,7 @@ var _ = Describe("Module controller without runner", func() {
 		It("Should not trigger run for module with git error", func() {
 			const (
 				moduleName = "test-module4"
-				repo       = "modules1"
+				repoURL    = "https://host.xy/dummy/repo2.git"
 				path       = "dev/" + moduleName
 			)
 
@@ -275,7 +275,7 @@ var _ = Describe("Module controller without runner", func() {
 				},
 				Spec: tfaplv1beta1.ModuleSpec{
 					Schedule: "1 * * * *",
-					RepoName: repo,
+					RepoURL:  repoURL,
 					Path:     path,
 				},
 			}
@@ -299,7 +299,7 @@ var _ = Describe("Module controller without runner", func() {
 			module.Status.RunCommitHash = "CommitAbc123"
 			Expect(k8sClient.Status().Update(ctx, module)).Should(Succeed())
 
-			testGitSyncPool.EXPECT().HasChangesForPath(gomock.Any(), repo, path, "CommitAbc123").Return(false, fmt.Errorf("some git error"))
+			testRepos.EXPECT().Hash(gomock.Any(), repoURL, "HEAD", path).Return("", fmt.Errorf("some git error"))
 
 			// wait for next reconcile loop
 			time.Sleep(15 * time.Second)

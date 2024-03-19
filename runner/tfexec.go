@@ -60,9 +60,9 @@ func (r *Runner) NewTFRunner(
 	}()
 
 	// clone repo to new temp dir so that file doesn't change during run.
-	// copy whole repository because module might contain relative path to modules/files
+	// checkout whole repo as module might contain relative path to modules/files
 	// which are outside of its path
-	err = r.GitSyncPool.CopyRepo(ctx, module.Spec.RepoName, tmpRoot)
+	_, err = r.Repos.Clone(ctx, module.Spec.RepoURL, tmpRoot, module.Spec.RepoRef, "", true)
 	if err != nil {
 		return nil, fmt.Errorf("unable copy module's tf files to tmp dir err:%w", err)
 	}

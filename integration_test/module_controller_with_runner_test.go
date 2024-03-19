@@ -11,7 +11,6 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	tfaplv1beta1 "github.com/utilitywarehouse/terraform-applier/api/v1beta1"
-	"github.com/utilitywarehouse/terraform-applier/git"
 	"github.com/utilitywarehouse/terraform-applier/sysutil"
 	"github.com/utilitywarehouse/terraform-applier/vault"
 	corev1 "k8s.io/api/core/v1"
@@ -50,16 +49,15 @@ var _ = Describe("Module controller with Runner", func() {
 			testFilter.LabelSelectorValue = ""
 
 			// all jobs will be triggered automatically as they do not have initial commit hash
-			// testGitSyncPool.EXPECT().HasChangesForPath(gomock.Any(), "modules", "hello", gomock.Any()).Return(true, nil).AnyTimes()
-			testGitSyncPool.EXPECT().HashForPath(gomock.Any(), "modules", "hello").
+			testRepos.EXPECT().Hash(gomock.Any(), "https://host.xy/dummy/repo.git", "HEAD", "hello").
 				Return(commitHash, nil).AnyTimes()
-			testGitSyncPool.EXPECT().LogMsgForPath(gomock.Any(), "modules", "hello").
+			testRepos.EXPECT().LogMsg(gomock.Any(), "https://host.xy/dummy/repo.git", "HEAD", "hello").
 				Return(commitMsg, nil).AnyTimes()
-			testGitSyncPool.EXPECT().RepositoryConfig(gomock.Any()).Return(git.RepositoryConfig{Remote: "github.com/org/repo"}, nil).AnyTimes()
+
 			var dst string
-			testGitSyncPool.EXPECT().CopyRepo(gomock.Any(), "modules", gomock.AssignableToTypeOf(dst)).
-				DoAndReturn(func(ctx context.Context, name string, dst string) error {
-					return sysutil.CopyDir(filepath.Join("src", name), dst)
+			testRepos.EXPECT().Clone(gomock.Any(), "https://host.xy/dummy/repo.git", gomock.AssignableToTypeOf(dst), "HEAD", "", true).
+				DoAndReturn(func(ctx context.Context, remote, dst, branch, pathspec string, rmGitDir bool) (string, error) {
+					return "commit124", sysutil.CopyDir(filepath.Join("src", "modules"), dst)
 				}).AnyTimes()
 
 			testMetrics.EXPECT().UpdateModuleRunDuration(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
@@ -73,7 +71,7 @@ var _ = Describe("Module controller with Runner", func() {
 		It("Should send module to job queue on commit change and runner should do plan & apply", func() {
 			const (
 				moduleName = "hello"
-				repo       = "modules"
+				repoURL    = "https://host.xy/dummy/repo.git"
 				path       = "hello"
 			)
 
@@ -90,7 +88,7 @@ var _ = Describe("Module controller with Runner", func() {
 				},
 				Spec: tfaplv1beta1.ModuleSpec{
 					Schedule: "50 * * * *",
-					RepoName: repo,
+					RepoURL:  repoURL,
 					Path:     path,
 					Env: []corev1.EnvVar{
 						{Name: "TF_APPLIER_STRONGBOX_KEYRING", Value: string(sbKeyringData)},
@@ -156,7 +154,7 @@ var _ = Describe("Module controller with Runner", func() {
 		It("Should send module to job queue on commit change and runner should only do plan", func() {
 			const (
 				moduleName = "hello-plan-only"
-				repo       = "modules"
+				repoURL    = "https://host.xy/dummy/repo.git"
 				path       = "hello"
 			)
 
@@ -173,7 +171,7 @@ var _ = Describe("Module controller with Runner", func() {
 				},
 				Spec: tfaplv1beta1.ModuleSpec{
 					Schedule: "50 * * * *",
-					RepoName: repo,
+					RepoURL:  repoURL,
 					Path:     path,
 					PlanOnly: &boolTrue,
 					Env: []corev1.EnvVar{
@@ -236,7 +234,7 @@ var _ = Describe("Module controller with Runner", func() {
 		It("Should send module to job queue on commit change and runner should read configmaps and secrets before apply and setup local backend", func() {
 			const (
 				moduleName = "hello-with-var-env"
-				repo       = "modules"
+				repoURL    = "https://host.xy/dummy/repo.git"
 				path       = "hello"
 			)
 
@@ -253,7 +251,7 @@ var _ = Describe("Module controller with Runner", func() {
 				},
 				Spec: tfaplv1beta1.ModuleSpec{
 					Schedule: "50 * * * *",
-					RepoName: repo,
+					RepoURL:  repoURL,
 					Path:     path,
 					Backend: []corev1.EnvVar{
 						{Name: "path", Value: testStateFilePath},
@@ -370,7 +368,7 @@ var _ = Describe("Module controller with Runner", func() {
 		It("Should send module to job queue on commit change and runner should generate aws vault creds", func() {
 			const (
 				moduleName = "hello-with-aws-creds"
-				repo       = "modules"
+				repoURL    = "https://host.xy/dummy/repo.git"
 				path       = "hello"
 			)
 
@@ -392,7 +390,7 @@ var _ = Describe("Module controller with Runner", func() {
 				},
 				Spec: tfaplv1beta1.ModuleSpec{
 					Schedule:      "50 * * * *",
-					RepoName:      repo,
+					RepoURL:       repoURL,
 					Path:          path,
 					VaultRequests: &vaultReq,
 					Env: []corev1.EnvVar{

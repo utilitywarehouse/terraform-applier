@@ -82,7 +82,7 @@ var (
 
 	// testRunnerQueue only used for send job to runner of runner testing
 	testRunnerQueue  chan runner.Request
-	testGitSyncPool  *git.MockSyncInterface
+	testRepos        *git.MockRepositories
 	testMetrics      *metrics.MockPrometheusInterface
 	testDelegate     *runner.MockDelegateInterface
 	testRunner       runner.Runner
@@ -157,7 +157,7 @@ var _ = BeforeSuite(func() {
 
 	goMockCtrl = gomock.NewController(RecoveringGinkgoT())
 
-	testGitSyncPool = git.NewMockSyncInterface(goMockCtrl)
+	testRepos = git.NewMockRepositories(goMockCtrl)
 	testMetrics = metrics.NewMockPrometheusInterface(goMockCtrl)
 	testDelegate = runner.NewMockDelegateInterface(goMockCtrl)
 
@@ -169,7 +169,7 @@ var _ = BeforeSuite(func() {
 		Recorder:               k8sManager.GetEventRecorderFor("terraform-applier"),
 		Clock:                  fakeClock,
 		Queue:                  testControllerQueue,
-		GitSyncPool:            testGitSyncPool,
+		Repos:                  testRepos,
 		Log:                    testLogger.Named("manager"),
 		MinIntervalBetweenRuns: minIntervalBetweenRunsDuration,
 		RunStatus:              runStatus,
@@ -214,7 +214,7 @@ var _ = BeforeSuite(func() {
 		Recorder:               k8sManager.GetEventRecorderFor("terraform-applier"),
 		KubeClt:                fakeClient,
 		Queue:                  testRunnerQueue,
-		GitSyncPool:            testGitSyncPool,
+		Repos:                  testRepos,
 		Delegate:               testDelegate,
 		Log:                    testLogger.Named("runner"),
 		Metrics:                testMetrics,
