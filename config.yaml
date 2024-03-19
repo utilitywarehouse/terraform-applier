@@ -1,6 +1,10 @@
-repositories:
-  terraform-applier:
-    remote: git@github.com:utilitywarehouse/terraform-applier.git
-    branch: master
-    revision: HEAD
-    depth: 0
+git_mirror:
+  defaults:
+    root:  /src
+    interval: 30s
+    git_gc:  always
+    auth: 
+      ssh_key_path: /etc/git-secret/ssh
+      ssh_known_hosts_path: /etc/git-secret/known_hosts
+  repositories:
+    - remote: git@github.com:utilitywarehouse/terraform-applier.git

@@ -516,32 +516,6 @@ func run(c *cli.Context) {
 		os.Exit(1)
 	}
 
-	git.EnableMetrics("terraform_applier", runTimeMetrics.Registry)
-
-	gitSyncPool, err := git.NewSyncPool(
-		ctx,
-		reposRootPath,
-		git.SyncOptions{
-			GitSSHKeyPath:        c.String("git-ssh-key-file"),
-			GitSSHKnownHostsPath: c.String("git-ssh-known-hosts-file"),
-			Interval:             30 * time.Second,
-			WithCheckout:         true,
-		},
-		logger.Named("git-sync"),
-	)
-	if err != nil {
-		setupLog.Error("could not create git sync pool", "err", err)
-		os.Exit(1)
-	}
-
-	for name, repoConfig := range conf.Repositories {
-		err := gitSyncPool.AddRepository(name, repoConfig, nil)
-		if err != nil {
-			setupLog.Error("unable to add repository to git sync pool", "name", name, "err", err)
-			os.Exit(1)
-		}
-	}
-
 	// Find the requested version of terraform and log the version
 	// information
 	execPath, cleanup, err := findTerraformExecPath(ctx, terraformPath, terraformVersion)
