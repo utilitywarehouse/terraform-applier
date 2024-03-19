@@ -1,3 +1,10 @@
+resource "null_resource" "echo_version" {
+  provisioner "local-exec" {
+    command = "echo 'as-test-module-01'"
+  }
+}
+
+
 resource "null_resource" "echo_hw" {
   provisioner "local-exec" {
     command = "echo 'Hello World'"
