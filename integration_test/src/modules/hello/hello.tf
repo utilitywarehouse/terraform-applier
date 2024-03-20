@@ -4,6 +4,8 @@ resource "null_resource" "echo_version" {
   }
 }
 
+resource "google_bigquery_dataset" "test" {
+}
 
 resource "null_resource" "echo_hw" {
   provisioner "local-exec" {
