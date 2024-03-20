@@ -128,7 +128,7 @@
                         <span class='badge rounded-pill text-bg-secondary'>plan only</span>
                         {{end}}
                     </h3>
-                    <div class="">
+                    <div>
                         <button data-namespace="{{ .Namespace }}" data-name="{{ .Name }}" data-plan-only="true"
                             class="force-button force-module-button btn btn-info btn-s">
                             <strong>Force Plan</strong>
@@ -139,48 +139,103 @@
                         </button>
                     </div>
                 </div>
-                <p class="fw-semibold">Status:
-                    <span {{if or (eq .Status.StateReason "PlanedDriftDetected" ) (eq .Status.StateReason "Applied" ) }}
-                        class='text-primary' {{else if eq .Status.CurrentState "Errored" }} class='text-danger' {{end}}>
-                        {{.Status.CurrentState}} ({{.Status.StateReason}})
-                    </span>
-                </p>
-                <div class="d-flex flex-row">
-                    <div class="pe-4"><span class="fw-semibold">Repo:</span> {{ .Spec.RepoName }}</div>
-                    <div class="pe-4"><span class="fw-semibold">Path:</span> {{ .Spec.Path }}</div>
-                </div>
-                <p><span class="fw-semibold">Schedule:</span> {{ .Spec.Schedule }}</p>
-                <p><span class="fw-semibold">Message:</span> {{.Status.StateMessage}}</p>
+
+                <dl>
+                    <div class="row">
+                        <div class="col-6">
+                            <dt>Status</dt>
+                            <dd class="fw-semibold">
+                                <span {{if or (eq .Status.StateReason "PlanedDriftDetected" ) (eq
+                                    .Status.StateReason "Applied" ) }} class='text-primary' {{else if eq
+                                    .Status.CurrentState "Errored" }} class='text-danger' {{end}}>
+                                    {{.Status.CurrentState}} ({{.Status.StateReason}})
+                                </span>
+                            </dd>
+                        </div>
+                        {{if .Spec.Schedule}}
+                        <div class="col-6">
+                            <dt>Schedule</dt>
+                            <dd>{{ .Spec.Schedule }}</dd>
+                        </div>
+                        {{end}}
+
+                        <div class="w-100 d-none d-md-block"></div>
+
+                        <div class="col-6">
+                            <dt>Repo</dt>
+                            <dd>
+                                <a href="{{ commitURL .Spec.RepoURL `` }}">
+                                    {{.Spec.RepoURL }}</a>
+                            </dd>
+                        </div>
+                        <div class="col-2">
+                            <dt>Ref</dt>
+                            <dd>{{.Spec.RepoRef}}</dd>
+                        </div>
+                        <div class="col-4">
+                            <dt>Path</dt>
+                            <dd><a href="{{commitURL .Spec.RepoURL ``}}/tree/{{.Spec.RepoRef}}/{{ .Spec.Path }}">
+                                    {{ .Spec.Path }}</a>
+                            </dd>
+                        </div>
+                        <div class="w-100 d-none d-md-block"></div>
+                        <div class="col-12">
+                            <dt>Message</dt>
+                            <dd>{{.Status.StateMessage}}</dd>
+                        </div>
+                    </div>
+                </dl>
             </div>
         </div>
         <div id="{{sanitizedUniqueName .}}-info">
             <div class="card-body">
                 <div>
-                    <div class="d-flex flex-row justify-content-between">
-                        <div class="d-flex flex-column mb-3">
-                            <div class="d-flex flex-row">
-                                <p class="pe-4"><span class="fw-semibold">Type:</span> {{.Status.RunType}}</p>
-                                <p><span class="fw-semibold">Started:</span> {{ formattedTime .Status.RunStartedAt }}
+                    <dl>
+                        <div class="row">
+                            <div class="col-6">
+                                <dt>Last run type</dt>
+                                <dd>{{ .Status.RunType }}</dd>
+                            </div>
+                            <div class="col-6">
+                                <dt>Last run started at</dt>
+                                <dd>{{ formattedTime .Status.RunStartedAt }}
                                     (took {{ duration
                                     .Status.RunDuration }})
-                                </p>
+                                </dd>
                             </div>
-                            <div class=""><span class="fw-semibold">Commit Hash:</span>
-                                <a href="{{ commitURL .Status.RemoteURL .Status.RunCommitHash}}">
-                                    {{.Status.RunCommitHash}}</a>
+                            <div class="col-6">
+                                <dt>Last run commit hash</dt>
+                                <dd><a href="{{ commitURL .Status.RemoteURL .Status.RunCommitHash}}">
+                                        {{.Status.RunCommitHash}}</a>
+                                </dd>
                             </div>
-                            <div class=""><span class="fw-semibold">Commit Message:</span> {{.Status.RunCommitMsg}}
+                            <div class="col-6">
+                                <dt>Last run commit message</dt>
+                                <dd> {{.Status.RunCommitMsg}}</dd>
+                            </div>
+                            <div class="col-6">
+                                <dt>Last applied commit hash</dt>
+                                <dd><a href="{{ commitURL .Status.RemoteURL .Status.LastApplyInfo.CommitHash}}">
+                                        {{.Status.LastApplyInfo.CommitHash}}
+                                    </a>
+                                </dd>
+                            </div>
+                            <div class="col-6">
+                                <dt>Last applied at</dt>
+                                <dd>{{ formattedTime .Status.LastApplyInfo.Timestamp }}</dd>
                             </div>
                         </div>
-                    </div>
+                    </dl>
                 </div>
                 <div>
                     <nav>
                         <div class="nav nav-tabs" role="tablist">
                             <a class="nav-link active" href="#{{sanitizedUniqueName .}}-nav-plan" data-bs-toggle="tab"
-                                role="tab">Last Run Output</a>
+                                role="tab">Last Run Output
+                            </a>
                             <a class="nav-link" href="#{{sanitizedUniqueName .}}-nav-apply" data-bs-toggle="tab"
-                                role="tab">Last Apply Output</a>
+                                role="tab">Last Apply Output
+                            </a>
                         </div>
                     </nav>
                     <div class="tab-content">
@@ -191,14 +246,6 @@
                             </pre>
                         </div>
                         <div class="tab-pane fade" id="{{sanitizedUniqueName .}}-nav-apply" role="tabpanel">
-                            <div class="d-flex flex-row m-2">
-                                <div class="pe-4"><span class="fw-semibold">Commit:</span>
-                                    <a
-                                        href="{{ commitURL .Status.RemoteURL .Status.LastApplyInfo.CommitHash}}">{{.Status.LastApplyInfo.CommitHash}}</a>
-                                </div>
-                                <div><span class="fw-semibold">At:</span> {{ formattedTime
-                                    .Status.LastApplyInfo.Timestamp }}</div>
-                            </div>
                             <pre class="file-output font-monospace p-3"
                                 style="max-height: 40em; background-color: #f5f5f5;">
 <!-- to remove left margin on first line -->
