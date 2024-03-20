@@ -408,7 +408,7 @@ func (r *Runner) setFailedStatus(req Request, module *tfaplv1beta1.Module, reaso
 	module.Status.StateMessage = msg
 	module.Status.StateReason = reason
 
-	r.Recorder.Event(module, corev1.EventTypeWarning, reason, msg)
+	r.Recorder.Event(module, corev1.EventTypeWarning, reason, fmt.Sprintf("%q", msg))
 
 	if err := r.patchStatus(context.Background(), req.NamespacedName, module.Status); err != nil {
 		r.Log.With("module", req.NamespacedName).Error("unable to set failed status", "err", err)
