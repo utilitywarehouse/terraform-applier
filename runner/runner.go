@@ -256,7 +256,8 @@ func (r *Runner) runTF(
 	_, err := te.init(ctx, backendConf)
 	if err != nil {
 		msg := fmt.Sprintf("unable to init module: err:%s", err)
-		log.Error(msg)
+		// tf err contains new lines not suitable logging
+		log.Error("unable to init module", "err", fmt.Sprintf("%q", err))
 		r.setFailedStatus(req, module, tfaplv1beta1.ReasonInitialiseFailed, msg, r.Clock.Now())
 		return false
 	}
@@ -282,7 +283,8 @@ func (r *Runner) runTF(
 	if err != nil {
 		module.Status.RunOutput = planOut
 		msg := fmt.Sprintf("unable to plan module: err:%s", err)
-		log.Error(msg)
+		// tf err contains new lines not suitable logging
+		log.Error("unable to plan module", "err", fmt.Sprintf("%q", err))
 		r.setFailedStatus(req, module, tfaplv1beta1.ReasonPlanFailed, msg, r.Clock.Now())
 		return false
 	}
@@ -299,7 +301,8 @@ func (r *Runner) runTF(
 	savedPlan, err := te.showPlanFileRaw(ctx)
 	if err != nil {
 		msg := fmt.Sprintf("unable to get saved plan: err:%s", err)
-		log.Error(msg)
+		// tf err contains new lines not suitable logging
+		log.Error("unable to get saved plan", "err", fmt.Sprintf("%q", err))
 		r.setFailedStatus(req, module, tfaplv1beta1.ReasonPlanFailed, msg, r.Clock.Now())
 		return false
 	}
@@ -341,11 +344,12 @@ func (r *Runner) runTF(
 	if err != nil {
 		module.Status.RunOutput = savedPlan + applyOut
 		msg := fmt.Sprintf("unable to apply module: err:%s", err)
-		log.Error(msg)
+		// tf err contains new lines not suitable logging
+		log.Error("unable to apply module", "err", fmt.Sprintf("%q", err))
 		r.setFailedStatus(req, module, tfaplv1beta1.ReasonApplyFailed, msg, r.Clock.Now())
 		return false
 	}
-
+	module.Status.RunOutput = savedPlan + applyOut
 	module.Status.LastApplyInfo = tfaplv1beta1.OutputStats{Timestamp: &metav1.Time{Time: r.Clock.Now()}, CommitHash: commitHash, Output: savedPlan + applyOut}
 
 	// extract last line of output
