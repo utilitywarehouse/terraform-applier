@@ -18,6 +18,7 @@ package integration_test
 
 import (
 	"context"
+	"log/slog"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -25,8 +26,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-logr/logr"
 	"github.com/golang/mock/gomock"
-	"github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/hc-install/product"
 	"github.com/hashicorp/hc-install/releases"
 	"github.com/hashicorp/hc-install/src"
@@ -44,7 +45,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	tfaplv1beta1 "github.com/utilitywarehouse/terraform-applier/api/v1beta1"
 	"github.com/utilitywarehouse/terraform-applier/controllers"
@@ -72,7 +72,7 @@ var (
 
 	fakeClock  *sysutil.FakeClock
 	goMockCtrl *gomock.Controller
-	testLogger hclog.Logger
+	testLogger *slog.Logger
 	// testControllerQueue only used for controller behaviour testing
 	testControllerQueue       chan runner.Request
 	testFilterControllerQueue chan runner.Request
@@ -94,10 +94,21 @@ var (
 func TestAPIs(t *testing.T) {
 	RegisterFailHandler(Fail)
 
-	RunSpecs(t, "Controller Suite")
+	// fetch the current config
+	suiteConfig, reporterConfig := GinkgoConfiguration()
+	// adjust it
+	suiteConfig.SkipStrings = []string{"NEVER-RUN"}
+	reporterConfig.Verbose = true
+	reporterConfig.FullTrace = true
+	// pass it in to RunSpecs
+	RunSpecs(t, "Controller Suite", suiteConfig, reporterConfig)
 }
 
 var _ = BeforeSuite(func() {
+	testLogger = slog.New(slog.NewTextHandler(GinkgoWriter, &slog.HandlerOptions{
+		Level: slog.Level(-8),
+	}))
+
 	var err error
 	// Download test assets to ./bin dir
 	k8sAssetPath, err := exec.Command(
@@ -109,7 +120,7 @@ var _ = BeforeSuite(func() {
 
 	Expect(os.Setenv("KUBEBUILDER_ASSETS", string(k8sAssetPath))).To(Succeed())
 
-	logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true)))
+	logf.SetLogger(logr.FromSlogHandler(testLogger.Handler()))
 
 	ctx, cancel = context.WithCancel(context.TODO())
 
@@ -138,12 +149,6 @@ var _ = BeforeSuite(func() {
 	})
 	Expect(err).ToNot(HaveOccurred())
 
-	testLogger = hclog.New(&hclog.LoggerOptions{
-		Name:            "test",
-		Level:           hclog.LevelFromString("TRACE"),
-		IncludeLocation: false,
-	})
-
 	fakeClock = &sysutil.FakeClock{
 		T: time.Date(01, 01, 01, 0, 0, 0, 0, time.UTC),
 	}
@@ -170,13 +175,13 @@ var _ = BeforeSuite(func() {
 		Clock:                  fakeClock,
 		Queue:                  testControllerQueue,
 		Repos:                  testRepos,
-		Log:                    testLogger.Named("manager"),
+		Log:                    testLogger.With("logger", "manager"),
 		MinIntervalBetweenRuns: minIntervalBetweenRunsDuration,
 		RunStatus:              runStatus,
 	}
 
 	testFilter = &controllers.Filter{
-		Log:                testLogger.Named("filter"),
+		Log:                testLogger.With("logger", "filter"),
 		LabelSelectorKey:   "",
 		LabelSelectorValue: "",
 	}
@@ -216,7 +221,7 @@ var _ = BeforeSuite(func() {
 		Queue:                  testRunnerQueue,
 		Repos:                  testRepos,
 		Delegate:               testDelegate,
-		Log:                    testLogger.Named("runner"),
+		Log:                    testLogger.With("logger", "runner"),
 		Metrics:                testMetrics,
 		TerraformExecPath:      execPath,
 		AWSSecretsEngineConfig: testVaultAWSConf,

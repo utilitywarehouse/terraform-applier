@@ -3,11 +3,11 @@ package runner
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"regexp"
 	"sync"
 	"time"
 
-	"github.com/hashicorp/go-hclog"
 	tfaplv1beta1 "github.com/utilitywarehouse/terraform-applier/api/v1beta1"
 	"github.com/utilitywarehouse/terraform-applier/git"
 	"github.com/utilitywarehouse/terraform-applier/metrics"
@@ -39,7 +39,7 @@ type Runner struct {
 	KubeClt                kubernetes.Interface
 	Repos                  git.Repositories
 	Queue                  <-chan Request
-	Log                    hclog.Logger
+	Log                    *slog.Logger
 	Delegate               DelegateInterface
 	Metrics                metrics.PrometheusInterface
 	TerraformExecPath      string

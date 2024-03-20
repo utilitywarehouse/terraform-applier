@@ -19,6 +19,7 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"sync"
 	"time"
 
@@ -29,7 +30,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	"github.com/hashicorp/go-hclog"
 	"github.com/robfig/cron/v3"
 	tfaplv1beta1 "github.com/utilitywarehouse/terraform-applier/api/v1beta1"
 	"github.com/utilitywarehouse/terraform-applier/git"
@@ -37,6 +37,8 @@ import (
 	"github.com/utilitywarehouse/terraform-applier/sysutil"
 	corev1 "k8s.io/api/core/v1"
 )
+
+const trace = slog.Level(-8)
 
 // ModuleReconciler reconciles a Module object
 type ModuleReconciler struct {
@@ -46,7 +48,7 @@ type ModuleReconciler struct {
 	Clock                  sysutil.ClockInterface
 	Repos                  git.Repositories
 	Queue                  chan<- runner.Request
-	Log                    hclog.Logger
+	Log                    *slog.Logger
 	MinIntervalBetweenRuns time.Duration
 	RunStatus              *sync.Map
 }
@@ -70,7 +72,7 @@ type ModuleReconciler struct {
 func (r *ModuleReconciler) Reconcile(ctx context.Context, req reconcile.Request) (ctrl.Result, error) {
 	log := r.Log.With("module", req.NamespacedName)
 
-	log.Trace("reconciling...")
+	log.Log(ctx, trace, "reconciling...")
 
 	var module tfaplv1beta1.Module
 	if err := r.Get(ctx, req.NamespacedName, &module); err != nil {

@@ -8,11 +8,11 @@ import (
 	"fmt"
 	"html/template"
 	"io"
+	"log/slog"
 	"net/http"
 	"sync"
 
 	"github.com/gorilla/mux"
-	"github.com/hashicorp/go-hclog"
 	tfaplv1beta1 "github.com/utilitywarehouse/terraform-applier/api/v1beta1"
 	"github.com/utilitywarehouse/terraform-applier/runner"
 	"github.com/utilitywarehouse/terraform-applier/webserver/oidc"
@@ -21,13 +21,15 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+const trace = slog.Level(-8)
+
 //go:embed static
 var staticFiles embed.FS
 
 //go:embed templates/status.html
 var statusHTML string
 
-var log hclog.Logger
+var log *slog.Logger
 
 // WebServer struct
 type WebServer struct {
@@ -37,7 +39,7 @@ type WebServer struct {
 	KubeClient    kubernetes.Interface
 	RunQueue      chan<- runner.Request
 	RunStatus     *sync.Map
-	Log           hclog.Logger
+	Log           *slog.Logger
 }
 
 // StatusPageHandler implements the http.Handler interface and serves a status page with info about the most recent applier run.
@@ -45,12 +47,12 @@ type StatusPageHandler struct {
 	Template      *template.Template
 	Authenticator *oidc.Authenticator
 	ClusterClt    client.Client
-	Log           hclog.Logger
+	Log           *slog.Logger
 }
 
 // ServeHTTP populates the status page template with data and serves it when there is a request.
 func (s *StatusPageHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	s.Log.Trace("Applier status request")
+	s.Log.Log(r.Context(), trace, "Applier status request")
 
 	if s.Authenticator != nil {
 		_, err := s.Authenticator.Authenticate(r.Context(), w, r)
@@ -84,7 +86,7 @@ func (s *StatusPageHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		log.Error("Request failed: %v", err)
 		return
 	}
-	s.Log.Trace("Request completed successfully")
+	s.Log.Log(r.Context(), trace, "Request completed successfully")
 }
 
 // ForceRunHandler implements the http.Handle interface and serves an API
@@ -95,7 +97,7 @@ type ForceRunHandler struct {
 	KubeClt       kubernetes.Interface
 	RunQueue      chan<- runner.Request
 	RunStatus     *sync.Map
-	Log           hclog.Logger
+	Log           *slog.Logger
 }
 
 // ServeHTTP handles requests for forcing a run by attempting to add to the

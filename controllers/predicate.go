@@ -1,9 +1,10 @@
 package controllers
 
 import (
+	"context"
 	"fmt"
+	"log/slog"
 
-	"github.com/hashicorp/go-hclog"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
@@ -13,7 +14,7 @@ type Filter struct {
 	predicate.Funcs
 	LabelSelectorKey   string
 	LabelSelectorValue string
-	Log                hclog.Logger
+	Log                *slog.Logger
 }
 
 func (f Filter) Create(e event.CreateEvent) bool {
@@ -52,7 +53,7 @@ func (f Filter) Update(e event.UpdateEvent) bool {
 		return true
 	}
 
-	f.Log.Trace("skipping module update event", "module", fmt.Sprintf("%s/%s", e.ObjectNew.GetNamespace(), e.ObjectNew.GetName()))
+	f.Log.Log(context.TODO(), trace, "skipping module update event", "module", fmt.Sprintf("%s/%s", e.ObjectNew.GetNamespace(), e.ObjectNew.GetName()))
 	return false
 }
 
