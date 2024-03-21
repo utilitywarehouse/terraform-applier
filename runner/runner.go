@@ -368,7 +368,7 @@ func (r *Runner) runTF(
 
 func (r *Runner) SetProgressingStatus(objectKey types.NamespacedName, m *tfaplv1beta1.Module, msg string) error {
 	m.Status.CurrentState = string(tfaplv1beta1.StatusRunning)
-	m.Status.StateMessage = msg
+	m.Status.StateMessage = tfaplv1beta1.NormaliseStateMsg(msg)
 	return r.patchStatus(context.Background(), objectKey, m.Status)
 }
 
@@ -382,7 +382,7 @@ func (r *Runner) SetRunStartedStatus(req Request, m *tfaplv1beta1.Module, msg, c
 	m.Status.RunCommitHash = commitHash
 	m.Status.RunCommitMsg = commitMsg
 	m.Status.RemoteURL = remoteURL
-	m.Status.StateMessage = msg
+	m.Status.StateMessage = tfaplv1beta1.NormaliseStateMsg(msg)
 	m.Status.StateReason = tfaplv1beta1.GetRunReason(req.Type)
 
 	r.Recorder.Eventf(m, corev1.EventTypeNormal, tfaplv1beta1.GetRunReason(req.Type), "%s: type:%s, commit:%s", msg, req.Type, commitHash)
@@ -393,7 +393,7 @@ func (r *Runner) SetRunStartedStatus(req Request, m *tfaplv1beta1.Module, msg, c
 func (r *Runner) SetRunFinishedStatus(objectKey types.NamespacedName, m *tfaplv1beta1.Module, reason, msg string, now time.Time) error {
 	m.Status.CurrentState = string(tfaplv1beta1.StatusReady)
 	m.Status.RunDuration = &metav1.Duration{Duration: now.Sub(m.Status.RunStartedAt.Time).Round(time.Second)}
-	m.Status.StateMessage = msg
+	m.Status.StateMessage = tfaplv1beta1.NormaliseStateMsg(msg)
 	m.Status.StateReason = reason
 
 	r.Recorder.Event(m, corev1.EventTypeNormal, reason, msg)
@@ -405,7 +405,7 @@ func (r *Runner) setFailedStatus(req Request, module *tfaplv1beta1.Module, reaso
 
 	module.Status.CurrentState = string(tfaplv1beta1.StatusErrored)
 	module.Status.RunDuration = &metav1.Duration{Duration: now.Sub(module.Status.RunStartedAt.Time).Round(time.Second)}
-	module.Status.StateMessage = msg
+	module.Status.StateMessage = tfaplv1beta1.NormaliseStateMsg(msg)
 	module.Status.StateReason = reason
 
 	r.Recorder.Event(module, corev1.EventTypeWarning, reason, fmt.Sprintf("%q", msg))
