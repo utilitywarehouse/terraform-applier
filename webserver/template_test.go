@@ -25,6 +25,8 @@ func Test_ExecuteTemplate(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{Name: "admins", Namespace: "foo"},
 			Spec: tfaplv1beta1.ModuleSpec{
 				Schedule: "00 */1 * * *",
+				RepoURL:  "https://github.com/utilitywarehouse/terraform-applier.git",
+				RepoRef:  "prj-dev",
 				Path:     "foo/admins",
 			},
 			Status: tfaplv1beta1.ModuleStatus{
@@ -38,7 +40,8 @@ func Test_ExecuteTemplate(t *testing.T) {
 			TypeMeta:   metav1.TypeMeta{APIVersion: "terraform-applier.uw.systems/v1beta1", Kind: "Module"},
 			ObjectMeta: metav1.ObjectMeta{Name: "users", Namespace: "foo"},
 			Spec: tfaplv1beta1.ModuleSpec{
-				Schedule: "*/30 * * * *",
+				RepoURL:  "git@github.com:utilitywarehouse/terraform-applier.git",
+				RepoRef:  "master",
 				Path:     "foo/users",
 				PlanOnly: &boolTrue,
 			},
@@ -55,8 +58,10 @@ func Test_ExecuteTemplate(t *testing.T) {
 			TypeMeta:   metav1.TypeMeta{APIVersion: "terraform-applier.uw.systems/v1beta1", Kind: "Module"},
 			ObjectMeta: metav1.ObjectMeta{Name: "groups", Namespace: "bar"},
 			Spec: tfaplv1beta1.ModuleSpec{
+				RepoURL:  "ssh://git@github.com/utilitywarehouse/terraform-applier.git",
+				RepoRef:  "as-test-module",
 				Schedule: "00 */2 * * *",
-				Path:     "dev/groups",
+				Path:     "integration_test/src/modules/hello",
 			},
 			Status: tfaplv1beta1.ModuleStatus{
 				CurrentState: "Ready",
@@ -116,6 +121,7 @@ Apply complete! Resources: 7 added, 0 changed, 0 destroyed.`,
 			TypeMeta:   metav1.TypeMeta{APIVersion: "terraform-applier.uw.systems/v1beta1", Kind: "Module"},
 			ObjectMeta: metav1.ObjectMeta{Name: "users", Namespace: "bar"},
 			Spec: tfaplv1beta1.ModuleSpec{
+				RepoURL:  "git@github.com:utilitywarehouse/terraform-applier.git",
 				Schedule: "*/15 * * * ",
 				Path:     "dev/users",
 			},

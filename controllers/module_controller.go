@@ -19,6 +19,7 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"sync"
 	"time"
 
@@ -29,7 +30,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	"github.com/hashicorp/go-hclog"
 	"github.com/robfig/cron/v3"
 	tfaplv1beta1 "github.com/utilitywarehouse/terraform-applier/api/v1beta1"
 	"github.com/utilitywarehouse/terraform-applier/git"
@@ -38,15 +38,17 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
+const trace = slog.Level(-8)
+
 // ModuleReconciler reconciles a Module object
 type ModuleReconciler struct {
 	client.Client
 	Scheme                 *runtime.Scheme
 	Recorder               record.EventRecorder
 	Clock                  sysutil.ClockInterface
-	GitSyncPool            git.SyncInterface
+	Repos                  git.Repositories
 	Queue                  chan<- runner.Request
-	Log                    hclog.Logger
+	Log                    *slog.Logger
 	MinIntervalBetweenRuns time.Duration
 	RunStatus              *sync.Map
 }
@@ -70,7 +72,7 @@ type ModuleReconciler struct {
 func (r *ModuleReconciler) Reconcile(ctx context.Context, req reconcile.Request) (ctrl.Result, error) {
 	log := r.Log.With("module", req.NamespacedName)
 
-	log.Trace("reconciling...")
+	log.Log(ctx, trace, "reconciling...")
 
 	var module tfaplv1beta1.Module
 	if err := r.Get(ctx, req.NamespacedName, &module); err != nil {
@@ -83,6 +85,17 @@ func (r *ModuleReconciler) Reconcile(ctx context.Context, req reconcile.Request)
 	if !module.ObjectMeta.DeletionTimestamp.IsZero() {
 		// TODO: what if module is in running state?
 		log.Info("module is deleting..")
+		return ctrl.Result{}, nil
+	}
+
+	// verify repoURL exists
+	// this step is required as for migration we have kept repoURL as optional
+	if module.Spec.RepoURL == "" {
+		msg := fmt.Sprintf("repoURL is required, please add repoURL instead of repoName:%s", module.Spec.RepoName)
+		log.Error(msg)
+		r.setFailedStatus(req, &module, tfaplv1beta1.ReasonSpecsParsingFailure, msg, r.Clock.Now())
+		// we don't really care about requeuing until we get an update that
+		// fixes the repoURL, so don't return an error
 		return ctrl.Result{}, nil
 	}
 
@@ -111,24 +124,24 @@ func (r *ModuleReconciler) Reconcile(ctx context.Context, req reconcile.Request)
 	}
 
 	if module.Status.RunCommitHash == "" {
-		log.Info("starting initial run")
+		log.Debug("starting initial run")
 		r.Queue <- runner.Request{NamespacedName: req.NamespacedName, Type: tfaplv1beta1.PollingRun, PlanOnly: isPlanOnly}
 		// use next poll internal as minimum queue duration as status change will not trigger Reconcile
 		return ctrl.Result{RequeueAfter: pollIntervalDuration}, nil
 	}
 
 	// check for new changes on modules path
-	changed, err := r.GitSyncPool.HasChangesForPath(ctx, module.Spec.RepoName, module.Spec.Path, module.Status.RunCommitHash)
+	hash, err := r.Repos.Hash(ctx, module.Spec.RepoURL, module.Spec.RepoRef, module.Spec.Path)
 	if err != nil {
-		msg := fmt.Sprintf("unable to determine changes in repo based on hash:%s err:%s", module.Status.RunCommitHash, err)
+		msg := fmt.Sprintf("unable to get current hash of the repo err:%s", err)
 		log.Error(msg)
 		r.setFailedStatus(req, &module, tfaplv1beta1.ReasonGitFailure, msg, r.Clock.Now())
 		// since issue is not related to module specs, requeue again in case its fixed
 		return ctrl.Result{RequeueAfter: pollIntervalDuration}, nil
 	}
 
-	if changed {
-		log.Info("new changes are available starting run")
+	if hash != module.Status.RunCommitHash {
+		log.Debug("revision is changed on module path triggering run", "lastRun", module.Status.RunCommitHash, "current", hash)
 		r.Queue <- runner.Request{NamespacedName: req.NamespacedName, Type: tfaplv1beta1.PollingRun, PlanOnly: isPlanOnly}
 		// use next poll internal as minimum queue duration as status change will not trigger Reconcile
 		return ctrl.Result{RequeueAfter: pollIntervalDuration}, nil
@@ -151,7 +164,7 @@ func (r *ModuleReconciler) Reconcile(ctx context.Context, req reconcile.Request)
 	}
 
 	if numOfMissedRuns > 0 {
-		log.Info("starting scheduled run", "missed-runs", numOfMissedRuns)
+		log.Debug("starting scheduled run", "missed-runs", numOfMissedRuns)
 		r.Queue <- runner.Request{NamespacedName: req.NamespacedName, Type: tfaplv1beta1.ScheduledRun}
 	}
 

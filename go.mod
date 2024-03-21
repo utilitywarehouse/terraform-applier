@@ -1,12 +1,12 @@
 module github.com/utilitywarehouse/terraform-applier
 
-go 1.22
+go 1.22.0
 
 require (
+	github.com/go-logr/logr v1.4.1
 	github.com/golang/mock v1.6.0
 	github.com/gorilla/mux v1.8.1
 	github.com/gorilla/securecookie v1.1.2
-	github.com/hashicorp/go-hclog v1.6.2
 	github.com/hashicorp/go-version v1.6.0
 	github.com/hashicorp/hc-install v0.6.3
 	github.com/hashicorp/terraform-exec v0.20.0
@@ -16,8 +16,8 @@ require (
 	github.com/prometheus/client_golang v1.19.0
 	github.com/robfig/cron/v3 v3.0.1
 	github.com/urfave/cli/v2 v2.27.1
+	github.com/utilitywarehouse/git-mirror v0.0.0-20240320170707-c5188344fc50
 	github.com/utilitywarehouse/go-operational v0.0.0-20220413104526-79ce40a50281
-	go.uber.org/zap v1.27.0
 	golang.org/x/oauth2 v0.17.0
 	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/api v0.29.2
@@ -43,7 +43,6 @@ require (
 	github.com/fatih/color v1.16.0 // indirect
 	github.com/fsnotify/fsnotify v1.7.0 // indirect
 	github.com/go-jose/go-jose/v3 v3.0.3 // indirect
-	github.com/go-logr/logr v1.4.1 // indirect
 	github.com/go-logr/zapr v1.3.0 // indirect
 	github.com/go-openapi/jsonpointer v0.20.2 // indirect
 	github.com/go-openapi/jsonreference v0.20.4 // indirect
@@ -60,6 +59,7 @@ require (
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
+	github.com/hashicorp/go-hclog v1.6.2 // indirect
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
 	github.com/hashicorp/go-retryablehttp v0.7.5 // indirect
 	github.com/hashicorp/go-rootcerts v1.0.2 // indirect
@@ -92,6 +92,7 @@ require (
 	github.com/xrash/smetrics v0.0.0-20231213231151-1d8dd44e695e // indirect
 	github.com/zclconf/go-cty v1.14.2 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
+	go.uber.org/zap v1.27.0 // indirect
 	golang.org/x/crypto v0.20.0 // indirect
 	golang.org/x/exp v0.0.0-20240222234643-814bf88cf225 // indirect
 	golang.org/x/mod v0.15.0 // indirect

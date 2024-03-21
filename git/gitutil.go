@@ -19,5 +19,5 @@ func GitSSHCommand(sshKeyPath, knownHostsFilePath string, verifyKnownHosts bool)
 		knownHostsFragment = fmt.Sprintf("-o StrictHostKeyChecking=yes -o UserKnownHostsFile=%s", knownHostsFilePath)
 	}
 
-	return fmt.Sprintf(`ssh -i %s %s`, sshKeyPath, knownHostsFragment), nil
+	return fmt.Sprintf(`ssh -q -F none -o IdentitiesOnly=yes -i %s %s`, sshKeyPath, knownHostsFragment), nil
 }

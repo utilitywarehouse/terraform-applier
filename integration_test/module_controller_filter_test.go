@@ -8,7 +8,6 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	tfaplv1beta1 "github.com/utilitywarehouse/terraform-applier/api/v1beta1"
-	"github.com/utilitywarehouse/terraform-applier/git"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
@@ -36,17 +35,16 @@ var _ = Describe("Module controller without runner with label selector", func() 
 			testFilter.LabelSelectorValue = "true"
 
 			// Trigger Job run as soon as module is created
-			testGitSyncPool.EXPECT().HashForPath(gomock.Any(), "modules", "hello-filter-test").
+			testRepos.EXPECT().Hash(gomock.Any(), "https://host.xy/dummy/repo.git", "HEAD", "hello-filter-test").
 				Return(commitHash, nil).AnyTimes()
-			testGitSyncPool.EXPECT().LogMsgForPath(gomock.Any(), "modules", "hello-filter-test").
+			testRepos.EXPECT().LogMsg(gomock.Any(), "https://host.xy/dummy/repo.git", "HEAD", "hello-filter-test").
 				Return(commitMsg, nil).AnyTimes()
-			testGitSyncPool.EXPECT().RepositoryConfig(gomock.Any()).Return(git.RepositoryConfig{Remote: "github.com/org/repo"}, nil).AnyTimes()
 		})
 
 		It("Should send module with valid selector label selector to job queue", func() {
 			const (
 				moduleName = "filter-test-module1"
-				repo       = "modules"
+				repoURL    = "https://host.xy/dummy/repo.git"
 				path       = "hello-filter-test"
 			)
 
@@ -59,7 +57,7 @@ var _ = Describe("Module controller without runner with label selector", func() 
 					Namespace: moduleNamespace,
 					Labels:    map[string]string{labelSelectorKey: "true"},
 				},
-				Spec: tfaplv1beta1.ModuleSpec{Schedule: "1 * * * *", RepoName: repo, Path: path},
+				Spec: tfaplv1beta1.ModuleSpec{Schedule: "1 * * * *", RepoURL: repoURL, Path: path},
 			}
 			Expect(k8sClient.Create(ctx, module)).Should(Succeed())
 
@@ -84,7 +82,7 @@ var _ = Describe("Module controller without runner with label selector", func() 
 		It("Should not send module with valid selector label key but invalid value to job queue", func() {
 			const (
 				moduleName = "filter-test-module2"
-				repo       = "modules"
+				repoURL    = "https://host.xy/dummy/repo.git"
 				path       = "hello-filter-test"
 			)
 
@@ -97,7 +95,7 @@ var _ = Describe("Module controller without runner with label selector", func() 
 					Namespace: moduleNamespace,
 					Labels:    map[string]string{labelSelectorKey: "false"},
 				},
-				Spec: tfaplv1beta1.ModuleSpec{Schedule: "1 * * * *", RepoName: repo, Path: path},
+				Spec: tfaplv1beta1.ModuleSpec{Schedule: "1 * * * *", RepoURL: repoURL, Path: path},
 			}
 			Expect(k8sClient.Create(ctx, module)).Should(Succeed())
 
@@ -122,7 +120,7 @@ var _ = Describe("Module controller without runner with label selector", func() 
 		It("Should not send module with missing selector label selector to job queue", func() {
 			const (
 				moduleName = "filter-test-module3"
-				repo       = "modules"
+				repoURL    = "https://host.xy/dummy/repo.git"
 				path       = "hello-filter-test"
 			)
 
@@ -135,7 +133,7 @@ var _ = Describe("Module controller without runner with label selector", func() 
 					Namespace: moduleNamespace,
 					Labels:    map[string]string{labelSelectorKeyInvalid: "true"},
 				},
-				Spec: tfaplv1beta1.ModuleSpec{Schedule: "1 * * * *", RepoName: repo, Path: path},
+				Spec: tfaplv1beta1.ModuleSpec{Schedule: "1 * * * *", RepoURL: repoURL, Path: path},
 			}
 			Expect(k8sClient.Create(ctx, module)).Should(Succeed())
 
@@ -160,7 +158,7 @@ var _ = Describe("Module controller without runner with label selector", func() 
 		It("Should not send module with mo labels to job queue", func() {
 			const (
 				moduleName = "filter-test-module4"
-				repo       = "modules"
+				repoURL    = "https://host.xy/dummy/repo.git"
 				path       = "hello-filter-test"
 			)
 
@@ -172,7 +170,7 @@ var _ = Describe("Module controller without runner with label selector", func() 
 					Name:      moduleName,
 					Namespace: moduleNamespace,
 				},
-				Spec: tfaplv1beta1.ModuleSpec{Schedule: "1 * * * *", RepoName: repo, Path: path},
+				Spec: tfaplv1beta1.ModuleSpec{Schedule: "1 * * * *", RepoURL: repoURL, Path: path},
 			}
 			Expect(k8sClient.Create(ctx, module)).Should(Succeed())
 

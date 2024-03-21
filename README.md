@@ -19,7 +19,8 @@ kind: Module
 metadata:
   name: hello
 spec:
-  repoName: terraform-applier
+  repoURL: git@github.com:utilitywarehouse/terraform-applier.git
+  repoRef: master
   path: dev/hello
   schedule: "00 */1 * * *"
   planOnly: false
@@ -143,26 +144,29 @@ it will not do `apply` even if drift is detected.
 Controller will force shutdown on current stage run if it takes more time then `TERMINATION_GRACE_PERIOD` set on controller.
 
 ### Git Sync
-
-Terraform-applier has built in git sync functionality, it will periodically pull files down from a repository and make it available for modules.
-it supports multiple repositories, use following config to add repositories. config is map of repository name and repo config.
-modules must use this repository name in CRD as `repoName` to reference a repository. git-sync only supports 1 branch and revision per repository.
-all repositories will be cloned to given `repos-root-path` path.
+Terraform-applier uses [git-mirror](https://github.com/utilitywarehouse/git-mirror) package to sync git repositories. 
+This package supports mirroring multiple repositories and all available references.
+Because of this terraform-applier can also support different revisions on same repo. it can be set in module CRD by `repoRef` field. 
+Use following config to add repositories. supported urls formats are
+'git@host.xz:org/repo.git','ssh://git@host.xz/org/repo.git' or 'https://host.xz/org/repo.git'
 
 ```yaml
-repositories:
-  terraform-applier:
-    remote: git@github.com:utilitywarehouse/terraform-applier.git
-    branch: master
-    revision: HEAD
-    depth: 0
-  another-repo:
-    remote: git@github.com/org/another-repo.git
+git_mirror:
+  defaults:
+    interval: 1m # defaults to 30s
+    git_gc:  always # defaults to always
+    auth: 
+      ssh_key_path: /etc/git-secret/ssh # defaults to --git-ssh-key-file flag
+      ssh_known_hosts_path: /etc/git-secret/known_hosts # defaults to --git-ssh-known-hosts
+  repositories:
+    - remote: git@github.com:utilitywarehouse/terraform-applier.git
+    - remote: git@github.com:utilitywarehouse/other-repo.git
 ```
 
 ### Controller config
 
-- `--repos-root-path (REPOS_ROOT_PATH)` - (default: `/src`) Absolute path to the directory containing all repositories of the modules. The immediate subdirectories of this directory should contain the module repo directories and directory name should match repoName referenced in module.
+- `--repos-root-path (REPOS_ROOT_PATH)` - (default: `/src`) Absolute path to the directory containing all repositories of the modules. 
+  This dir will be cleared on start.
 - `--config (TF_APPLIER_CONFIG)` - (default: `/config/config.yaml`) Path to the tf applier config file containing repository config.
 - `--min-interval-between-runs (MIN_INTERVAL_BETWEEN_RUNS)` - (default: `60`) The minimum interval in seconds, user can set between 2 consecutive runs. This value defines the frequency of runs.
 - `--termination-grace-period (TERMINATION_GRACE_PERIOD)` - (default: `60`) Termination grace period is the ime given to

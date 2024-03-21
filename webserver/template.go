@@ -58,5 +58,9 @@ func commitURL(remoteURL, hash string) string {
 	remoteURL = strings.TrimPrefix(remoteURL, "git@")
 	remoteURL = strings.TrimSuffix(remoteURL, ".git")
 	remoteURL = strings.ReplaceAll(remoteURL, ":", "/")
+
+	if hash == "" {
+		return fmt.Sprintf("https://%s", remoteURL)
+	}
 	return fmt.Sprintf("https://%s/commit/%s", remoteURL, hash)
 }

@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -14,7 +15,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/hashicorp/go-hclog"
+	"github.com/go-logr/logr"
 	"github.com/hashicorp/go-version"
 	hcinstall "github.com/hashicorp/hc-install"
 	"github.com/hashicorp/hc-install/fs"
@@ -23,8 +24,8 @@ import (
 	"github.com/hashicorp/hc-install/src"
 	"github.com/hashicorp/terraform-exec/tfexec"
 	"github.com/urfave/cli/v2"
-	"go.uber.org/zap/zapcore"
 
+	"github.com/utilitywarehouse/git-mirror/pkg/mirror"
 	"github.com/utilitywarehouse/terraform-applier/git"
 	"github.com/utilitywarehouse/terraform-applier/metrics"
 	"github.com/utilitywarehouse/terraform-applier/runner"
@@ -47,7 +48,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
-	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	runTimeMetrics "sigs.k8s.io/controller-runtime/pkg/metrics"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
@@ -57,7 +57,8 @@ import (
 )
 
 var (
-	logger            hclog.Logger
+	loggerLevel       = new(slog.LevelVar)
+	logger            *slog.Logger
 	oidcAuthenticator *oidc.Authenticator
 
 	scheme = runtime.NewScheme()
@@ -72,12 +73,12 @@ var (
 	watchNamespaces    []string
 	globalRunEnv       map[string]string
 
-	zapLevelStrings = map[string]zapcore.Level{
-		"trace": zapcore.DebugLevel,
-		"debug": zapcore.DebugLevel,
-		"info":  zapcore.InfoLevel,
-		"warn":  zapcore.WarnLevel,
-		"error": zapcore.ErrorLevel,
+	levelStrings = map[string]slog.Level{
+		"trace": slog.Level(-8),
+		"debug": slog.LevelDebug,
+		"info":  slog.LevelInfo,
+		"warn":  slog.LevelWarn,
+		"error": slog.LevelError,
 	}
 
 	flags = []cli.Flag{
@@ -252,15 +253,17 @@ func init() {
 	utilruntime.Must(tfaplv1beta1.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
 
-	logger = hclog.New(&hclog.LoggerOptions{
-		Name:            "terraform-applier",
-		Level:           hclog.Info,
-		IncludeLocation: false,
-	})
+	loggerLevel.Set(slog.LevelInfo)
+	logger = slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
+		Level: loggerLevel,
+	}))
 }
 
 func validate(c *cli.Context) {
-	logger.SetLevel(hclog.LevelFromString(logLevel))
+	// set log level according to argument
+	if v, ok := levelStrings[strings.ToLower(logLevel)]; ok {
+		loggerLevel.Set(v)
+	}
 
 	if c.IsSet("module-label-selector") {
 		labelKV := strings.Split(c.String("module-label-selector"), "=")
@@ -429,6 +432,29 @@ func cleanupTmpDir() {
 	}
 }
 
+func applyGitDefaults(c *cli.Context, mirrorConf mirror.RepoPoolConfig) mirror.RepoPoolConfig {
+	// always override root as we use root path passed as argument on controller
+	mirrorConf.Defaults.Root = reposRootPath
+
+	if mirrorConf.Defaults.GitGC == "" {
+		mirrorConf.Defaults.GitGC = "always"
+	}
+
+	if mirrorConf.Defaults.Interval == 0 {
+		mirrorConf.Defaults.Interval = 30 * time.Second
+	}
+
+	if mirrorConf.Defaults.Auth.SSHKeyPath == "" {
+		mirrorConf.Defaults.Auth.SSHKeyPath = c.String("git-ssh-key-file")
+	}
+
+	if mirrorConf.Defaults.Auth.SSHKnownHostsPath == "" {
+		mirrorConf.Defaults.Auth.SSHKnownHostsPath = c.String("git-ssh-known-hosts-file")
+	}
+
+	return mirrorConf
+}
+
 func main() {
 	app := &cli.App{
 		Name: "terraform-applier",
@@ -453,13 +479,7 @@ func main() {
 func run(c *cli.Context) {
 	ctx, cancel := context.WithCancel(c.Context)
 
-	setupLog := logger.Named("setup")
-
-	opts := zap.Options{
-		Development: true,
-		Level:       zapLevelStrings[strings.ToLower(logLevel)],
-	}
-	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
+	ctrl.SetLogger(logr.FromSlogHandler(logger.Handler()))
 
 	// runStatus keeps track of currently running modules
 	runStatus := new(sync.Map)
@@ -474,34 +494,21 @@ func run(c *cli.Context) {
 
 	conf, err := parseConfigFile(c.String("config"))
 	if err != nil {
-		setupLog.Error("unable to parse tf applier config file", "err", err)
+		logger.Error("unable to parse tf applier config file", "err", err)
 		os.Exit(1)
 	}
 
-	git.EnableMetrics("terraform_applier", runTimeMetrics.Registry)
+	// setup git-mirror
+	conf.GitMirror = applyGitDefaults(c, conf.GitMirror)
 
-	gitSyncPool, err := git.NewSyncPool(
-		ctx,
-		reposRootPath,
-		git.SyncOptions{
-			GitSSHKeyPath:        c.String("git-ssh-key-file"),
-			GitSSHKnownHostsPath: c.String("git-ssh-known-hosts-file"),
-			Interval:             30 * time.Second,
-			WithCheckout:         true,
-		},
-		logger.Named("git-sync"),
-	)
+	mirror.EnableMetrics("terraform_applier", runTimeMetrics.Registry)
+
+	// path to resolve strongbox
+	gitENV := []string{fmt.Sprintf("PATH=%s", os.Getenv("PATH"))}
+	repos, err := mirror.NewRepoPool(conf.GitMirror, logger.With("logger", "git-mirror"), gitENV)
 	if err != nil {
-		setupLog.Error("could not create git sync pool", "err", err)
+		logger.Error("could not create git mirror pool", "err", err)
 		os.Exit(1)
-	}
-
-	for name, repoConfig := range conf.Repositories {
-		err := gitSyncPool.AddRepository(name, repoConfig, nil)
-		if err != nil {
-			setupLog.Error("unable to add repository to git sync pool", "name", name, "err", err)
-			os.Exit(1)
-		}
 	}
 
 	// Find the requested version of terraform and log the version
@@ -509,15 +516,15 @@ func run(c *cli.Context) {
 	execPath, cleanup, err := findTerraformExecPath(ctx, terraformPath, terraformVersion)
 	defer cleanup()
 	if err != nil {
-		setupLog.Error("error finding terraform", "err", err)
+		logger.Error("error finding terraform", "err", err)
 		os.Exit(1)
 	}
 	version, err := terraformVersionString(ctx, execPath)
 	if err != nil {
-		setupLog.Error("error getting terraform version", "err", err)
+		logger.Error("error getting terraform version", "err", err)
 		os.Exit(1)
 	}
-	setupLog.Info("found terraform binary", "version", version)
+	logger.Info("found terraform binary", "version", version)
 
 	if electionID == "" {
 		electionID = generateElectionID("4ee367ac", labelSelectorKey, labelSelectorValue, watchNamespaces)
@@ -554,14 +561,14 @@ func run(c *cli.Context) {
 	}
 
 	filter := &controllers.Filter{
-		Log:                logger.Named("filter"),
+		Log:                logger.With("logger", "filter"),
 		LabelSelectorKey:   labelSelectorKey,
 		LabelSelectorValue: labelSelectorValue,
 	}
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), options)
 	if err != nil {
-		setupLog.Error("unable to start manager", "err", err)
+		logger.Error("unable to start manager", "err", err)
 		os.Exit(1)
 	}
 
@@ -571,28 +578,28 @@ func run(c *cli.Context) {
 		Recorder:               mgr.GetEventRecorderFor("terraform-applier"),
 		Clock:                  clock,
 		Queue:                  moduleQueue,
-		GitSyncPool:            gitSyncPool,
-		Log:                    logger.Named("manager"),
+		Repos:                  repos,
+		Log:                    logger.With("logger", "manager"),
 		MinIntervalBetweenRuns: time.Duration(c.Int("min-interval-between-runs")) * time.Second,
 		RunStatus:              runStatus,
 	}).SetupWithManager(mgr, filter); err != nil {
-		setupLog.Error("unable to create module controller", "err", err)
+		logger.Error("unable to create module controller", "err", err)
 		os.Exit(1)
 	}
 	//+kubebuilder:scaffold:builder
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
-		setupLog.Error("unable to set up health check", "err", err)
+		logger.Error("unable to set up health check", "err", err)
 		os.Exit(1)
 	}
 	if err := mgr.AddReadyzCheck("readyz", healthz.Ping); err != nil {
-		setupLog.Error("unable to set up ready check", "err", err)
+		logger.Error("unable to set up ready check", "err", err)
 		os.Exit(1)
 	}
 
 	kubeClient, err := kubeClient()
 	if err != nil {
-		setupLog.Error("unable to create kube client", "err", err)
+		logger.Error("unable to create kube client", "err", err)
 		os.Exit(1)
 	}
 	runner := runner.Runner{
@@ -601,8 +608,8 @@ func run(c *cli.Context) {
 		Recorder:               mgr.GetEventRecorderFor("terraform-applier"),
 		KubeClt:                kubeClient,
 		Queue:                  moduleQueue,
-		GitSyncPool:            gitSyncPool,
-		Log:                    logger.Named("runner"),
+		Repos:                  repos,
+		Log:                    logger.With("logger", "runner"),
 		Metrics:                metrics,
 		TerraformExecPath:      execPath,
 		TerminationGracePeriod: time.Duration(c.Int("termination-grace-period")) * time.Second,
@@ -622,10 +629,10 @@ func run(c *cli.Context) {
 			c.String("oidc-callback-url"),
 		)
 		if err != nil {
-			setupLog.Error("could not setup oidc authenticator", "error", err)
+			logger.Error("could not setup oidc authenticator", "error", err)
 			os.Exit(1)
 		}
-		setupLog.Info("OIDC authentication configured", "issuer", c.String("oidc-issuer"), "clientID", c.String("oidc-client-id"))
+		logger.Info("OIDC authentication configured", "issuer", c.String("oidc-issuer"), "clientID", c.String("oidc-client-id"))
 	}
 
 	webserver := &webserver.WebServer{
@@ -635,21 +642,21 @@ func run(c *cli.Context) {
 		KubeClient:    kubeClient,
 		RunQueue:      moduleQueue,
 		RunStatus:     runStatus,
-		Log:           logger.Named("webserver"),
+		Log:           logger.With("logger", "webserver"),
 	}
 
 	go runner.Start(ctx, done)
 	go func() {
 		err := webserver.Start(ctx)
 		if err != nil {
-			setupLog.Error("unable to start webserver", "err", err)
+			logger.Error("unable to start webserver", "err", err)
 		}
 	}()
 
 	go func() {
-		setupLog.Info("starting manager")
+		logger.Info("starting manager")
 		if err := mgr.Start(ctx); err != nil {
-			setupLog.Error("problem running manager", "err", err)
+			logger.Error("problem running manager", "err", err)
 		}
 	}()
 
@@ -661,7 +668,7 @@ func run(c *cli.Context) {
 		signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 
 		sig := <-sigCh
-		setupLog.Info("received Term signal, waiting for all running modules to finish before exiting", "signal", sig)
+		logger.Info("received Term signal, waiting for all running modules to finish before exiting", "signal", sig)
 
 		// signal runner to start shutting down...
 		cancel()
@@ -669,12 +676,12 @@ func run(c *cli.Context) {
 		for {
 			select {
 			case sig := <-sigCh:
-				setupLog.Error("received a second signal, force exiting", "signal", sig)
+				logger.Error("received a second signal, force exiting", "signal", sig)
 				os.Exit(1)
 
 			// wait for runner to finish
 			case <-done:
-				setupLog.Info("runner successfully shutdown")
+				logger.Info("runner successfully shutdown")
 			}
 		}
 	}(cancel)

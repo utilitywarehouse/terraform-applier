@@ -3,7 +3,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.13.0
+    controller-gen.kubebuilder.io/version: v0.14.0
   name: modules.terraform-applier.uw.systems
 spec:
   group: terraform-applier.uw.systems
@@ -54,14 +54,19 @@ spec:
         description: Module is the Schema for the modules API
         properties:
           apiVersion:
-            description: 'APIVersion defines the versioned schema of this representation
-              of an object. Servers should convert recognized schemas to the latest
-              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
             type: string
           kind:
-            description: 'Kind is a string value representing the REST resource this
-              object represents. Servers may infer this from the endpoint the client
-              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
             type: string
           metadata:
             type: object
@@ -69,8 +74,9 @@ spec:
             description: ModuleSpec defines the desired state of Module
             properties:
               backend:
-                description: List of backend config attributes passed to the Terraform
-                  init for terraform backend configuration
+                description: |-
+                  List of backend config attributes passed to the Terraform init
+                  for terraform backend configuration
                 items:
                   description: EnvVar represents an environment variable present in
                     a Container.
@@ -79,15 +85,16 @@ spec:
                       description: Name of the environment variable. Must be a C_IDENTIFIER.
                       type: string
                     value:
-                      description: 'Variable references $(VAR_NAME) are expanded using
-                        the previously defined environment variables in the container
-                        and any service environment variables. If a variable cannot
-                        be resolved, the reference in the input string will be unchanged.
-                        Double $$ are reduced to a single $, which allows for escaping
-                        the $(VAR_NAME) syntax: i.e. "$$(VAR_NAME)" will produce the
-                        string literal "$(VAR_NAME)". Escaped references will never
-                        be expanded, regardless of whether the variable exists or
-                        not. Defaults to "".'
+                      description: |-
+                        Variable references $(VAR_NAME) are expanded
+                        using the previously defined environment variables in the container and
+                        any service environment variables. If a variable cannot be resolved,
+                        the reference in the input string will be unchanged. Double $$ are reduced
+                        to a single $, which allows for escaping the $(VAR_NAME) syntax: i.e.
+                        "$$(VAR_NAME)" will produce the string literal "$(VAR_NAME)".
+                        Escaped references will never be expanded, regardless of whether the variable
+                        exists or not.
+                        Defaults to "".
                       type: string
                     valueFrom:
                       description: Source for the environment variable's value. Cannot
@@ -100,8 +107,10 @@ spec:
                               description: The key to select.
                               type: string
                             name:
-                              description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                TODO: Add other useful fields. apiVersion, kind, uid?'
+                              description: |-
+                                Name of the referent.
+                                More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                TODO: Add other useful fields. apiVersion, kind, uid?
                               type: string
                             optional:
                               description: Specify whether the ConfigMap or its key
@@ -112,10 +121,9 @@ spec:
                           type: object
                           x-kubernetes-map-type: atomic
                         fieldRef:
-                          description: 'Selects a field of the pod: supports metadata.name,
-                            metadata.namespace, `metadata.labels[''<KEY>'']`, `metadata.annotations[''<KEY>'']`,
-                            spec.nodeName, spec.serviceAccountName, status.hostIP,
-                            status.podIP, status.podIPs.'
+                          description: |-
+                            Selects a field of the pod: supports metadata.name, metadata.namespace, `metadata.labels['<KEY>']`, `metadata.annotations['<KEY>']`,
+                            spec.nodeName, spec.serviceAccountName, status.hostIP, status.podIP, status.podIPs.
                           properties:
                             apiVersion:
                               description: Version of the schema the FieldPath is
@@ -130,10 +138,9 @@ spec:
                           type: object
                           x-kubernetes-map-type: atomic
                         resourceFieldRef:
-                          description: 'Selects a resource of the container: only
-                            resources limits and requests (limits.cpu, limits.memory,
-                            limits.ephemeral-storage, requests.cpu, requests.memory
-                            and requests.ephemeral-storage) are currently supported.'
+                          description: |-
+                            Selects a resource of the container: only resources limits and requests
+                            (limits.cpu, limits.memory, limits.ephemeral-storage, requests.cpu, requests.memory and requests.ephemeral-storage) are currently supported.
                           properties:
                             containerName:
                               description: 'Container name: required for volumes,
@@ -162,8 +169,10 @@ spec:
                                 be a valid secret key.
                               type: string
                             name:
-                              description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                TODO: Add other useful fields. apiVersion, kind, uid?'
+                              description: |-
+                                Name of the referent.
+                                More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                TODO: Add other useful fields. apiVersion, kind, uid?
                               type: string
                             optional:
                               description: Specify whether the Secret or its key must
@@ -180,11 +189,11 @@ spec:
                 type: array
               delegateServiceAccountSecretRef:
                 default: terraform-applier-delegate-token
-                description: DelegateServiceAccountSecretRef references a Secret of
-                  type kubernetes.io/service-account-token in the same namespace as
-                  the Module that will be used to fetch secrets, configmaps from modules'
-                  namespace. if vaultRequests are specified, the service account's
-                  jwt will be used for vault authentication.
+                description: |-
+                  DelegateServiceAccountSecretRef references a Secret of type
+                  kubernetes.io/service-account-token in the same namespace as the Module
+                  that will be used to fetch secrets, configmaps from modules' namespace.
+                  if vaultRequests are specified, the service account's jwt will be used for vault authentication.
                 minLength: 1
                 type: string
               env:
@@ -198,15 +207,16 @@ spec:
                       description: Name of the environment variable. Must be a C_IDENTIFIER.
                       type: string
                     value:
-                      description: 'Variable references $(VAR_NAME) are expanded using
-                        the previously defined environment variables in the container
-                        and any service environment variables. If a variable cannot
-                        be resolved, the reference in the input string will be unchanged.
-                        Double $$ are reduced to a single $, which allows for escaping
-                        the $(VAR_NAME) syntax: i.e. "$$(VAR_NAME)" will produce the
-                        string literal "$(VAR_NAME)". Escaped references will never
-                        be expanded, regardless of whether the variable exists or
-                        not. Defaults to "".'
+                      description: |-
+                        Variable references $(VAR_NAME) are expanded
+                        using the previously defined environment variables in the container and
+                        any service environment variables. If a variable cannot be resolved,
+                        the reference in the input string will be unchanged. Double $$ are reduced
+                        to a single $, which allows for escaping the $(VAR_NAME) syntax: i.e.
+                        "$$(VAR_NAME)" will produce the string literal "$(VAR_NAME)".
+                        Escaped references will never be expanded, regardless of whether the variable
+                        exists or not.
+                        Defaults to "".
                       type: string
                     valueFrom:
                       description: Source for the environment variable's value. Cannot
@@ -219,8 +229,10 @@ spec:
                               description: The key to select.
                               type: string
                             name:
-                              description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                TODO: Add other useful fields. apiVersion, kind, uid?'
+                              description: |-
+                                Name of the referent.
+                                More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                TODO: Add other useful fields. apiVersion, kind, uid?
                               type: string
                             optional:
                               description: Specify whether the ConfigMap or its key
@@ -231,10 +243,9 @@ spec:
                           type: object
                           x-kubernetes-map-type: atomic
                         fieldRef:
-                          description: 'Selects a field of the pod: supports metadata.name,
-                            metadata.namespace, `metadata.labels[''<KEY>'']`, `metadata.annotations[''<KEY>'']`,
-                            spec.nodeName, spec.serviceAccountName, status.hostIP,
-                            status.podIP, status.podIPs.'
+                          description: |-
+                            Selects a field of the pod: supports metadata.name, metadata.namespace, `metadata.labels['<KEY>']`, `metadata.annotations['<KEY>']`,
+                            spec.nodeName, spec.serviceAccountName, status.hostIP, status.podIP, status.podIPs.
                           properties:
                             apiVersion:
                               description: Version of the schema the FieldPath is
@@ -249,10 +260,9 @@ spec:
                           type: object
                           x-kubernetes-map-type: atomic
                         resourceFieldRef:
-                          description: 'Selects a resource of the container: only
-                            resources limits and requests (limits.cpu, limits.memory,
-                            limits.ephemeral-storage, requests.cpu, requests.memory
-                            and requests.ephemeral-storage) are currently supported.'
+                          description: |-
+                            Selects a resource of the container: only resources limits and requests
+                            (limits.cpu, limits.memory, limits.ephemeral-storage, requests.cpu, requests.memory and requests.ephemeral-storage) are currently supported.
                           properties:
                             containerName:
                               description: 'Container name: required for volumes,
@@ -281,8 +291,10 @@ spec:
                                 be a valid secret key.
                               type: string
                             name:
-                              description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                TODO: Add other useful fields. apiVersion, kind, uid?'
+                              description: |-
+                                Name of the referent.
+                                More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                TODO: Add other useful fields. apiVersion, kind, uid?
                               type: string
                             optional:
                               description: Specify whether the Secret or its key must
@@ -343,6 +355,16 @@ spec:
               repoName:
                 description: Name of the repository containing Terraform module directory.
                 type: string
+              repoRef:
+                default: HEAD
+                description: |-
+                  The RepoRef specifies the revision of the repository for the module source code.
+                  this can be tag or branch. If not specified, this defaults to "HEAD" (repo's default branch)
+                type: string
+              repoURL:
+                description: URL to the repository containing Terraform module source
+                  code.
+                type: string
               runTimeout:
                 default: 900
                 description: RunTimeout specifies the timeout in sec for performing
@@ -350,9 +372,9 @@ spec:
                 maximum: 1800
                 type: integer
               schedule:
-                description: The schedule in Cron format. Module will do periodic
-                  run for a given schedule if no schedule provided then module will
-                  only run if new PRs are added to given module path
+                description: |-
+                  The schedule in Cron format. Module will do periodic run for a given schedule
+                  if no schedule provided then module will only run if new PRs are added to given module path
                 type: string
               var:
                 description: List of input variables passed to the Terraform execution.
@@ -364,15 +386,16 @@ spec:
                       description: Name of the environment variable. Must be a C_IDENTIFIER.
                       type: string
                     value:
-                      description: 'Variable references $(VAR_NAME) are expanded using
-                        the previously defined environment variables in the container
-                        and any service environment variables. If a variable cannot
-                        be resolved, the reference in the input string will be unchanged.
-                        Double $$ are reduced to a single $, which allows for escaping
-                        the $(VAR_NAME) syntax: i.e. "$$(VAR_NAME)" will produce the
-                        string literal "$(VAR_NAME)". Escaped references will never
-                        be expanded, regardless of whether the variable exists or
-                        not. Defaults to "".'
+                      description: |-
+                        Variable references $(VAR_NAME) are expanded
+                        using the previously defined environment variables in the container and
+                        any service environment variables. If a variable cannot be resolved,
+                        the reference in the input string will be unchanged. Double $$ are reduced
+                        to a single $, which allows for escaping the $(VAR_NAME) syntax: i.e.
+                        "$$(VAR_NAME)" will produce the string literal "$(VAR_NAME)".
+                        Escaped references will never be expanded, regardless of whether the variable
+                        exists or not.
+                        Defaults to "".
                       type: string
                     valueFrom:
                       description: Source for the environment variable's value. Cannot
@@ -385,8 +408,10 @@ spec:
                               description: The key to select.
                               type: string
                             name:
-                              description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                TODO: Add other useful fields. apiVersion, kind, uid?'
+                              description: |-
+                                Name of the referent.
+                                More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                TODO: Add other useful fields. apiVersion, kind, uid?
                               type: string
                             optional:
                               description: Specify whether the ConfigMap or its key
@@ -397,10 +422,9 @@ spec:
                           type: object
                           x-kubernetes-map-type: atomic
                         fieldRef:
-                          description: 'Selects a field of the pod: supports metadata.name,
-                            metadata.namespace, `metadata.labels[''<KEY>'']`, `metadata.annotations[''<KEY>'']`,
-                            spec.nodeName, spec.serviceAccountName, status.hostIP,
-                            status.podIP, status.podIPs.'
+                          description: |-
+                            Selects a field of the pod: supports metadata.name, metadata.namespace, `metadata.labels['<KEY>']`, `metadata.annotations['<KEY>']`,
+                            spec.nodeName, spec.serviceAccountName, status.hostIP, status.podIP, status.podIPs.
                           properties:
                             apiVersion:
                               description: Version of the schema the FieldPath is
@@ -415,10 +439,9 @@ spec:
                           type: object
                           x-kubernetes-map-type: atomic
                         resourceFieldRef:
-                          description: 'Selects a resource of the container: only
-                            resources limits and requests (limits.cpu, limits.memory,
-                            limits.ephemeral-storage, requests.cpu, requests.memory
-                            and requests.ephemeral-storage) are currently supported.'
+                          description: |-
+                            Selects a resource of the container: only resources limits and requests
+                            (limits.cpu, limits.memory, limits.ephemeral-storage, requests.cpu, requests.memory and requests.ephemeral-storage) are currently supported.
                           properties:
                             containerName:
                               description: 'Container name: required for volumes,
@@ -447,8 +470,10 @@ spec:
                                 be a valid secret key.
                               type: string
                             name:
-                              description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                TODO: Add other useful fields. apiVersion, kind, uid?'
+                              description: |-
+                                Name of the referent.
+                                More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                TODO: Add other useful fields. apiVersion, kind, uid?
                               type: string
                             optional:
                               description: Specify whether the Secret or its key must
@@ -464,30 +489,32 @@ spec:
                   type: object
                 type: array
               vaultRequests:
-                description: VaultRequests specifies credential generate requests
-                  from the vault configured on the controller
+                description: |-
+                  VaultRequests specifies credential generate requests from the vault
+                  configured on the controller
                 properties:
                   aws:
-                    description: aws specifies vault credential generation request
-                      for AWS secrets engine If specified, controller will request
-                      AWS creds from vault and set AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY
-                      and AWS_SESSION_TOKEN envs during terraform run. 'VAULT_AWS_ENG_PATH'
-                      env set on controller will be used as credential path
+                    description: |-
+                      aws specifies vault credential generation request for AWS secrets engine
+                      If specified, controller will request AWS creds from vault and set
+                      AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY and AWS_SESSION_TOKEN envs during
+                      terraform run.
+                      'VAULT_AWS_ENG_PATH' env set on controller will be used as credential path
                     properties:
                       credentialType:
                         default: assumed_role
-                        description: CredentialType specifies the type of credential
-                          to be used when retrieving credentials from the role. Must
-                          be one of iam_user, assumed_role, or federation_token.
+                        description: |-
+                          CredentialType specifies the type of credential to be used when retrieving credentials from the role.
+                          Must be one of iam_user, assumed_role, or federation_token.
                         enum:
                         - iam_user
                         - assumed_role
                         - federation_token
                         type: string
                       roleARN:
-                        description: The ARN of the role to assume if credential_type
-                          on the Vault role is assumed_role. Optional if the Vault
-                          role only allows a single AWS role ARN.
+                        description: |-
+                          The ARN of the role to assume if credential_type on the Vault role is assumed_role.
+                          Optional if the Vault role only allows a single AWS role ARN.
                         type: string
                       vaultRole:
                         description: VaultRole Specifies the name of the vault role
@@ -497,17 +524,17 @@ spec:
                 type: object
             required:
             - path
-            - repoName
             type: object
           status:
             description: ModuleStatus defines the observed state of Module
             properties:
               currentState:
-                description: CurrentState denotes current overall status of module
-                  run it will be either 'Running' -> Module is in running state 'Ready'
-                  -> last run finished successfully and its waiting for next run/event
-                  'Errored' -> last run finished with Error and its waiting for next
-                  run/event
+                description: |-
+                  CurrentState denotes current overall status of module run
+                  it will be either
+                  'Running' -> Module is in running state
+                  'Ready' -> last run finished successfully and its waiting for next run/event
+                  'Errored' -> last run finished with Error and its waiting for next run/event
                 type: string
               lastApplyInfo:
                 description: LastApplyInfo is the stdout of apply command. it may

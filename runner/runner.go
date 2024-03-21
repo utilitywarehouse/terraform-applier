@@ -3,11 +3,11 @@ package runner
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"regexp"
 	"sync"
 	"time"
 
-	"github.com/hashicorp/go-hclog"
 	tfaplv1beta1 "github.com/utilitywarehouse/terraform-applier/api/v1beta1"
 	"github.com/utilitywarehouse/terraform-applier/git"
 	"github.com/utilitywarehouse/terraform-applier/metrics"
@@ -37,9 +37,9 @@ type Runner struct {
 	ClusterClt             client.Client
 	Recorder               record.EventRecorder
 	KubeClt                kubernetes.Interface
-	GitSyncPool            git.SyncInterface
+	Repos                  git.Repositories
 	Queue                  <-chan Request
-	Log                    hclog.Logger
+	Log                    *slog.Logger
 	Delegate               DelegateInterface
 	Metrics                metrics.PrometheusInterface
 	TerraformExecPath      string
@@ -143,21 +143,16 @@ func (r *Runner) process(req Request, cancelChan <-chan struct{}) bool {
 		}
 	}()
 
-	commitHash, err := r.GitSyncPool.HashForPath(ctx, module.Spec.RepoName, module.Spec.Path)
+	commitHash, err := r.Repos.Hash(ctx, module.Spec.RepoURL, module.Spec.RepoRef, module.Spec.Path)
 	if err != nil {
 		log.Error("unable to get commit hash", "err", err)
 		return false
 	}
 
-	commitLog, err := r.GitSyncPool.LogMsgForPath(ctx, module.Spec.RepoName, module.Spec.Path)
+	commitLog, err := r.Repos.LogMsg(ctx, module.Spec.RepoURL, module.Spec.RepoRef, module.Spec.Path)
 	if err != nil {
 		log.Error("unable to get commit log subject", "err", err)
 		return false
-	}
-
-	repo, err := r.GitSyncPool.RepositoryConfig(module.Spec.RepoName)
-	if err != nil {
-		log.Error("unable to get repo's remote url", "err", err)
 	}
 
 	// if termination signal received its safe to return here
@@ -169,7 +164,7 @@ func (r *Runner) process(req Request, cancelChan <-chan struct{}) bool {
 	}
 
 	// Update Status
-	if err = r.SetRunStartedStatus(req, module, "preparing for TF run", commitHash, commitLog, repo.Remote, r.Clock.Now()); err != nil {
+	if err = r.SetRunStartedStatus(req, module, "preparing for TF run", commitHash, commitLog, module.Spec.RepoURL, r.Clock.Now()); err != nil {
 		log.Error("unable to set run starting status", "err", err)
 		return false
 	}
@@ -261,7 +256,8 @@ func (r *Runner) runTF(
 	_, err := te.init(ctx, backendConf)
 	if err != nil {
 		msg := fmt.Sprintf("unable to init module: err:%s", err)
-		log.Error(msg)
+		// tf err contains new lines not suitable logging
+		log.Error("unable to init module", "err", fmt.Sprintf("%q", err))
 		r.setFailedStatus(req, module, tfaplv1beta1.ReasonInitialiseFailed, msg, r.Clock.Now())
 		return false
 	}
@@ -287,7 +283,8 @@ func (r *Runner) runTF(
 	if err != nil {
 		module.Status.RunOutput = planOut
 		msg := fmt.Sprintf("unable to plan module: err:%s", err)
-		log.Error(msg)
+		// tf err contains new lines not suitable logging
+		log.Error("unable to plan module", "err", fmt.Sprintf("%q", err))
 		r.setFailedStatus(req, module, tfaplv1beta1.ReasonPlanFailed, msg, r.Clock.Now())
 		return false
 	}
@@ -304,7 +301,8 @@ func (r *Runner) runTF(
 	savedPlan, err := te.showPlanFileRaw(ctx)
 	if err != nil {
 		msg := fmt.Sprintf("unable to get saved plan: err:%s", err)
-		log.Error(msg)
+		// tf err contains new lines not suitable logging
+		log.Error("unable to get saved plan", "err", fmt.Sprintf("%q", err))
 		r.setFailedStatus(req, module, tfaplv1beta1.ReasonPlanFailed, msg, r.Clock.Now())
 		return false
 	}
@@ -346,11 +344,12 @@ func (r *Runner) runTF(
 	if err != nil {
 		module.Status.RunOutput = savedPlan + applyOut
 		msg := fmt.Sprintf("unable to apply module: err:%s", err)
-		log.Error(msg)
+		// tf err contains new lines not suitable logging
+		log.Error("unable to apply module", "err", fmt.Sprintf("%q", err))
 		r.setFailedStatus(req, module, tfaplv1beta1.ReasonApplyFailed, msg, r.Clock.Now())
 		return false
 	}
-
+	module.Status.RunOutput = savedPlan + applyOut
 	module.Status.LastApplyInfo = tfaplv1beta1.OutputStats{Timestamp: &metav1.Time{Time: r.Clock.Now()}, CommitHash: commitHash, Output: savedPlan + applyOut}
 
 	// extract last line of output
@@ -409,7 +408,7 @@ func (r *Runner) setFailedStatus(req Request, module *tfaplv1beta1.Module, reaso
 	module.Status.StateMessage = msg
 	module.Status.StateReason = reason
 
-	r.Recorder.Event(module, corev1.EventTypeWarning, reason, msg)
+	r.Recorder.Event(module, corev1.EventTypeWarning, reason, fmt.Sprintf("%q", msg))
 
 	if err := r.patchStatus(context.Background(), req.NamespacedName, module.Status); err != nil {
 		r.Log.With("module", req.NamespacedName).Error("unable to set failed status", "err", err)
