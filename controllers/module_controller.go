@@ -93,7 +93,7 @@ func (r *ModuleReconciler) Reconcile(ctx context.Context, req reconcile.Request)
 	if module.Spec.RepoURL == "" {
 		msg := fmt.Sprintf("repoURL is required, please add repoURL instead of repoName:%s", module.Spec.RepoName)
 		log.Error(msg)
-		r.setFailedStatus(req, &module, tfaplv1beta1.ReasonSpecsParsingFailure, msg, r.Clock.Now())
+		r.setFailedStatus(req, &module, tfaplv1beta1.ReasonSpecsParsingFailure, msg)
 		// we don't really care about requeuing until we get an update that
 		// fixes the repoURL, so don't return an error
 		return ctrl.Result{}, nil
@@ -115,7 +115,7 @@ func (r *ModuleReconciler) Reconcile(ctx context.Context, req reconcile.Request)
 		// module is not currently running so change status and continue
 		msg := "wrong status found, module is not currently running"
 		log.Error(msg)
-		r.setFailedStatus(req, &module, tfaplv1beta1.ReasonUnknown, msg, r.Clock.Now())
+		r.setFailedStatus(req, &module, tfaplv1beta1.ReasonUnknown, msg)
 	}
 
 	var isPlanOnly bool
@@ -135,7 +135,7 @@ func (r *ModuleReconciler) Reconcile(ctx context.Context, req reconcile.Request)
 	if err != nil {
 		msg := fmt.Sprintf("unable to get current hash of the repo err:%s", err)
 		log.Error(msg)
-		r.setFailedStatus(req, &module, tfaplv1beta1.ReasonGitFailure, msg, r.Clock.Now())
+		r.setFailedStatus(req, &module, tfaplv1beta1.ReasonGitFailure, msg)
 		// since issue is not related to module specs, requeue again in case its fixed
 		return ctrl.Result{RequeueAfter: pollIntervalDuration}, nil
 	}
@@ -157,7 +157,7 @@ func (r *ModuleReconciler) Reconcile(ctx context.Context, req reconcile.Request)
 	if err != nil {
 		msg := fmt.Sprintf("unable to figure out CronJob schedule: err:%s", err)
 		log.Error(msg)
-		r.setFailedStatus(req, &module, tfaplv1beta1.ReasonSpecsParsingFailure, msg, r.Clock.Now())
+		r.setFailedStatus(req, &module, tfaplv1beta1.ReasonSpecsParsingFailure, msg)
 		// we don't really care about requeuing until we get an update that
 		// fixes the schedule, so don't return an error
 		return ctrl.Result{}, nil
@@ -251,10 +251,10 @@ func NextSchedule(module *tfaplv1beta1.Module, now time.Time, minIntervalBetween
 	return numOfMissedRuns, sched.Next(now), nil
 }
 
-func (r *ModuleReconciler) setFailedStatus(req ctrl.Request, module *tfaplv1beta1.Module, reason, msg string, now time.Time) {
+func (r *ModuleReconciler) setFailedStatus(req ctrl.Request, module *tfaplv1beta1.Module, reason, msg string) {
 
 	module.Status.CurrentState = string(tfaplv1beta1.StatusErrored)
-	module.Status.StateMessage = msg
+	module.Status.StateMessage = tfaplv1beta1.NormaliseStateMsg(msg)
 	module.Status.StateReason = reason
 	module.Status.RunStartedAt = nil
 	module.Status.RunDuration = nil

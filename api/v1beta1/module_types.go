@@ -17,6 +17,8 @@ limitations under the License.
 package v1beta1
 
 import (
+	"strings"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -47,6 +49,8 @@ const (
 	ReasonPlanedDriftDetected   = "PlanedDriftDetected"
 	ReasonPlanedNoDriftDetected = "PlanedNoDriftDetected"
 	ReasonApplied               = "Applied"
+
+	stateMsgCharLimit = 1024
 )
 
 const (
@@ -314,4 +318,14 @@ func GetRunReason(runType string) string {
 		return ReasonForcedApplyTriggered
 	}
 	return ReasonRunTriggered
+}
+
+func NormaliseStateMsg(msg string) string {
+	msg = strings.TrimSpace(msg)
+
+	r := []rune(msg)
+	if len(r) > stateMsgCharLimit {
+		return strings.TrimSpace(string(r[:stateMsgCharLimit])) + "..."
+	}
+	return msg
 }
