@@ -216,6 +216,10 @@ github.com/utilitywarehouse/git-mirror v0.0.0-20240319143905-78ec52d5d091 h1:78Y
 github.com/utilitywarehouse/git-mirror v0.0.0-20240319143905-78ec52d5d091/go.mod h1:iGusuCneGiwwKaPsxgBaR974OwLd/FKhUGDsSbC8zWM=
 github.com/utilitywarehouse/git-mirror v0.0.0-20240320170707-c5188344fc50 h1:8A5AQpIx74Vx0Qncd7avauMnN66bvsjfT3r02sE5Noc=
 github.com/utilitywarehouse/git-mirror v0.0.0-20240320170707-c5188344fc50/go.mod h1:iGusuCneGiwwKaPsxgBaR974OwLd/FKhUGDsSbC8zWM=
+github.com/utilitywarehouse/git-mirror v0.0.0-20240321172933-12fc1855d28a h1:8q9g3Cn0fO3yNkoLbvhi0Rx2EAkuyp3Hmdak0ylIYjg=
+github.com/utilitywarehouse/git-mirror v0.0.0-20240321172933-12fc1855d28a/go.mod h1:iGusuCneGiwwKaPsxgBaR974OwLd/FKhUGDsSbC8zWM=
+github.com/utilitywarehouse/git-mirror v0.0.0-20240322085947-5ac034aa35e3 h1:Ct3WWxlnIP8QZO8CgHZEqFkzv4ldhaCUWp+zZ6+YZMo=
+github.com/utilitywarehouse/git-mirror v0.0.0-20240322085947-5ac034aa35e3/go.mod h1:iGusuCneGiwwKaPsxgBaR974OwLd/FKhUGDsSbC8zWM=
 github.com/utilitywarehouse/go-operational v0.0.0-20220413104526-79ce40a50281 h1:o2reBE9vn4ZXmq73rNDmipyJsH0GPqoS8A6CVeWZsGU=
 github.com/utilitywarehouse/go-operational v0.0.0-20220413104526-79ce40a50281/go.mod h1:NVEoiRSDBsLOEk9X+pwskLIPWL5YGmZMaGP0kXnpvhM=
 github.com/xanzy/ssh-agent v0.3.3 h1:+/15pJfg/RsTxqYcX6fHqOXZwwMP+2VyYWJeWM2qQFM=
