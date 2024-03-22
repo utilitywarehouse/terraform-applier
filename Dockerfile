@@ -31,7 +31,7 @@ RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go generate ./...
     && go test -v -cover ./... \
     && go build -a -o tf-applier
 
-FROM alpine:3.18
+FROM alpine:3.19
 
 ENV USER_ID=65532
 
