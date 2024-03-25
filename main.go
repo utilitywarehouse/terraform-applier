@@ -515,7 +515,7 @@ func run(c *cli.Context) {
 		os.Exit(1)
 	}
 
-	// perform 1st mirror
+	// perform 1st mirror to ensure all repositories before starting controller
 	// initial mirror might take longer
 	timeout := 2 * conf.GitMirror.Defaults.MirrorTimeout
 	if err := repos.Mirror(ctx, timeout); err != nil {
