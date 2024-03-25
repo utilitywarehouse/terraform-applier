@@ -280,6 +280,6 @@ In addition to the [controller-runtime](https://book.kubebuilder.io/reference/me
 - `terraform_applier_module_terraform_exit_code_count` - (tags: `module`,`namespace`, `command`, `exit_code`) A `Counter` for each exit code returned by executions of
   `terraform`, labelled with the command issued (`init`, `plan`,`apply`) and the exit code. It's worth noting that `plan` will
   return a code of `2` if there are changes to be made, which is not an error or a failure, so you may wish to account for this in your alerting.
-- `terraform_applier_git_last_sync_timestamp` - (tags: `repo`) A Gauge that captures the Timestamp of the last successful git sync per repo.
-- `terraform_applier_git_sync_count` - (tags: `repo`,`success`) A Counter for each repo sync, incremented with each sync attempt and tagged with the result (`success=true|false`)
-- `terraform_applier_git_sync_latency_seconds` - (tags: `repo`) A Summary that keeps track of the git sync latency per repo.
+- `terraform_applier_git_last_mirror_timestamp` - (tags: `repo`) A Gauge that captures the Timestamp of the last successful git sync per repo.
+- `terraform_applier_git_mirror_count` - (tags: `repo`,`success`) A Counter for each repo sync, incremented with each sync attempt and tagged with the result (`success=true|false`)
+- `terraform_applier_git_mirror_latency_seconds` - (tags: `repo`) A Summary that keeps track of the git sync latency per repo.

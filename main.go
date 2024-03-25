@@ -444,6 +444,10 @@ func applyGitDefaults(c *cli.Context, mirrorConf mirror.RepoPoolConfig) mirror.R
 		mirrorConf.Defaults.Interval = 30 * time.Second
 	}
 
+	if mirrorConf.Defaults.MirrorTimeout == 0 {
+		mirrorConf.Defaults.MirrorTimeout = 2 * time.Minute
+	}
+
 	if mirrorConf.Defaults.Auth.SSHKeyPath == "" {
 		mirrorConf.Defaults.Auth.SSHKeyPath = c.String("git-ssh-key-file")
 	}
@@ -510,6 +514,17 @@ func run(c *cli.Context) {
 		logger.Error("could not create git mirror pool", "err", err)
 		os.Exit(1)
 	}
+
+	// perform 1st mirror
+	// initial mirror might take longer
+	timeout := conf.GitMirror.Defaults.MirrorTimeout + time.Minute
+	if err := repos.Mirror(ctx, timeout); err != nil {
+		logger.Error("could not perform initial repositories mirror", "err", err)
+		os.Exit(1)
+	}
+
+	// start mirror Loop
+	repos.StartLoop()
 
 	// Find the requested version of terraform and log the version
 	// information

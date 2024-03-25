@@ -1,9 +1,10 @@
 git_mirror:
   defaults:
-    root:  /src
+    root: /src
     interval: 30s
-    git_gc:  always
-    auth: 
+    mirror_timeout: 2m
+    git_gc: always
+    auth:
       ssh_key_path: /etc/git-secret/ssh
       ssh_known_hosts_path: /etc/git-secret/known_hosts
   repositories:
