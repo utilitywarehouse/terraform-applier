@@ -517,7 +517,7 @@ func run(c *cli.Context) {
 
 	// perform 1st mirror
 	// initial mirror might take longer
-	timeout := conf.GitMirror.Defaults.MirrorTimeout + time.Minute
+	timeout := 2 * conf.GitMirror.Defaults.MirrorTimeout
 	if err := repos.Mirror(ctx, timeout); err != nil {
 		logger.Error("could not perform initial repositories mirror", "err", err)
 		os.Exit(1)
