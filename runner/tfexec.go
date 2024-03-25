@@ -139,7 +139,11 @@ func (te *tfRunner) init(ctx context.Context, backendConf map[string]string) (st
 	te.tf.SetStderr(&out)
 
 	opts := []tfexec.InitOption{
-		tfexec.Upgrade(true),
+		// unset upgrade so that tf-applier doesn't override providers version in lock file.
+		// tf-applier should always select provider version from the lock file
+		// if lock file is not there TF will download newest available version
+		// that matches the given version constraint of the provider
+		tfexec.Upgrade(false),
 	}
 
 	for k, v := range backendConf {
