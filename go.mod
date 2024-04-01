@@ -11,7 +11,7 @@ require (
 	github.com/hashicorp/hc-install v0.6.3
 	github.com/hashicorp/terraform-exec v0.20.0
 	github.com/hashicorp/vault/api v1.12.2
-	github.com/onsi/ginkgo/v2 v2.15.0
+	github.com/onsi/ginkgo/v2 v2.17.1
 	github.com/onsi/gomega v1.32.0
 	github.com/prometheus/client_golang v1.19.0
 	github.com/robfig/cron/v3 v3.0.1
