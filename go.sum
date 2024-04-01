@@ -115,8 +115,8 @@ github.com/hashicorp/terraform-exec v0.20.0 h1:DIZnPsqzPGuUnq6cH8jWcPunBfY+C+M8J
 github.com/hashicorp/terraform-exec v0.20.0/go.mod h1:ckKGkJWbsNqFKV1itgMnE0hY9IYf1HoiekpuN0eWoDw=
 github.com/hashicorp/terraform-json v0.21.0 h1:9NQxbLNqPbEMze+S6+YluEdXgJmhQykRyRNd+zTI05U=
 github.com/hashicorp/terraform-json v0.21.0/go.mod h1:qdeBs11ovMzo5puhrRibdD6d2Dq6TyE/28JiU4tIQxk=
-github.com/hashicorp/vault/api v1.12.0 h1:meCpJSesvzQyao8FCOgk2fGdoADAnbDu2WPJN1lDLJ4=
-github.com/hashicorp/vault/api v1.12.0/go.mod h1:si+lJCYO7oGkIoNPAN8j3azBLTn9SjMGS+jFaHd1Cck=
+github.com/hashicorp/vault/api v1.12.2 h1:7YkCTE5Ni90TcmYHDBExdt4WGJxhpzaHqR6uGbQb/rE=
+github.com/hashicorp/vault/api v1.12.2/go.mod h1:LSGf1NGT1BnvFFnKVtnvcaLBM2Lz+gJdpL6HUYed8KE=
 github.com/imdario/mergo v0.3.16 h1:wwQJbIsHYGMUyLSPrEq1CT16AhnhNJQ51+4fdHUnCl4=
 github.com/imdario/mergo v0.3.16/go.mod h1:WBLT9ZmE3lPoWsEzCh9LPo3TiwVN+ZKEjmz+hD27ysY=
 github.com/inconshreveable/mousetrap v1.1.0 h1:wN+x4NVGpMsO7ErUn/mUI3vEoE6Jt13X2s0bqwp9tc8=
@@ -212,14 +212,6 @@ github.com/stretchr/testify v1.8.4 h1:CcVxjf3Q8PM0mHUKJCdn+eZZtm5yQwehR5yeSVQQcU
 github.com/stretchr/testify v1.8.4/go.mod h1:sz/lmYIOXD/1dqDmKjjqLyZ2RngseejIcXlSw2iwfAo=
 github.com/urfave/cli/v2 v2.27.1 h1:8xSQ6szndafKVRmfyeUMxkNUJQMjL1F2zmsZ+qHpfho=
 github.com/urfave/cli/v2 v2.27.1/go.mod h1:8qnjx1vcq5s2/wpsqoZFndg2CE5tNFyrTvS6SinrnYQ=
-github.com/utilitywarehouse/git-mirror v0.0.0-20240319143905-78ec52d5d091 h1:78YV5e+wxcl7ViJ9Bb2x0A37zxkippIspLUTj9BUHew=
-github.com/utilitywarehouse/git-mirror v0.0.0-20240319143905-78ec52d5d091/go.mod h1:iGusuCneGiwwKaPsxgBaR974OwLd/FKhUGDsSbC8zWM=
-github.com/utilitywarehouse/git-mirror v0.0.0-20240320170707-c5188344fc50 h1:8A5AQpIx74Vx0Qncd7avauMnN66bvsjfT3r02sE5Noc=
-github.com/utilitywarehouse/git-mirror v0.0.0-20240320170707-c5188344fc50/go.mod h1:iGusuCneGiwwKaPsxgBaR974OwLd/FKhUGDsSbC8zWM=
-github.com/utilitywarehouse/git-mirror v0.0.0-20240321172933-12fc1855d28a h1:8q9g3Cn0fO3yNkoLbvhi0Rx2EAkuyp3Hmdak0ylIYjg=
-github.com/utilitywarehouse/git-mirror v0.0.0-20240321172933-12fc1855d28a/go.mod h1:iGusuCneGiwwKaPsxgBaR974OwLd/FKhUGDsSbC8zWM=
-github.com/utilitywarehouse/git-mirror v0.0.0-20240322085947-5ac034aa35e3 h1:Ct3WWxlnIP8QZO8CgHZEqFkzv4ldhaCUWp+zZ6+YZMo=
-github.com/utilitywarehouse/git-mirror v0.0.0-20240322085947-5ac034aa35e3/go.mod h1:iGusuCneGiwwKaPsxgBaR974OwLd/FKhUGDsSbC8zWM=
 github.com/utilitywarehouse/git-mirror v0.0.0-20240325114641-5b0347fa3b56 h1:Ngdvk5snCmK29BxOgmmUG9C1m9fnmJrwOeVssN4FGlA=
 github.com/utilitywarehouse/git-mirror v0.0.0-20240325114641-5b0347fa3b56/go.mod h1:iGusuCneGiwwKaPsxgBaR974OwLd/FKhUGDsSbC8zWM=
 github.com/utilitywarehouse/go-operational v0.0.0-20220413104526-79ce40a50281 h1:o2reBE9vn4ZXmq73rNDmipyJsH0GPqoS8A6CVeWZsGU=
