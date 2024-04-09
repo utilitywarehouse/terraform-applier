@@ -111,8 +111,8 @@ func (r *Runner) process(req Request, cancelChan <-chan struct{}) bool {
 	defer cancel()
 
 	// get Object
-	module := new(tfaplv1beta1.Module)
-	if err := r.ClusterClt.Get(ctx, req.NamespacedName, module); err != nil {
+	module, err := sysutil.GetModule(ctx, r.ClusterClt, req.NamespacedName)
+	if err != nil {
 		log.Error("unable to fetch terraform module", "err", err)
 		return false
 	}
@@ -369,7 +369,7 @@ func (r *Runner) runTF(
 func (r *Runner) SetProgressingStatus(objectKey types.NamespacedName, m *tfaplv1beta1.Module, msg string) error {
 	m.Status.CurrentState = string(tfaplv1beta1.StatusRunning)
 	m.Status.StateMessage = tfaplv1beta1.NormaliseStateMsg(msg)
-	return r.patchStatus(context.Background(), objectKey, m.Status)
+	return sysutil.PatchModuleStatus(context.Background(), r.ClusterClt, objectKey, m.Status)
 }
 
 func (r *Runner) SetRunStartedStatus(req Request, m *tfaplv1beta1.Module, msg, commitHash, commitMsg, remoteURL string, now time.Time) error {
@@ -387,7 +387,7 @@ func (r *Runner) SetRunStartedStatus(req Request, m *tfaplv1beta1.Module, msg, c
 
 	r.Recorder.Eventf(m, corev1.EventTypeNormal, tfaplv1beta1.GetRunReason(req.Type), "%s: type:%s, commit:%s", msg, req.Type, commitHash)
 
-	return r.patchStatus(context.Background(), req.NamespacedName, m.Status)
+	return sysutil.PatchModuleStatus(context.Background(), r.ClusterClt, req.NamespacedName, m.Status)
 }
 
 func (r *Runner) SetRunFinishedStatus(objectKey types.NamespacedName, m *tfaplv1beta1.Module, reason, msg string, now time.Time) error {
@@ -398,7 +398,7 @@ func (r *Runner) SetRunFinishedStatus(objectKey types.NamespacedName, m *tfaplv1
 
 	r.Recorder.Event(m, corev1.EventTypeNormal, reason, msg)
 
-	return r.patchStatus(context.Background(), objectKey, m.Status)
+	return sysutil.PatchModuleStatus(context.Background(), r.ClusterClt, objectKey, m.Status)
 }
 
 func (r *Runner) setFailedStatus(req Request, module *tfaplv1beta1.Module, reason, msg string, now time.Time) {
@@ -410,47 +410,9 @@ func (r *Runner) setFailedStatus(req Request, module *tfaplv1beta1.Module, reaso
 
 	r.Recorder.Event(module, corev1.EventTypeWarning, reason, fmt.Sprintf("%q", msg))
 
-	if err := r.patchStatus(context.Background(), req.NamespacedName, module.Status); err != nil {
-		r.Log.With("module", req.NamespacedName).Error("unable to set failed status", "err", err)
+	if err := sysutil.PatchModuleStatus(context.Background(), r.ClusterClt, req.NamespacedName, module.Status); err != nil {
+		r.Log.With("module", req).Error("unable to set failed status", "err", err)
 	}
-}
-
-func (r *Runner) patchStatus(ctx context.Context, objectKey types.NamespacedName, newStatus tfaplv1beta1.ModuleStatus) error {
-	maxAttempt := 5
-	waitMultiplier := 5 //sec
-
-	log := r.Log.With("module", objectKey)
-
-	var attempt int
-	for {
-		attempt++
-
-		err := r.tryPatchStatus(ctx, objectKey, newStatus)
-		if err == nil {
-			return nil
-		}
-		if attempt > maxAttempt {
-			return fmt.Errorf("unable to set status, max attempted reached : err:%w", err)
-		}
-
-		retryAfter := attempt * waitMultiplier
-
-		log.Warn("unable to set status will try again", "attempt", attempt, "retryAfter", retryAfter, "err", err)
-
-		time.Sleep(time.Second * time.Duration(retryAfter))
-	}
-}
-
-func (r *Runner) tryPatchStatus(ctx context.Context, objectKey types.NamespacedName, newStatus tfaplv1beta1.ModuleStatus) error {
-	module := new(tfaplv1beta1.Module)
-	if err := r.ClusterClt.Get(ctx, objectKey, module); err != nil {
-		return err
-	}
-
-	patch := client.MergeFrom(module.DeepCopy())
-	module.Status = newStatus
-
-	return r.ClusterClt.Status().Patch(ctx, module, patch, client.FieldOwner("terraform-applier"))
 }
 
 func isChannelClosed(cancelChan <-chan struct{}) bool {

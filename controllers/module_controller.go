@@ -24,7 +24,6 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -74,8 +73,8 @@ func (r *ModuleReconciler) Reconcile(ctx context.Context, req reconcile.Request)
 
 	log.Log(ctx, trace, "reconciling...")
 
-	var module tfaplv1beta1.Module
-	if err := r.Get(ctx, req.NamespacedName, &module); err != nil {
+	module, err := sysutil.GetModule(ctx, r.Client, req.NamespacedName)
+	if err != nil {
 		log.Error("unable to fetch terraform module", "err", err)
 		// we'll ignore not-found errors, since they can't be fixed by an immediate requeue
 		return ctrl.Result{}, client.IgnoreNotFound(err)
@@ -93,7 +92,7 @@ func (r *ModuleReconciler) Reconcile(ctx context.Context, req reconcile.Request)
 	if module.Spec.RepoURL == "" {
 		msg := fmt.Sprintf("repoURL is required, please add repoURL instead of repoName:%s", module.Spec.RepoName)
 		log.Error(msg)
-		r.setFailedStatus(req, &module, tfaplv1beta1.ReasonSpecsParsingFailure, msg)
+		r.setFailedStatus(req, module, tfaplv1beta1.ReasonSpecsParsingFailure, msg)
 		// we don't really care about requeuing until we get an update that
 		// fixes the repoURL, so don't return an error
 		return ctrl.Result{}, nil
@@ -115,7 +114,7 @@ func (r *ModuleReconciler) Reconcile(ctx context.Context, req reconcile.Request)
 		// module is not currently running so change status and continue
 		msg := "wrong status found, module is not currently running"
 		log.Error(msg)
-		r.setFailedStatus(req, &module, tfaplv1beta1.ReasonUnknown, msg)
+		r.setFailedStatus(req, module, tfaplv1beta1.ReasonUnknown, msg)
 	}
 
 	var isPlanOnly bool
@@ -135,7 +134,7 @@ func (r *ModuleReconciler) Reconcile(ctx context.Context, req reconcile.Request)
 	if err != nil {
 		msg := fmt.Sprintf("unable to get current hash of the repo err:%s", err)
 		log.Error(msg)
-		r.setFailedStatus(req, &module, tfaplv1beta1.ReasonGitFailure, msg)
+		r.setFailedStatus(req, module, tfaplv1beta1.ReasonGitFailure, msg)
 		// since issue is not related to module specs, requeue again in case its fixed
 		return ctrl.Result{RequeueAfter: pollIntervalDuration}, nil
 	}
@@ -153,11 +152,11 @@ func (r *ModuleReconciler) Reconcile(ctx context.Context, req reconcile.Request)
 	}
 
 	// figure out the next times that we need to run or last missed runs time if any.
-	numOfMissedRuns, nextRun, err := NextSchedule(&module, r.Clock.Now(), r.MinIntervalBetweenRuns)
+	numOfMissedRuns, nextRun, err := NextSchedule(module, r.Clock.Now(), r.MinIntervalBetweenRuns)
 	if err != nil {
 		msg := fmt.Sprintf("unable to figure out CronJob schedule: err:%s", err)
 		log.Error(msg)
-		r.setFailedStatus(req, &module, tfaplv1beta1.ReasonSpecsParsingFailure, msg)
+		r.setFailedStatus(req, module, tfaplv1beta1.ReasonSpecsParsingFailure, msg)
 		// we don't really care about requeuing until we get an update that
 		// fixes the schedule, so don't return an error
 		return ctrl.Result{}, nil
@@ -262,19 +261,7 @@ func (r *ModuleReconciler) setFailedStatus(req ctrl.Request, module *tfaplv1beta
 
 	r.Recorder.Event(module, corev1.EventTypeWarning, reason, msg)
 
-	if err := r.patchStatus(context.Background(), req.NamespacedName, module.Status); err != nil {
+	if err := sysutil.PatchModuleStatus(context.Background(), r.Client, req.NamespacedName, module.Status); err != nil {
 		r.Log.With("module", req).Error("unable to set failed status", "err", err)
 	}
-}
-
-func (r *ModuleReconciler) patchStatus(ctx context.Context, objectKey types.NamespacedName, newStatus tfaplv1beta1.ModuleStatus) error {
-	module := new(tfaplv1beta1.Module)
-	if err := r.Get(ctx, objectKey, module); err != nil {
-		return err
-	}
-
-	patch := client.MergeFrom(module.DeepCopy())
-	module.Status = newStatus
-
-	return r.Status().Patch(ctx, module, patch, client.FieldOwner("terraform-applier"))
 }

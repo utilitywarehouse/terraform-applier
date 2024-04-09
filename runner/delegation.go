@@ -7,8 +7,8 @@ import (
 	"os"
 
 	tfaplv1beta1 "github.com/utilitywarehouse/terraform-applier/api/v1beta1"
+	"github.com/utilitywarehouse/terraform-applier/sysutil"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/util/cert"
@@ -34,7 +34,7 @@ func (d *Delegate) SetupDelegation(ctx context.Context, jwt string) (kubernetes.
 }
 
 func (d *Delegate) DelegateToken(ctx context.Context, kubeClt kubernetes.Interface, module *tfaplv1beta1.Module) (string, error) {
-	secret, err := kubeClt.CoreV1().Secrets(module.Namespace).Get(ctx, module.Spec.DelegateServiceAccountSecretRef, metav1.GetOptions{})
+	secret, err := sysutil.GetSecret(ctx, kubeClt, module.Namespace, module.Spec.DelegateServiceAccountSecretRef)
 	if err != nil {
 		return "", fmt.Errorf(`unable to get delegate token secret "%s/%s" err:%w`, module.Namespace, module.Spec.DelegateServiceAccountSecretRef, err)
 	}
@@ -85,16 +85,14 @@ func fetchEnvVars(ctx context.Context, client kubernetes.Interface, module *tfap
 		}
 
 		if env.ValueFrom.ConfigMapKeyRef != nil {
-
-			cm, err := client.CoreV1().ConfigMaps(module.Namespace).Get(ctx, env.ValueFrom.ConfigMapKeyRef.Name, metav1.GetOptions{})
+			cm, err := sysutil.GetConfigMaps(ctx, client, module.Namespace, env.ValueFrom.ConfigMapKeyRef.Name)
 			if err != nil {
 				return nil, fmt.Errorf("unable to get valueFrom configMap:%s err:%w", env.ValueFrom.ConfigMapKeyRef.Name, err)
 			}
 			kvPairs[env.Name] = cm.Data[env.ValueFrom.ConfigMapKeyRef.Key]
 
 		} else if env.ValueFrom.SecretKeyRef != nil {
-
-			secret, err := client.CoreV1().Secrets(module.Namespace).Get(ctx, env.ValueFrom.SecretKeyRef.Name, metav1.GetOptions{})
+			secret, err := sysutil.GetSecret(ctx, client, module.Namespace, env.ValueFrom.SecretKeyRef.Name)
 			if err != nil {
 				return nil, fmt.Errorf("unable to get valueFrom configMap:%s err:%w", env.ValueFrom.SecretKeyRef.Name, err)
 			}
