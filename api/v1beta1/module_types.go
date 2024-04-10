@@ -18,13 +18,19 @@ package v1beta1
 
 import (
 	"strings"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
+
+const (
+	TriggerRunAnnotationKey = `terraform-applier.uw.systems/trigger-run`
+)
 
 // The potential reasons for events and current state
 const (
@@ -33,6 +39,7 @@ const (
 	ReasonForcedApplyTriggered  = "ForcedApplyTriggered"
 	ReasonPollingRunTriggered   = "PollingRunTriggered"
 	ReasonScheduledRunTriggered = "ScheduledRunTriggered"
+	ReasonPRPlanTriggered       = "PullRequestPlanTriggered"
 
 	ReasonRunPreparationFailed = "RunPreparationFailed"
 	ReasonDelegationFailed     = "DelegationFailed"
@@ -62,6 +69,8 @@ const (
 	ForcedPlan = "ForcedPlan"
 	// ForcedApply indicates a forced (triggered on the UI) terraform apply.
 	ForcedApply = "ForcedApply"
+	// PRPlan indicates terraform plan trigged by PullRequest on modules repo path.
+	PRPlan = "PullRequestPlan"
 )
 
 // Overall state of Module run
@@ -306,6 +315,20 @@ func (m *Module) IsPlanOnly() bool {
 	return m.Spec.PlanOnly != nil && *m.Spec.PlanOnly
 }
 
+func (m *Module) NewRunRequest(reqType string) *Request {
+	req := Request{
+		NamespacedName: types.NamespacedName{
+			Namespace: m.Namespace,
+			Name:      m.Name,
+		},
+		RequestedAt: &metav1.Time{Time: time.Now()},
+		ID:          NewRequestID(),
+		Type:        reqType,
+	}
+
+	return &req
+}
+
 func GetRunReason(runType string) string {
 	switch runType {
 	case ScheduledRun:
@@ -316,6 +339,8 @@ func GetRunReason(runType string) string {
 		return ReasonForcedPlanTriggered
 	case ForcedApply:
 		return ReasonForcedApplyTriggered
+	case PRPlan:
+		return ReasonPRPlanTriggered
 	}
 	return ReasonRunTriggered
 }

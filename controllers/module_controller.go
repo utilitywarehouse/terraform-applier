@@ -32,7 +32,6 @@ import (
 	"github.com/robfig/cron/v3"
 	tfaplv1beta1 "github.com/utilitywarehouse/terraform-applier/api/v1beta1"
 	"github.com/utilitywarehouse/terraform-applier/git"
-	"github.com/utilitywarehouse/terraform-applier/runner"
 	"github.com/utilitywarehouse/terraform-applier/sysutil"
 	corev1 "k8s.io/api/core/v1"
 )
@@ -46,7 +45,7 @@ type ModuleReconciler struct {
 	Recorder               record.EventRecorder
 	Clock                  sysutil.ClockInterface
 	Repos                  git.Repositories
-	Queue                  chan<- runner.Request
+	Queue                  chan<- *tfaplv1beta1.Request
 	Log                    *slog.Logger
 	MinIntervalBetweenRuns time.Duration
 	RunStatus              *sync.Map
@@ -117,14 +116,9 @@ func (r *ModuleReconciler) Reconcile(ctx context.Context, req reconcile.Request)
 		r.setFailedStatus(req, module, tfaplv1beta1.ReasonUnknown, msg)
 	}
 
-	var isPlanOnly bool
-	if module.Spec.PlanOnly != nil && *module.Spec.PlanOnly {
-		isPlanOnly = true
-	}
-
 	if module.Status.RunCommitHash == "" {
 		log.Debug("starting initial run")
-		r.Queue <- runner.Request{NamespacedName: req.NamespacedName, Type: tfaplv1beta1.PollingRun, PlanOnly: isPlanOnly}
+		r.Queue <- module.NewRunRequest(tfaplv1beta1.PollingRun)
 		// use next poll internal as minimum queue duration as status change will not trigger Reconcile
 		return ctrl.Result{RequeueAfter: pollIntervalDuration}, nil
 	}
@@ -141,7 +135,7 @@ func (r *ModuleReconciler) Reconcile(ctx context.Context, req reconcile.Request)
 
 	if hash != module.Status.RunCommitHash {
 		log.Debug("revision is changed on module path triggering run", "lastRun", module.Status.RunCommitHash, "current", hash)
-		r.Queue <- runner.Request{NamespacedName: req.NamespacedName, Type: tfaplv1beta1.PollingRun, PlanOnly: isPlanOnly}
+		r.Queue <- module.NewRunRequest(tfaplv1beta1.PollingRun)
 		// use next poll internal as minimum queue duration as status change will not trigger Reconcile
 		return ctrl.Result{RequeueAfter: pollIntervalDuration}, nil
 	}
@@ -164,7 +158,7 @@ func (r *ModuleReconciler) Reconcile(ctx context.Context, req reconcile.Request)
 
 	if numOfMissedRuns > 0 {
 		log.Debug("starting scheduled run", "missed-runs", numOfMissedRuns)
-		r.Queue <- runner.Request{NamespacedName: req.NamespacedName, Type: tfaplv1beta1.ScheduledRun}
+		r.Queue <- module.NewRunRequest(tfaplv1beta1.ScheduledRun)
 	}
 
 	// Calculate shortest duration to next run

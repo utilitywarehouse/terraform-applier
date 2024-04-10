@@ -488,7 +488,7 @@ func run(c *cli.Context) {
 	// runStatus keeps track of currently running modules
 	runStatus := new(sync.Map)
 
-	moduleQueue := make(chan runner.Request)
+	moduleQueue := make(chan *tfaplv1beta1.Request)
 	done := make(chan bool, 1)
 
 	clock := &sysutil.Clock{}

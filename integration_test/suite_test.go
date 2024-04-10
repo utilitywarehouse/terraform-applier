@@ -74,14 +74,14 @@ var (
 	goMockCtrl *gomock.Controller
 	testLogger *slog.Logger
 	// testControllerQueue only used for controller behaviour testing
-	testControllerQueue       chan runner.Request
-	testFilterControllerQueue chan runner.Request
+	testControllerQueue       chan *tfaplv1beta1.Request
+	testFilterControllerQueue chan *tfaplv1beta1.Request
 
 	testStateFilePath string
 	testFilter        *controllers.Filter
 
 	// testRunnerQueue only used for send job to runner of runner testing
-	testRunnerQueue  chan runner.Request
+	testRunnerQueue  chan *tfaplv1beta1.Request
 	testRepos        *git.MockRepositories
 	testMetrics      *metrics.MockPrometheusInterface
 	testDelegate     *runner.MockDelegateInterface
@@ -156,9 +156,9 @@ var _ = BeforeSuite(func() {
 	runStatus := new(sync.Map)
 
 	minIntervalBetweenRunsDuration := 1 * time.Minute
-	testControllerQueue = make(chan runner.Request)
-	testFilterControllerQueue = make(chan runner.Request)
-	testRunnerQueue = make(chan runner.Request)
+	testControllerQueue = make(chan *tfaplv1beta1.Request)
+	testFilterControllerQueue = make(chan *tfaplv1beta1.Request)
+	testRunnerQueue = make(chan *tfaplv1beta1.Request)
 
 	goMockCtrl = gomock.NewController(RecoveringGinkgoT())
 

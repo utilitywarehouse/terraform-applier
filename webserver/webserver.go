@@ -14,7 +14,6 @@ import (
 
 	"github.com/gorilla/mux"
 	tfaplv1beta1 "github.com/utilitywarehouse/terraform-applier/api/v1beta1"
-	"github.com/utilitywarehouse/terraform-applier/runner"
 	"github.com/utilitywarehouse/terraform-applier/webserver/oidc"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
@@ -37,7 +36,7 @@ type WebServer struct {
 	Authenticator *oidc.Authenticator
 	ClusterClt    client.Client
 	KubeClient    kubernetes.Interface
-	RunQueue      chan<- runner.Request
+	RunQueue      chan<- *tfaplv1beta1.Request
 	RunStatus     *sync.Map
 	Log           *slog.Logger
 }
@@ -95,7 +94,7 @@ type ForceRunHandler struct {
 	Authenticator *oidc.Authenticator
 	ClusterClt    client.Client
 	KubeClt       kubernetes.Interface
-	RunQueue      chan<- runner.Request
+	RunQueue      chan<- *tfaplv1beta1.Request
 	RunStatus     *sync.Map
 	Log           *slog.Logger
 }
@@ -223,16 +222,12 @@ func (f *ForceRunHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	req := runner.Request{
-		NamespacedName: namespacedName,
-		Type:           tfaplv1beta1.ForcedPlan,
-		PlanOnly:       isPlanOnly,
-	}
+	reqType := tfaplv1beta1.ForcedPlan
 	if !isPlanOnly {
-		req.Type = tfaplv1beta1.ForcedApply
+		reqType = tfaplv1beta1.ForcedApply
 	}
 
-	f.RunQueue <- req
+	f.RunQueue <- module.NewRunRequest(reqType)
 
 	data.Result = "success"
 	data.Message = "Run queued"
