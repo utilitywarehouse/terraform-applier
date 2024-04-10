@@ -655,7 +655,6 @@ func run(c *cli.Context) {
 		ListenAddress: c.String("webserver-bind-address"),
 		ClusterClt:    mgr.GetClient(),
 		KubeClient:    kubeClient,
-		RunQueue:      moduleQueue,
 		RunStatus:     runStatus,
 		Log:           logger.With("logger", "webserver"),
 	}

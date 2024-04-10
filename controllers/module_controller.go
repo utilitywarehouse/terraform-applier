@@ -120,6 +120,17 @@ func (r *ModuleReconciler) Reconcile(ctx context.Context, req reconcile.Request)
 	}
 
 	// case 1:
+	// check for run triggers
+	//
+	runReq, ok := module.PendingRunRequest()
+	if ok {
+		log.Debug("starting triggered run", "req", runReq, "delay", time.Since(runReq.RequestedAt.Time))
+		r.Queue <- runReq
+		// use next poll internal as minimum queue duration as status change will not trigger Reconcile
+		return ctrl.Result{RequeueAfter: pollIntervalDuration}, nil
+	}
+
+	// case 2:
 	// check for initial run
 	//
 	if module.Status.RunCommitHash == "" {
@@ -129,7 +140,7 @@ func (r *ModuleReconciler) Reconcile(ctx context.Context, req reconcile.Request)
 		return ctrl.Result{RequeueAfter: pollIntervalDuration}, nil
 	}
 
-	// case 2:
+	// case 3:
 	// check for new git hash changes on modules path
 	//
 	hash, err := r.Repos.Hash(ctx, module.Spec.RepoURL, module.Spec.RepoRef, module.Spec.Path)
@@ -148,7 +159,7 @@ func (r *ModuleReconciler) Reconcile(ctx context.Context, req reconcile.Request)
 		return ctrl.Result{RequeueAfter: pollIntervalDuration}, nil
 	}
 
-	// case 3:
+	// case 4:
 	// check if schedule run required
 	//
 

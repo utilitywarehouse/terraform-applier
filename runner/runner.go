@@ -79,8 +79,8 @@ func (r *Runner) Start(ctx context.Context, done chan bool) {
 				} else {
 					r.Log.Error("run completed with error", "module", req.NamespacedName)
 				}
-				r.Metrics.UpdateModuleSuccess(req.Name, req.Namespace, success)
-				r.Metrics.UpdateModuleRunDuration(req.Name, req.Namespace, time.Since(start).Seconds(), success)
+				r.Metrics.UpdateModuleSuccess(req.NamespacedName.Name, req.NamespacedName.Namespace, success)
+				r.Metrics.UpdateModuleRunDuration(req.NamespacedName.Name, req.NamespacedName.Namespace, time.Since(start).Seconds(), success)
 			}(req)
 		}
 	}
@@ -99,6 +99,13 @@ func (r *Runner) process(req *tfaplv1beta1.Request, cancelChan <-chan struct{}) 
 	// set running status
 	r.RunStatus.Store(req.NamespacedName.String(), true)
 	defer r.RunStatus.Delete(req.NamespacedName.String())
+
+	// remove pending run request regardless of run outcome
+	defer func() {
+		if err := sysutil.RemoveRequest(context.Background(), r.ClusterClt, req); err != nil {
+			log.Error("unable to remove run request", "err", err)
+		}
+	}()
 
 	// create new context
 	ctx, cancel := context.WithCancel(context.Background())

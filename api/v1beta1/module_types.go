@@ -17,6 +17,7 @@ limitations under the License.
 package v1beta1
 
 import (
+	"encoding/json"
 	"strings"
 	"time"
 
@@ -327,6 +328,22 @@ func (m *Module) NewRunRequest(reqType string) *Request {
 	}
 
 	return &req
+}
+
+// PendingRunRequest returns pending requests if any from module's annotation.
+func (m *Module) PendingRunRequest() (*Request, bool) {
+	valueString, exists := m.ObjectMeta.Annotations[TriggerRunAnnotationKey]
+	if !exists {
+		return nil, false
+	}
+	value := Request{}
+	if err := json.Unmarshal([]byte(valueString), &value); err != nil {
+		// unmarshal errors are ignored as it should not happen and if it does
+		// it can be treated as no request pending and module can override it
+		// with new valid request
+		return nil, false
+	}
+	return &value, true
 }
 
 func GetRunReason(runType string) string {
