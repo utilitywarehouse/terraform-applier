@@ -5,24 +5,7 @@ import (
 	"io"
 	"os"
 	"path"
-	"path/filepath"
 )
-
-// ListDirs walks the directory tree rooted at the path and adds all non-directory file paths to a []string.
-func ListDirs(rootPath string) ([]string, error) {
-	var dirs []string
-	files, err := os.ReadDir(rootPath)
-	if err != nil {
-		return dirs, fmt.Errorf("Could not read %s error=(%v)", rootPath, err)
-	}
-
-	for _, file := range files {
-		if file.IsDir() {
-			dirs = append(dirs, filepath.Join(rootPath, file.Name()))
-		}
-	}
-	return dirs, nil
-}
 
 // CopyFile copies a file
 func CopyFile(src, dst string) error {
