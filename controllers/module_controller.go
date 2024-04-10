@@ -97,25 +97,31 @@ func (r *ModuleReconciler) Reconcile(ctx context.Context, req reconcile.Request)
 		return ctrl.Result{}, nil
 	}
 
-	// pollIntervalDuration is used as minimum duration for the next run
+	// pollIntervalDuration is used as minimum duration for re-queue
 	pollIntervalDuration := time.Duration(module.Spec.PollInterval) * time.Second
 
-	// check module's run status
+	// check if module is actually running on this controller...
+	if _, ok := r.RunStatus.Load(req.NamespacedName.String()); ok {
+		// it is running so use next poll internal as minimum queue duration
+		return ctrl.Result{RequeueAfter: pollIntervalDuration}, nil
+	}
+
+	// at this stage module is not deleting and its not currently running
+	//
+
+	// check module's run status, it is possible that process got killed before
+	// runner could update module status or module status update API could have
+	// failed
 	if module.Status.CurrentState == string(tfaplv1beta1.StatusRunning) {
-		// make sure module is actually running at the moment
-		// it is possible that process got killed before it could update module status or
-		// module status update could have failed and hence it stayed in running state
-		_, ok := r.RunStatus.Load(req.NamespacedName.String())
-		if ok {
-			// it is running so use next poll internal as minimum queue duration
-			return ctrl.Result{RequeueAfter: pollIntervalDuration}, nil
-		}
-		// module is not currently running so change status and continue
-		msg := "wrong status found, module is not currently running"
+		// module is not actually running so change status and continue
+		msg := "wrong status found, module is not actually running"
 		log.Error(msg)
 		r.setFailedStatus(req, module, tfaplv1beta1.ReasonUnknown, msg)
 	}
 
+	// case 1:
+	// check for initial run
+	//
 	if module.Status.RunCommitHash == "" {
 		log.Debug("starting initial run")
 		r.Queue <- module.NewRunRequest(tfaplv1beta1.PollingRun)
@@ -123,7 +129,9 @@ func (r *ModuleReconciler) Reconcile(ctx context.Context, req reconcile.Request)
 		return ctrl.Result{RequeueAfter: pollIntervalDuration}, nil
 	}
 
-	// check for new changes on modules path
+	// case 2:
+	// check for new git hash changes on modules path
+	//
 	hash, err := r.Repos.Hash(ctx, module.Spec.RepoURL, module.Spec.RepoRef, module.Spec.Path)
 	if err != nil {
 		msg := fmt.Sprintf("unable to get current hash of the repo err:%s", err)
@@ -139,6 +147,10 @@ func (r *ModuleReconciler) Reconcile(ctx context.Context, req reconcile.Request)
 		// use next poll internal as minimum queue duration as status change will not trigger Reconcile
 		return ctrl.Result{RequeueAfter: pollIntervalDuration}, nil
 	}
+
+	// case 3:
+	// check if schedule run required
+	//
 
 	// If No schedule is provided, just requeue for next git check
 	if module.Spec.Schedule == "" {
@@ -159,7 +171,13 @@ func (r *ModuleReconciler) Reconcile(ctx context.Context, req reconcile.Request)
 	if numOfMissedRuns > 0 {
 		log.Debug("starting scheduled run", "missed-runs", numOfMissedRuns)
 		r.Queue <- module.NewRunRequest(tfaplv1beta1.ScheduledRun)
+		// use next poll internal as minimum queue duration as status change will not trigger Reconcile
+		return ctrl.Result{RequeueAfter: pollIntervalDuration}, nil
 	}
+
+	// default:
+	// No action required so requeue module
+	//
 
 	// Calculate shortest duration to next run
 	requeueAfter := nextRun.Sub(r.Clock.Now())
@@ -167,7 +185,6 @@ func (r *ModuleReconciler) Reconcile(ctx context.Context, req reconcile.Request)
 		requeueAfter = pollIntervalDuration
 	}
 
-	// Requeue module again even after triggering run as status change will not trigger Reconcile
 	return ctrl.Result{RequeueAfter: requeueAfter}, nil
 }
 
