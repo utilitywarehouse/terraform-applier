@@ -177,6 +177,7 @@ var _ = BeforeSuite(func() {
 		Log:                    testLogger.With("logger", "manager"),
 		MinIntervalBetweenRuns: minIntervalBetweenRunsDuration,
 		RunStatus:              runStatus,
+		Metrics:                testMetrics,
 	}
 
 	testFilter = &controllers.Filter{

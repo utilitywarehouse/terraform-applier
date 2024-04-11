@@ -239,7 +239,7 @@ func (f *ForceRunHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		data.Result = "error"
 		data.Message = "Unable to request run as another request is pending"
 		f.Log.Error("unable to request force run", "module", namespacedName, "err", err)
-		w.WriteHeader(http.StatusOK)
+		w.WriteHeader(http.StatusConflict)
 		return
 	default:
 		data.Result = "error"

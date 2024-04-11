@@ -102,6 +102,12 @@ var (
 			Usage:   "The minimum interval in seconds, user can set between 2 consecutive runs. This value defines the frequency of runs.",
 		},
 		&cli.IntFlag{
+			Name:    "max-concurrent-runs",
+			EnvVars: []string{"MAX_CONCURRENT_RUNS"},
+			Value:   10,
+			Usage:   "The maximum number of concurrent module runs allowed on controller. if its 0 there is no limit",
+		},
+		&cli.IntFlag{
 			Name:    "termination-grace-period",
 			EnvVars: []string{"TERMINATION_GRACE_PERIOD"},
 			Value:   60,
@@ -595,7 +601,9 @@ func run(c *cli.Context) {
 		Repos:                  repos,
 		Log:                    logger.With("logger", "manager"),
 		MinIntervalBetweenRuns: time.Duration(c.Int("min-interval-between-runs")) * time.Second,
+		MaxConcurrentRuns:      c.Int("max-concurrent-runs"),
 		RunStatus:              runStatus,
+		Metrics:                metrics,
 	}).SetupWithManager(mgr, filter); err != nil {
 		logger.Error("unable to create module controller", "err", err)
 		os.Exit(1)

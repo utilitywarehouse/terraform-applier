@@ -26,7 +26,7 @@ func (rs *RunStatus) Delete(key string) {
 }
 
 // Len returns current length of the Map
-func (rs *RunStatus) Len(key string) int {
+func (rs *RunStatus) Len() int {
 	rs.RLock()
 	defer rs.RUnlock()
 

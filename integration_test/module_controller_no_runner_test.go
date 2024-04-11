@@ -30,6 +30,8 @@ var _ = Describe("Module controller without runner", func() {
 			// remove any label selector
 			testFilter.LabelSelectorKey = ""
 			testFilter.LabelSelectorValue = ""
+
+			testMetrics.EXPECT().SetRunPending(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 		})
 
 		It("Should send module to job queue on schedule", func() {
