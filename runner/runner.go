@@ -68,6 +68,11 @@ func (r *Runner) Start(ctx context.Context, done chan bool) {
 			go func(req *tfaplv1beta1.Request) {
 				defer wg.Done()
 
+				if err := req.Validate(); err != nil {
+					r.Log.Error("run triggered with invalid request", "req", req, "err", err)
+					return
+				}
+
 				start := time.Now()
 
 				r.Log.Info("starting run", "module", req.NamespacedName, "type", req.Type)

@@ -17,7 +17,7 @@ var (
 
 // Request represents terraform run request
 type Request struct {
-	NamespacedName types.NamespacedName `json:"module,omitempty"`
+	NamespacedName types.NamespacedName `json:"-"`
 	ID             string               `json:"id,omitempty"`
 	RequestedAt    *metav1.Time         `json:"reqAt,omitempty"`
 	Type           string               `json:"type,omitempty"`

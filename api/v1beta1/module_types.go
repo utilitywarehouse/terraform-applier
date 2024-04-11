@@ -343,6 +343,10 @@ func (m *Module) PendingRunRequest() (*Request, bool) {
 		// with new valid request
 		return nil, false
 	}
+	value.NamespacedName = types.NamespacedName{
+		Namespace: m.Namespace,
+		Name:      m.Name,
+	}
 	return &value, true
 }
 
