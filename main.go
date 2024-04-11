@@ -11,7 +11,6 @@ import (
 	"os/signal"
 	"path/filepath"
 	"strings"
-	"sync"
 	"syscall"
 	"time"
 
@@ -486,7 +485,7 @@ func run(c *cli.Context) {
 	ctrl.SetLogger(logr.FromSlogHandler(logger.Handler()))
 
 	// runStatus keeps track of currently running modules
-	runStatus := new(sync.Map)
+	runStatus := sysutil.NewRunStatus()
 
 	moduleQueue := make(chan *tfaplv1beta1.Request)
 	done := make(chan bool, 1)

@@ -22,7 +22,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"sync"
 	"testing"
 	"time"
 
@@ -153,7 +152,7 @@ var _ = BeforeSuite(func() {
 		T: time.Date(01, 01, 01, 0, 0, 0, 0, time.UTC),
 	}
 
-	runStatus := new(sync.Map)
+	runStatus := sysutil.NewRunStatus()
 
 	minIntervalBetweenRunsDuration := 1 * time.Minute
 	testControllerQueue = make(chan *tfaplv1beta1.Request)

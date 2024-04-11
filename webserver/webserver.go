@@ -10,7 +10,6 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
-	"sync"
 
 	"github.com/gorilla/mux"
 	tfaplv1beta1 "github.com/utilitywarehouse/terraform-applier/api/v1beta1"
@@ -37,7 +36,7 @@ type WebServer struct {
 	Authenticator *oidc.Authenticator
 	ClusterClt    client.Client
 	KubeClient    kubernetes.Interface
-	RunStatus     *sync.Map
+	RunStatus     *sysutil.RunStatus
 	Log           *slog.Logger
 }
 
@@ -94,7 +93,7 @@ type ForceRunHandler struct {
 	Authenticator *oidc.Authenticator
 	ClusterClt    client.Client
 	KubeClt       kubernetes.Interface
-	RunStatus     *sync.Map
+	RunStatus     *sysutil.RunStatus
 	Log           *slog.Logger
 }
 

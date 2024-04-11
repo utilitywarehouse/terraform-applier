@@ -39,7 +39,7 @@ type Runner struct {
 	TerraformExecPath      string
 	TerminationGracePeriod time.Duration
 	AWSSecretsEngineConfig vault.AWSSecretsEngineInterface
-	RunStatus              *sync.Map
+	RunStatus              *sysutil.RunStatus
 	GlobalENV              map[string]string
 }
 

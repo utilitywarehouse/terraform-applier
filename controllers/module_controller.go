@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"sync"
 	"time"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -48,7 +47,7 @@ type ModuleReconciler struct {
 	Queue                  chan<- *tfaplv1beta1.Request
 	Log                    *slog.Logger
 	MinIntervalBetweenRuns time.Duration
-	RunStatus              *sync.Map
+	RunStatus              *sysutil.RunStatus
 }
 
 //+kubebuilder:rbac:groups="",resources=events,verbs=create;patch
