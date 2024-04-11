@@ -30,7 +30,7 @@ import (
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
 const (
-	TriggerRunAnnotationKey = `terraform-applier.uw.systems/trigger-run`
+	RunRequestAnnotationKey = `terraform-applier.uw.systems/run-request`
 )
 
 // The potential reasons for events and current state
@@ -332,7 +332,7 @@ func (m *Module) NewRunRequest(reqType string) *Request {
 
 // PendingRunRequest returns pending requests if any from module's annotation.
 func (m *Module) PendingRunRequest() (*Request, bool) {
-	valueString, exists := m.ObjectMeta.Annotations[TriggerRunAnnotationKey]
+	valueString, exists := m.ObjectMeta.Annotations[RunRequestAnnotationKey]
 	if !exists {
 		return nil, false
 	}

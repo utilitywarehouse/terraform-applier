@@ -39,7 +39,7 @@ func EnsureRequest(ctx context.Context, client client.Client, req *tfaplv1beta1.
 		if err != nil {
 			return err
 		}
-		module.ObjectMeta.Annotations[tfaplv1beta1.TriggerRunAnnotationKey] = string(valueBytes)
+		module.ObjectMeta.Annotations[tfaplv1beta1.RunRequestAnnotationKey] = string(valueBytes)
 
 		// return err itself here (not wrapped inside another error)
 		// so that ExponentialBackoffWithContext can identify it correctly.
@@ -73,7 +73,7 @@ func RemoveRequest(ctx context.Context, client client.Client, req *tfaplv1beta1.
 			return tfaplv1beta1.ErrRunRequestMismatch
 		}
 
-		delete(module.ObjectMeta.Annotations, tfaplv1beta1.TriggerRunAnnotationKey)
+		delete(module.ObjectMeta.Annotations, tfaplv1beta1.RunRequestAnnotationKey)
 
 		// return err itself here (not wrapped inside another error)
 		// so that ExponentialBackoffWithContext can identify it correctly.
