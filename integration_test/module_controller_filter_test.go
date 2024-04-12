@@ -39,6 +39,8 @@ var _ = Describe("Module controller without runner with label selector", func() 
 				Return(commitHash, nil).AnyTimes()
 			testRepos.EXPECT().LogMsg(gomock.Any(), "https://host.xy/dummy/repo.git", "HEAD", "hello-filter-test").
 				Return(commitMsg, nil).AnyTimes()
+
+			testMetrics.EXPECT().SetRunPending(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 		})
 
 		It("Should send module with valid selector label selector to job queue", func() {

@@ -17,14 +17,21 @@ limitations under the License.
 package v1beta1
 
 import (
+	"encoding/json"
 	"strings"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
+
+const (
+	RunRequestAnnotationKey = `terraform-applier.uw.systems/run-request`
+)
 
 // The potential reasons for events and current state
 const (
@@ -33,6 +40,7 @@ const (
 	ReasonForcedApplyTriggered  = "ForcedApplyTriggered"
 	ReasonPollingRunTriggered   = "PollingRunTriggered"
 	ReasonScheduledRunTriggered = "ScheduledRunTriggered"
+	ReasonPRPlanTriggered       = "PullRequestPlanTriggered"
 
 	ReasonRunPreparationFailed = "RunPreparationFailed"
 	ReasonDelegationFailed     = "DelegationFailed"
@@ -62,6 +70,8 @@ const (
 	ForcedPlan = "ForcedPlan"
 	// ForcedApply indicates a forced (triggered on the UI) terraform apply.
 	ForcedApply = "ForcedApply"
+	// PRPlan indicates terraform plan trigged by PullRequest on modules repo path.
+	PRPlan = "PullRequestPlan"
 )
 
 // Overall state of Module run
@@ -306,7 +316,41 @@ func (m *Module) IsPlanOnly() bool {
 	return m.Spec.PlanOnly != nil && *m.Spec.PlanOnly
 }
 
-func GetRunReason(runType string) string {
+func (m *Module) NewRunRequest(reqType string) *Request {
+	req := Request{
+		NamespacedName: types.NamespacedName{
+			Namespace: m.Namespace,
+			Name:      m.Name,
+		},
+		RequestedAt: &metav1.Time{Time: time.Now()},
+		ID:          NewRequestID(),
+		Type:        reqType,
+	}
+
+	return &req
+}
+
+// PendingRunRequest returns pending requests if any from module's annotation.
+func (m *Module) PendingRunRequest() (*Request, bool) {
+	valueString, exists := m.ObjectMeta.Annotations[RunRequestAnnotationKey]
+	if !exists {
+		return nil, false
+	}
+	value := Request{}
+	if err := json.Unmarshal([]byte(valueString), &value); err != nil {
+		// unmarshal errors are ignored as it should not happen and if it does
+		// it can be treated as no request pending and module can override it
+		// with new valid request
+		return nil, false
+	}
+	value.NamespacedName = types.NamespacedName{
+		Namespace: m.Namespace,
+		Name:      m.Name,
+	}
+	return &value, true
+}
+
+func RunReason(runType string) string {
 	switch runType {
 	case ScheduledRun:
 		return ReasonScheduledRunTriggered
@@ -316,6 +360,8 @@ func GetRunReason(runType string) string {
 		return ReasonForcedPlanTriggered
 	case ForcedApply:
 		return ReasonForcedApplyTriggered
+	case PRPlan:
+		return ReasonPRPlanTriggered
 	}
 	return ReasonRunTriggered
 }

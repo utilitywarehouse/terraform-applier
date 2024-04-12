@@ -30,6 +30,8 @@ var _ = Describe("Module controller without runner", func() {
 			// remove any label selector
 			testFilter.LabelSelectorKey = ""
 			testFilter.LabelSelectorValue = ""
+
+			testMetrics.EXPECT().SetRunPending(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 		})
 
 		It("Should send module to job queue on schedule", func() {
@@ -314,6 +316,53 @@ var _ = Describe("Module controller without runner", func() {
 				}
 				return fetchedModule.Status.CurrentState
 			}, time.Second*60, interval).Should(Equal("Errored"))
+			// delete module to stopping requeue
+			Expect(k8sClient.Delete(ctx, module)).Should(Succeed())
+		})
+
+		It("Should send module to job queue on pending run request", func() {
+			const (
+				moduleName = "test-module5"
+				repoURL    = "https://host.xy/dummy/repo2.git"
+				path       = "dev/" + moduleName
+			)
+
+			By("By creating a new Module")
+			ctx := context.Background()
+			module := &tfaplv1beta1.Module{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: "terraform-applier.uw.systems/v1beta1",
+					Kind:       "Module",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      moduleName,
+					Namespace: moduleNamespace,
+					Annotations: map[string]string{
+						tfaplv1beta1.RunRequestAnnotationKey: `{"id":"ueLMEbQj","reqAt":"2024-04-11T14:55:04Z","type":"ForcedPlan"}`,
+					},
+				},
+				Spec: tfaplv1beta1.ModuleSpec{
+					RepoURL: repoURL,
+					Path:    path,
+				},
+			}
+			Expect(k8sClient.Create(ctx, module)).Should(Succeed())
+
+			moduleLookupKey := types.NamespacedName{Name: moduleName, Namespace: moduleNamespace}
+
+			By("By making sure job was sent to jobQueue")
+			// wait for just about 60 sec default poll interval
+			Eventually(func() types.NamespacedName {
+				timer := time.NewTimer(time.Second)
+				for {
+					select {
+					case req := <-testControllerQueue:
+						return req.NamespacedName
+					case <-timer.C:
+						return types.NamespacedName{}
+					}
+				}
+			}, time.Second*70, interval).Should(Equal(moduleLookupKey))
 			// delete module to stopping requeue
 			Expect(k8sClient.Delete(ctx, module)).Should(Succeed())
 		})

@@ -20,11 +20,9 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"sync"
 	"time"
 
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -33,7 +31,7 @@ import (
 	"github.com/robfig/cron/v3"
 	tfaplv1beta1 "github.com/utilitywarehouse/terraform-applier/api/v1beta1"
 	"github.com/utilitywarehouse/terraform-applier/git"
-	"github.com/utilitywarehouse/terraform-applier/runner"
+	"github.com/utilitywarehouse/terraform-applier/metrics"
 	"github.com/utilitywarehouse/terraform-applier/sysutil"
 	corev1 "k8s.io/api/core/v1"
 )
@@ -47,10 +45,12 @@ type ModuleReconciler struct {
 	Recorder               record.EventRecorder
 	Clock                  sysutil.ClockInterface
 	Repos                  git.Repositories
-	Queue                  chan<- runner.Request
+	Queue                  chan<- *tfaplv1beta1.Request
 	Log                    *slog.Logger
 	MinIntervalBetweenRuns time.Duration
-	RunStatus              *sync.Map
+	MaxConcurrentRuns      int
+	RunStatus              *sysutil.RunStatus
+	Metrics                metrics.PrometheusInterface
 }
 
 //+kubebuilder:rbac:groups="",resources=events,verbs=create;patch
@@ -74,8 +74,8 @@ func (r *ModuleReconciler) Reconcile(ctx context.Context, req reconcile.Request)
 
 	log.Log(ctx, trace, "reconciling...")
 
-	var module tfaplv1beta1.Module
-	if err := r.Get(ctx, req.NamespacedName, &module); err != nil {
+	module, err := sysutil.GetModule(ctx, r.Client, req.NamespacedName)
+	if err != nil {
 		log.Error("unable to fetch terraform module", "err", err)
 		// we'll ignore not-found errors, since they can't be fixed by an immediate requeue
 		return ctrl.Result{}, client.IgnoreNotFound(err)
@@ -93,59 +93,75 @@ func (r *ModuleReconciler) Reconcile(ctx context.Context, req reconcile.Request)
 	if module.Spec.RepoURL == "" {
 		msg := fmt.Sprintf("repoURL is required, please add repoURL instead of repoName:%s", module.Spec.RepoName)
 		log.Error(msg)
-		r.setFailedStatus(req, &module, tfaplv1beta1.ReasonSpecsParsingFailure, msg)
+		r.setFailedStatus(req, module, tfaplv1beta1.ReasonSpecsParsingFailure, msg)
 		// we don't really care about requeuing until we get an update that
 		// fixes the repoURL, so don't return an error
 		return ctrl.Result{}, nil
 	}
 
-	// pollIntervalDuration is used as minimum duration for the next run
+	// pollIntervalDuration is used as minimum duration for re-queue
 	pollIntervalDuration := time.Duration(module.Spec.PollInterval) * time.Second
 
-	// check module's run status
-	if module.Status.CurrentState == string(tfaplv1beta1.StatusRunning) {
-		// make sure module is actually running at the moment
-		// it is possible that process got killed before it could update module status or
-		// module status update could have failed and hence it stayed in running state
-		_, ok := r.RunStatus.Load(req.NamespacedName.String())
-		if ok {
-			// it is running so use next poll internal as minimum queue duration
-			return ctrl.Result{RequeueAfter: pollIntervalDuration}, nil
-		}
-		// module is not currently running so change status and continue
-		msg := "wrong status found, module is not currently running"
-		log.Error(msg)
-		r.setFailedStatus(req, &module, tfaplv1beta1.ReasonUnknown, msg)
-	}
-
-	var isPlanOnly bool
-	if module.Spec.PlanOnly != nil && *module.Spec.PlanOnly {
-		isPlanOnly = true
-	}
-
-	if module.Status.RunCommitHash == "" {
-		log.Debug("starting initial run")
-		r.Queue <- runner.Request{NamespacedName: req.NamespacedName, Type: tfaplv1beta1.PollingRun, PlanOnly: isPlanOnly}
-		// use next poll internal as minimum queue duration as status change will not trigger Reconcile
+	// check if module is actually running on this controller...
+	if _, ok := r.RunStatus.Load(req.NamespacedName.String()); ok {
+		// it is running so use next poll internal as minimum queue duration
 		return ctrl.Result{RequeueAfter: pollIntervalDuration}, nil
 	}
 
-	// check for new changes on modules path
+	// at this stage module is not deleting and its not currently running
+	//
+
+	// check module's run status, it is possible that process got killed before
+	// runner could update module status or module status update API could have
+	// failed
+	if module.Status.CurrentState == string(tfaplv1beta1.StatusRunning) {
+		// module is not actually running so change status and continue
+		msg := "wrong status found, module is not actually running"
+		log.Error(msg)
+		r.setFailedStatus(req, module, tfaplv1beta1.ReasonUnknown, msg)
+	}
+
+	// case 1:
+	// check for run triggers
+	//
+	runReq, ok := module.PendingRunRequest()
+	if ok {
+		log.Debug("processing pending run request", "req", runReq, "delay", time.Since(runReq.RequestedAt.Time))
+		// use next poll internal as minimum queue duration as status change will not trigger Reconcile
+		return r.triggerRunORRequeue(runReq, pollIntervalDuration)
+
+	}
+
+	// case 2:
+	// check for initial run
+	//
+	if module.Status.RunCommitHash == "" {
+		log.Debug("requesting initial run")
+		// use next poll internal as minimum queue duration as status change will not trigger Reconcile
+		return r.triggerRunORRequeue(module.NewRunRequest(tfaplv1beta1.PollingRun), pollIntervalDuration)
+	}
+
+	// case 3:
+	// check for new git hash changes on modules path
+	//
 	hash, err := r.Repos.Hash(ctx, module.Spec.RepoURL, module.Spec.RepoRef, module.Spec.Path)
 	if err != nil {
 		msg := fmt.Sprintf("unable to get current hash of the repo err:%s", err)
 		log.Error(msg)
-		r.setFailedStatus(req, &module, tfaplv1beta1.ReasonGitFailure, msg)
+		r.setFailedStatus(req, module, tfaplv1beta1.ReasonGitFailure, msg)
 		// since issue is not related to module specs, requeue again in case its fixed
 		return ctrl.Result{RequeueAfter: pollIntervalDuration}, nil
 	}
 
 	if hash != module.Status.RunCommitHash {
-		log.Debug("revision is changed on module path triggering run", "lastRun", module.Status.RunCommitHash, "current", hash)
-		r.Queue <- runner.Request{NamespacedName: req.NamespacedName, Type: tfaplv1beta1.PollingRun, PlanOnly: isPlanOnly}
+		log.Debug("requesting run as revision is changed on module path", "lastRun", module.Status.RunCommitHash, "current", hash)
 		// use next poll internal as minimum queue duration as status change will not trigger Reconcile
-		return ctrl.Result{RequeueAfter: pollIntervalDuration}, nil
+		return r.triggerRunORRequeue(module.NewRunRequest(tfaplv1beta1.PollingRun), pollIntervalDuration)
 	}
+
+	// case 4:
+	// check if schedule run required
+	//
 
 	// If No schedule is provided, just requeue for next git check
 	if module.Spec.Schedule == "" {
@@ -153,20 +169,25 @@ func (r *ModuleReconciler) Reconcile(ctx context.Context, req reconcile.Request)
 	}
 
 	// figure out the next times that we need to run or last missed runs time if any.
-	numOfMissedRuns, nextRun, err := NextSchedule(&module, r.Clock.Now(), r.MinIntervalBetweenRuns)
+	numOfMissedRuns, nextRun, err := NextSchedule(module, r.Clock.Now(), r.MinIntervalBetweenRuns)
 	if err != nil {
 		msg := fmt.Sprintf("unable to figure out CronJob schedule: err:%s", err)
 		log.Error(msg)
-		r.setFailedStatus(req, &module, tfaplv1beta1.ReasonSpecsParsingFailure, msg)
+		r.setFailedStatus(req, module, tfaplv1beta1.ReasonSpecsParsingFailure, msg)
 		// we don't really care about requeuing until we get an update that
 		// fixes the schedule, so don't return an error
 		return ctrl.Result{}, nil
 	}
 
 	if numOfMissedRuns > 0 {
-		log.Debug("starting scheduled run", "missed-runs", numOfMissedRuns)
-		r.Queue <- runner.Request{NamespacedName: req.NamespacedName, Type: tfaplv1beta1.ScheduledRun}
+		log.Debug("requesting scheduled run", "missed-runs", numOfMissedRuns)
+		// use next poll internal as minimum queue duration as status change will not trigger Reconcile
+		return r.triggerRunORRequeue(module.NewRunRequest(tfaplv1beta1.ScheduledRun), pollIntervalDuration)
 	}
+
+	// default:
+	// No action required so requeue module
+	//
 
 	// Calculate shortest duration to next run
 	requeueAfter := nextRun.Sub(r.Clock.Now())
@@ -174,7 +195,6 @@ func (r *ModuleReconciler) Reconcile(ctx context.Context, req reconcile.Request)
 		requeueAfter = pollIntervalDuration
 	}
 
-	// Requeue module again even after triggering run as status change will not trigger Reconcile
 	return ctrl.Result{RequeueAfter: requeueAfter}, nil
 }
 
@@ -251,6 +271,20 @@ func NextSchedule(module *tfaplv1beta1.Module, now time.Time, minIntervalBetween
 	return numOfMissedRuns, sched.Next(now), nil
 }
 
+// triggerRunORRequeue will check controller capacity before triggering a run
+// if max limit is reached it will re-queue module to try again
+func (r *ModuleReconciler) triggerRunORRequeue(runReq *tfaplv1beta1.Request, requeueAfter time.Duration) (ctrl.Result, error) {
+	runningModuleCount := r.RunStatus.Len()
+	if r.MaxConcurrentRuns <= 0 || runningModuleCount < r.MaxConcurrentRuns {
+		r.Queue <- runReq
+		r.Metrics.SetRunPending(runReq.NamespacedName.Namespace, runReq.NamespacedName.Name, false)
+	} else {
+		r.Metrics.SetRunPending(runReq.NamespacedName.Namespace, runReq.NamespacedName.Name, true)
+		r.Log.Warn("skipping run max concurrent run limit reached", "module", runReq.NamespacedName, "count", runningModuleCount)
+	}
+	return ctrl.Result{RequeueAfter: requeueAfter}, nil
+}
+
 func (r *ModuleReconciler) setFailedStatus(req ctrl.Request, module *tfaplv1beta1.Module, reason, msg string) {
 
 	module.Status.CurrentState = string(tfaplv1beta1.StatusErrored)
@@ -262,19 +296,7 @@ func (r *ModuleReconciler) setFailedStatus(req ctrl.Request, module *tfaplv1beta
 
 	r.Recorder.Event(module, corev1.EventTypeWarning, reason, msg)
 
-	if err := r.patchStatus(context.Background(), req.NamespacedName, module.Status); err != nil {
+	if err := sysutil.PatchModuleStatus(context.Background(), r.Client, req.NamespacedName, module.Status); err != nil {
 		r.Log.With("module", req).Error("unable to set failed status", "err", err)
 	}
-}
-
-func (r *ModuleReconciler) patchStatus(ctx context.Context, objectKey types.NamespacedName, newStatus tfaplv1beta1.ModuleStatus) error {
-	module := new(tfaplv1beta1.Module)
-	if err := r.Get(ctx, objectKey, module); err != nil {
-		return err
-	}
-
-	patch := client.MergeFrom(module.DeepCopy())
-	module.Status = newStatus
-
-	return r.Status().Patch(ctx, module, patch, client.FieldOwner("terraform-applier"))
 }

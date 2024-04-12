@@ -19,6 +19,7 @@ type PrometheusInterface interface {
 	UpdateTerraformExitCodeCount(string, string, string, int)
 	UpdateModuleSuccess(string, string, bool)
 	UpdateModuleRunDuration(string, string, float64, bool)
+	SetRunPending(string, string, bool)
 }
 
 // Prometheus implements instrumentation of metrics for terraform-applier.
@@ -31,6 +32,7 @@ type Prometheus struct {
 	terraformExitCodeCount *prometheus.CounterVec
 	moduleRunCount         *prometheus.CounterVec
 	moduleRunDuration      *prometheus.HistogramVec
+	moduleRunPending       *prometheus.GaugeVec
 	moduleRunSuccess       *prometheus.GaugeVec
 	moduleRunTimestamp     *prometheus.GaugeVec
 }
@@ -66,6 +68,18 @@ func (p *Prometheus) Init() {
 			"namespace",
 			// Result: true if the run was successful, false otherwise
 			"success",
+		},
+	)
+	p.moduleRunPending = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Namespace: metricsNamespace,
+		Name:      "module_run_pending",
+		Help:      "is module ready to run but not yet started run?",
+	},
+		[]string{
+			// Name of the module
+			"module",
+			// Namespace name of the module that was ran
+			"namespace",
 		},
 	)
 	p.moduleRunSuccess = prometheus.NewGaugeVec(prometheus.GaugeOpts{
@@ -112,6 +126,7 @@ func (p *Prometheus) Init() {
 		p.moduleRunCount,
 		p.moduleRunDuration,
 		p.moduleRunSuccess,
+		p.moduleRunPending,
 		p.moduleRunTimestamp,
 		p.terraformExitCodeCount,
 	)
@@ -160,6 +175,18 @@ func (p *Prometheus) setRunSuccess(module, namespace string, success bool) {
 		as = 1
 	}
 	p.moduleRunSuccess.With(prometheus.Labels{
+		"module":    module,
+		"namespace": namespace,
+	}).Set(as)
+}
+
+// setRunPending sets pending status for a module
+func (p *Prometheus) SetRunPending(module, namespace string, pending bool) {
+	as := float64(0)
+	if pending {
+		as = 1
+	}
+	p.moduleRunPending.With(prometheus.Labels{
 		"module":    module,
 		"namespace": namespace,
 	}).Set(as)

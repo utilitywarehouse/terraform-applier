@@ -33,6 +33,18 @@ func (m *MockPrometheusInterface) EXPECT() *MockPrometheusInterfaceMockRecorder 
 	return m.recorder
 }
 
+// SetRunPending mocks base method.
+func (m *MockPrometheusInterface) SetRunPending(arg0, arg1 string, arg2 bool) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "SetRunPending", arg0, arg1, arg2)
+}
+
+// SetRunPending indicates an expected call of SetRunPending.
+func (mr *MockPrometheusInterfaceMockRecorder) SetRunPending(arg0, arg1, arg2 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetRunPending", reflect.TypeOf((*MockPrometheusInterface)(nil).SetRunPending), arg0, arg1, arg2)
+}
+
 // UpdateModuleRunDuration mocks base method.
 func (m *MockPrometheusInterface) UpdateModuleRunDuration(arg0, arg1 string, arg2 float64, arg3 bool) {
 	m.ctrl.T.Helper()

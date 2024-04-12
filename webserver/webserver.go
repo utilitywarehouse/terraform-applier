@@ -10,11 +10,10 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
-	"sync"
 
 	"github.com/gorilla/mux"
 	tfaplv1beta1 "github.com/utilitywarehouse/terraform-applier/api/v1beta1"
-	"github.com/utilitywarehouse/terraform-applier/runner"
+	"github.com/utilitywarehouse/terraform-applier/sysutil"
 	"github.com/utilitywarehouse/terraform-applier/webserver/oidc"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
@@ -37,8 +36,7 @@ type WebServer struct {
 	Authenticator *oidc.Authenticator
 	ClusterClt    client.Client
 	KubeClient    kubernetes.Interface
-	RunQueue      chan<- runner.Request
-	RunStatus     *sync.Map
+	RunStatus     *sysutil.RunStatus
 	Log           *slog.Logger
 }
 
@@ -95,8 +93,7 @@ type ForceRunHandler struct {
 	Authenticator *oidc.Authenticator
 	ClusterClt    client.Client
 	KubeClt       kubernetes.Interface
-	RunQueue      chan<- runner.Request
-	RunStatus     *sync.Map
+	RunStatus     *sysutil.RunStatus
 	Log           *slog.Logger
 }
 
@@ -124,6 +121,8 @@ func (f *ForceRunHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	var user *oidc.UserInfo
 	var err error
 
+	// authentication
+	// check if user logged in
 	if f.Authenticator != nil {
 		user, err = f.Authenticator.UserInfo(r.Context(), r)
 		if err != nil {
@@ -166,10 +165,6 @@ func (f *ForceRunHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		Namespace: payload["namespace"],
 		Name:      payload["module"],
 	}
-	isPlanOnly := true
-	if payload["planOnly"] == "false" {
-		isPlanOnly = false
-	}
 
 	var module tfaplv1beta1.Module
 	err = f.ClusterClt.Get(r.Context(), namespacedName, &module)
@@ -181,6 +176,8 @@ func (f *ForceRunHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// authorisation
+	// check if user has access
 	if f.Authenticator != nil {
 		// this should not happen but just in case
 		if user == nil {
@@ -210,7 +207,7 @@ func (f *ForceRunHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		f.Log.Info("force run triggered", "module", namespacedName, "isPlanOnly", isPlanOnly, "user", user.Email)
+		f.Log.Info("requesting force run...", "module", namespacedName, "user", user.Email)
 	}
 
 	// make sure module is not already running
@@ -223,20 +220,34 @@ func (f *ForceRunHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	req := runner.Request{
-		NamespacedName: namespacedName,
-		Type:           tfaplv1beta1.ForcedPlan,
-		PlanOnly:       isPlanOnly,
-	}
-	if !isPlanOnly {
-		req.Type = tfaplv1beta1.ForcedApply
+	reqType := tfaplv1beta1.ForcedPlan
+	if payload["planOnly"] == "false" {
+		reqType = tfaplv1beta1.ForcedApply
 	}
 
-	f.RunQueue <- req
+	req := module.NewRunRequest(reqType)
 
-	data.Result = "success"
-	data.Message = "Run queued"
-	w.WriteHeader(http.StatusOK)
+	err = sysutil.EnsureRequest(r.Context(), f.ClusterClt, req)
+	switch {
+	case err == nil:
+		data.Result = "success"
+		data.Message = "Run queued"
+		f.Log.Info("force run requested", "module", namespacedName, "req", req)
+		w.WriteHeader(http.StatusOK)
+		return
+	case errors.Is(err, tfaplv1beta1.ErrRunRequestExist):
+		data.Result = "error"
+		data.Message = "Unable to request run as another request is pending"
+		f.Log.Error("unable to request force run", "module", namespacedName, "err", err)
+		w.WriteHeader(http.StatusConflict)
+		return
+	default:
+		data.Result = "error"
+		data.Message = "internal error"
+		f.Log.Error("unable to request force run", "module", namespacedName, "err", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
 }
 
 // Start starts the webserver using the given port, and sets up handlers for:
@@ -262,7 +273,6 @@ func (ws *WebServer) Start(ctx context.Context) error {
 		ws.Authenticator,
 		ws.ClusterClt,
 		ws.KubeClient,
-		ws.RunQueue,
 		ws.RunStatus,
 		ws.Log,
 	}

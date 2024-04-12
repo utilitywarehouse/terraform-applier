@@ -55,8 +55,11 @@ func Test_ExecuteTemplate(t *testing.T) {
 			},
 		},
 		{
-			TypeMeta:   metav1.TypeMeta{APIVersion: "terraform-applier.uw.systems/v1beta1", Kind: "Module"},
-			ObjectMeta: metav1.ObjectMeta{Name: "groups", Namespace: "bar"},
+			TypeMeta: metav1.TypeMeta{APIVersion: "terraform-applier.uw.systems/v1beta1", Kind: "Module"},
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "groups", Namespace: "bar",
+				Annotations: map[string]string{tfaplv1beta1.RunRequestAnnotationKey: `'{"id":"VMqlQIIX","reqAt":"2024-04-11T15:05:46Z","type":"ForcedPlan"}'`},
+			},
 			Spec: tfaplv1beta1.ModuleSpec{
 				RepoURL:  "ssh://git@github.com/utilitywarehouse/terraform-applier.git",
 				RepoRef:  "as-test-module",

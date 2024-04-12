@@ -11,7 +11,6 @@ import (
 	"os/signal"
 	"path/filepath"
 	"strings"
-	"sync"
 	"syscall"
 	"time"
 
@@ -101,6 +100,12 @@ var (
 			EnvVars: []string{"MIN_INTERVAL_BETWEEN_RUNS"},
 			Value:   60,
 			Usage:   "The minimum interval in seconds, user can set between 2 consecutive runs. This value defines the frequency of runs.",
+		},
+		&cli.IntFlag{
+			Name:    "max-concurrent-runs",
+			EnvVars: []string{"MAX_CONCURRENT_RUNS"},
+			Value:   10,
+			Usage:   "The maximum number of concurrent module runs allowed on controller. if its 0 there is no limit",
 		},
 		&cli.IntFlag{
 			Name:    "termination-grace-period",
@@ -373,6 +378,14 @@ func setupGlobalEnv(c *cli.Context) {
 	// terraform depends on git for pulling remote modules
 	globalRunEnv["PATH"] = os.Getenv("PATH")
 
+	// setup plugin cache
+	pluginCache, err := os.MkdirTemp("", "plugin-cache")
+	if err != nil {
+		logger.Error("unable to create plugin cache dir", "err", err)
+		os.Exit(1)
+	}
+	globalRunEnv["TF_PLUGIN_CACHE_DIR"] = pluginCache
+
 	for _, env := range strings.Split(c.String("controller-runtime-env"), ",") {
 		globalRunEnv[env] = os.Getenv(env)
 	}
@@ -412,8 +425,7 @@ current-context: in-cluster
 users: []
 preferences: {}
 `
-	err := os.WriteFile(configPath, []byte(defaultCurrentKubeConfig), 0666)
-	if err != nil {
+	if err := os.WriteFile(configPath, []byte(defaultCurrentKubeConfig), 0666); err != nil {
 		logger.Error("unable to create custom in cluster config file", "err", err)
 		os.Exit(1)
 	}
@@ -486,9 +498,9 @@ func run(c *cli.Context) {
 	ctrl.SetLogger(logr.FromSlogHandler(logger.Handler()))
 
 	// runStatus keeps track of currently running modules
-	runStatus := new(sync.Map)
+	runStatus := sysutil.NewRunStatus()
 
-	moduleQueue := make(chan runner.Request)
+	moduleQueue := make(chan *tfaplv1beta1.Request)
 	done := make(chan bool, 1)
 
 	clock := &sysutil.Clock{}
@@ -596,7 +608,9 @@ func run(c *cli.Context) {
 		Repos:                  repos,
 		Log:                    logger.With("logger", "manager"),
 		MinIntervalBetweenRuns: time.Duration(c.Int("min-interval-between-runs")) * time.Second,
+		MaxConcurrentRuns:      c.Int("max-concurrent-runs"),
 		RunStatus:              runStatus,
+		Metrics:                metrics,
 	}).SetupWithManager(mgr, filter); err != nil {
 		logger.Error("unable to create module controller", "err", err)
 		os.Exit(1)
@@ -655,7 +669,6 @@ func run(c *cli.Context) {
 		ListenAddress: c.String("webserver-bind-address"),
 		ClusterClt:    mgr.GetClient(),
 		KubeClient:    kubeClient,
-		RunQueue:      moduleQueue,
 		RunStatus:     runStatus,
 		Log:           logger.With("logger", "webserver"),
 	}

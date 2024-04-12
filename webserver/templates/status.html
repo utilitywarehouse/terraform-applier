@@ -180,6 +180,13 @@
                         </div>
                         <div class="w-100 d-none d-md-block"></div>
                         <div class="col-12">
+                            <dt>Pending request</dt>
+                            <dd>
+                                <pre><code>{{index .ObjectMeta.Annotations "terraform-applier.uw.systems/run-request"}}</code></pre>
+                            </dd>
+                        </div>
+                        <div class="w-100 d-none d-md-block"></div>
+                        <div class="col-12">
                             <dt>Message</dt>
                             <dd>{{.Status.StateMessage}}</dd>
                         </div>
