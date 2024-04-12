@@ -378,6 +378,14 @@ func setupGlobalEnv(c *cli.Context) {
 	// terraform depends on git for pulling remote modules
 	globalRunEnv["PATH"] = os.Getenv("PATH")
 
+	// setup plugin cache
+	pluginCache, err := os.MkdirTemp("", "plugin-cache")
+	if err != nil {
+		logger.Error("unable to create plugin cache dir", "err", err)
+		os.Exit(1)
+	}
+	globalRunEnv["TF_PLUGIN_CACHE_DIR"] = pluginCache
+
 	for _, env := range strings.Split(c.String("controller-runtime-env"), ",") {
 		globalRunEnv[env] = os.Getenv(env)
 	}
