@@ -425,8 +425,7 @@ current-context: in-cluster
 users: []
 preferences: {}
 `
-	err := os.WriteFile(configPath, []byte(defaultCurrentKubeConfig), 0666)
-	if err != nil {
+	if err := os.WriteFile(configPath, []byte(defaultCurrentKubeConfig), 0666); err != nil {
 		logger.Error("unable to create custom in cluster config file", "err", err)
 		os.Exit(1)
 	}
