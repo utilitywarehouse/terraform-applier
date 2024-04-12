@@ -350,7 +350,7 @@ func (m *Module) PendingRunRequest() (*Request, bool) {
 	return &value, true
 }
 
-func GetRunReason(runType string) string {
+func RunReason(runType string) string {
 	switch runType {
 	case ScheduledRun:
 		return ReasonScheduledRunTriggered

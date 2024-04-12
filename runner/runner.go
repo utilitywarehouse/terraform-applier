@@ -389,9 +389,9 @@ func (r *Runner) SetRunStartedStatus(req *tfaplv1beta1.Request, m *tfaplv1beta1.
 	m.Status.RunCommitMsg = commitMsg
 	m.Status.RemoteURL = remoteURL
 	m.Status.StateMessage = tfaplv1beta1.NormaliseStateMsg(msg)
-	m.Status.StateReason = tfaplv1beta1.GetRunReason(req.Type)
+	m.Status.StateReason = tfaplv1beta1.RunReason(req.Type)
 
-	r.Recorder.Eventf(m, corev1.EventTypeNormal, tfaplv1beta1.GetRunReason(req.Type), "%s: type:%s, commit:%s", msg, req.Type, commitHash)
+	r.Recorder.Eventf(m, corev1.EventTypeNormal, tfaplv1beta1.RunReason(req.Type), "%s: type:%s, commit:%s", msg, req.Type, commitHash)
 
 	return sysutil.PatchModuleStatus(context.Background(), r.ClusterClt, req.NamespacedName, m.Status)
 }

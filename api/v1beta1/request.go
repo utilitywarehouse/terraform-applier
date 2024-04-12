@@ -77,9 +77,9 @@ func (req *Request) IsPlanOnly(module *Module) bool {
 	return true
 }
 
-// GetRepoRef returns the revision of the repository for the module source code
+// RepoRef returns the revision of the repository for the module source code
 // based on request type
-func (req *Request) GetRepoRef(module *Module) string {
+func (req *Request) RepoRef(module *Module) string {
 	// this is override triggered by user
 	if req.Type == PRPlan {
 		return req.PR.HeadBranch
