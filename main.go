@@ -500,7 +500,7 @@ func run(c *cli.Context) {
 	// runStatus keeps track of currently running modules
 	runStatus := sysutil.NewRunStatus()
 
-	moduleQueue := make(chan *tfaplv1beta1.Request)
+	moduleQueue := make(chan *tfaplv1beta1.Run)
 	done := make(chan bool, 1)
 
 	clock := &sysutil.Clock{}

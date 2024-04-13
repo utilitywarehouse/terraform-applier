@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"fmt"
+	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -15,13 +16,25 @@ var (
 	ErrRunRequestMismatch = fmt.Errorf("run request ID doesn't match pending request id")
 )
 
+// Run represents a complete run result of the terraform run
+type Run struct {
+	Module  types.NamespacedName `json:"module,omitempty"`
+	Request *Request             `json:"request,omitempty"`
+
+	Status     string        `json:"status,omitempty"` // 'Running','Success','Error'
+	StartedAt  *metav1.Time  `json:"startedAT,omitempty"`
+	Duration   time.Duration `json:"duration,omitempty"`
+	CommitHash string        `json:"commitHash,omitempty"`
+	CommitMsg  string        `json:"commitMsg,omitempty"`
+	Output     string        `json:"output,omitempty"`
+}
+
 // Request represents terraform run request
 type Request struct {
-	NamespacedName types.NamespacedName `json:"-"`
-	ID             string               `json:"id,omitempty"`
-	RequestedAt    *metav1.Time         `json:"reqAt,omitempty"`
-	Type           string               `json:"type,omitempty"`
-	PR             *PullRequest         `json:"pr,omitempty"`
+	ID          string       `json:"id,omitempty"`
+	RequestedAt *metav1.Time `json:"reqAt,omitempty"`
+	Type        string       `json:"type,omitempty"`
+	PR          *PullRequest `json:"pr,omitempty"`
 }
 
 type PullRequest struct {
@@ -31,12 +44,7 @@ type PullRequest struct {
 }
 
 func (req *Request) Validate() error {
-	if req.NamespacedName.Namespace == "" {
-		return fmt.Errorf("namespace is required")
-	}
-	if req.NamespacedName.Name == "" {
-		return fmt.Errorf("name is required")
-	}
+
 	if req.RequestedAt.IsZero() {
 		return fmt.Errorf("valid timestamp is required for 'RequestedAt'")
 	}

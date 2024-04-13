@@ -81,8 +81,8 @@ var _ = Describe("Module controller without runner", func() {
 				timer := time.NewTimer(time.Second)
 				for {
 					select {
-					case req := <-testControllerQueue:
-						return req.NamespacedName
+					case run := <-testControllerQueue:
+						return run.Module
 					case <-timer.C:
 						return types.NamespacedName{}
 					}
@@ -103,8 +103,8 @@ var _ = Describe("Module controller without runner", func() {
 				timer := time.NewTimer(time.Second)
 				for {
 					select {
-					case req := <-testControllerQueue:
-						return req.NamespacedName
+					case run := <-testControllerQueue:
+						return run.Module
 					case <-timer.C:
 						return types.NamespacedName{}
 					}
@@ -118,8 +118,8 @@ var _ = Describe("Module controller without runner", func() {
 				timer := time.NewTimer(time.Second)
 				for {
 					select {
-					case req := <-testControllerQueue:
-						return req.NamespacedName
+					case run := <-testControllerQueue:
+						return run.Module
 					case <-timer.C:
 						return types.NamespacedName{}
 					}
@@ -162,8 +162,8 @@ var _ = Describe("Module controller without runner", func() {
 				timer := time.NewTimer(time.Second)
 				for {
 					select {
-					case req := <-testControllerQueue:
-						return req.NamespacedName
+					case run := <-testControllerQueue:
+						return run.Module
 					case <-timer.C:
 						return types.NamespacedName{}
 					}
@@ -183,8 +183,8 @@ var _ = Describe("Module controller without runner", func() {
 				timer := time.NewTimer(time.Second)
 				for {
 					select {
-					case req := <-testControllerQueue:
-						return req.NamespacedName
+					case run := <-testControllerQueue:
+						return run.Module
 					case <-timer.C:
 						return types.NamespacedName{}
 					}
@@ -227,8 +227,8 @@ var _ = Describe("Module controller without runner", func() {
 				timer := time.NewTimer(time.Second)
 				for {
 					select {
-					case req := <-testControllerQueue:
-						return req.NamespacedName
+					case run := <-testControllerQueue:
+						return run.Module
 					case <-timer.C:
 						return types.NamespacedName{}
 					}
@@ -290,8 +290,8 @@ var _ = Describe("Module controller without runner", func() {
 				timer := time.NewTimer(time.Second)
 				for {
 					select {
-					case req := <-testControllerQueue:
-						return req.NamespacedName
+					case run := <-testControllerQueue:
+						return run.Module
 					case <-timer.C:
 						return types.NamespacedName{}
 					}
@@ -356,8 +356,8 @@ var _ = Describe("Module controller without runner", func() {
 				timer := time.NewTimer(time.Second)
 				for {
 					select {
-					case req := <-testControllerQueue:
-						return req.NamespacedName
+					case run := <-testControllerQueue:
+						return run.Module
 					case <-timer.C:
 						return types.NamespacedName{}
 					}

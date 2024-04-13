@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -45,7 +46,7 @@ type ModuleReconciler struct {
 	Recorder               record.EventRecorder
 	Clock                  sysutil.ClockInterface
 	Repos                  git.Repositories
-	Queue                  chan<- *tfaplv1beta1.Request
+	Queue                  chan<- *tfaplv1beta1.Run
 	Log                    *slog.Logger
 	MinIntervalBetweenRuns time.Duration
 	MaxConcurrentRuns      int
@@ -128,7 +129,7 @@ func (r *ModuleReconciler) Reconcile(ctx context.Context, req reconcile.Request)
 	if ok {
 		log.Debug("processing pending run request", "req", runReq, "delay", time.Since(runReq.RequestedAt.Time))
 		// use next poll internal as minimum queue duration as status change will not trigger Reconcile
-		return r.triggerRunORRequeue(runReq, pollIntervalDuration)
+		return r.triggerRunORRequeue(module, runReq, pollIntervalDuration)
 
 	}
 
@@ -138,7 +139,7 @@ func (r *ModuleReconciler) Reconcile(ctx context.Context, req reconcile.Request)
 	if module.Status.RunCommitHash == "" {
 		log.Debug("requesting initial run")
 		// use next poll internal as minimum queue duration as status change will not trigger Reconcile
-		return r.triggerRunORRequeue(module.NewRunRequest(tfaplv1beta1.PollingRun), pollIntervalDuration)
+		return r.triggerRunORRequeue(module, module.NewRunRequest(tfaplv1beta1.PollingRun), pollIntervalDuration)
 	}
 
 	// case 3:
@@ -156,7 +157,7 @@ func (r *ModuleReconciler) Reconcile(ctx context.Context, req reconcile.Request)
 	if hash != module.Status.RunCommitHash {
 		log.Debug("requesting run as revision is changed on module path", "lastRun", module.Status.RunCommitHash, "current", hash)
 		// use next poll internal as minimum queue duration as status change will not trigger Reconcile
-		return r.triggerRunORRequeue(module.NewRunRequest(tfaplv1beta1.PollingRun), pollIntervalDuration)
+		return r.triggerRunORRequeue(module, module.NewRunRequest(tfaplv1beta1.PollingRun), pollIntervalDuration)
 	}
 
 	// case 4:
@@ -182,7 +183,7 @@ func (r *ModuleReconciler) Reconcile(ctx context.Context, req reconcile.Request)
 	if numOfMissedRuns > 0 {
 		log.Debug("requesting scheduled run", "missed-runs", numOfMissedRuns)
 		// use next poll internal as minimum queue duration as status change will not trigger Reconcile
-		return r.triggerRunORRequeue(module.NewRunRequest(tfaplv1beta1.ScheduledRun), pollIntervalDuration)
+		return r.triggerRunORRequeue(module, module.NewRunRequest(tfaplv1beta1.ScheduledRun), pollIntervalDuration)
 	}
 
 	// default:
@@ -273,14 +274,22 @@ func NextSchedule(module *tfaplv1beta1.Module, now time.Time, minIntervalBetween
 
 // triggerRunORRequeue will check controller capacity before triggering a run
 // if max limit is reached it will re-queue module to try again
-func (r *ModuleReconciler) triggerRunORRequeue(runReq *tfaplv1beta1.Request, requeueAfter time.Duration) (ctrl.Result, error) {
+func (r *ModuleReconciler) triggerRunORRequeue(m *tfaplv1beta1.Module, runReq *tfaplv1beta1.Request, requeueAfter time.Duration) (ctrl.Result, error) {
+	run := tfaplv1beta1.Run{
+		Module: types.NamespacedName{
+			Namespace: m.Namespace,
+			Name:      m.Name,
+		},
+		Request: runReq,
+	}
+
 	runningModuleCount := r.RunStatus.Len()
 	if r.MaxConcurrentRuns <= 0 || runningModuleCount < r.MaxConcurrentRuns {
-		r.Queue <- runReq
-		r.Metrics.SetRunPending(runReq.NamespacedName.Namespace, runReq.NamespacedName.Name, false)
+		r.Queue <- &run
+		r.Metrics.SetRunPending(run.Module.Namespace, run.Module.Name, false)
 	} else {
-		r.Metrics.SetRunPending(runReq.NamespacedName.Namespace, runReq.NamespacedName.Name, true)
-		r.Log.Warn("skipping run max concurrent run limit reached", "module", runReq.NamespacedName, "count", runningModuleCount)
+		r.Metrics.SetRunPending(run.Module.Namespace, run.Module.Name, true)
+		r.Log.Warn("skipping run max concurrent run limit reached", "module", run.Module, "count", runningModuleCount)
 	}
 	return ctrl.Result{RequeueAfter: requeueAfter}, nil
 }

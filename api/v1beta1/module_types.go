@@ -312,16 +312,19 @@ type Subject struct {
 	Name string `json:"name,omitempty"`
 }
 
+func (m *Module) NamespacedName() types.NamespacedName {
+	return types.NamespacedName{
+		Namespace: m.Namespace,
+		Name:      m.Name,
+	}
+}
+
 func (m *Module) IsPlanOnly() bool {
 	return m.Spec.PlanOnly != nil && *m.Spec.PlanOnly
 }
 
 func (m *Module) NewRunRequest(reqType string) *Request {
 	req := Request{
-		NamespacedName: types.NamespacedName{
-			Namespace: m.Namespace,
-			Name:      m.Name,
-		},
 		RequestedAt: &metav1.Time{Time: time.Now()},
 		ID:          NewRequestID(),
 		Type:        reqType,
@@ -342,10 +345,6 @@ func (m *Module) PendingRunRequest() (*Request, bool) {
 		// it can be treated as no request pending and module can override it
 		// with new valid request
 		return nil, false
-	}
-	value.NamespacedName = types.NamespacedName{
-		Namespace: m.Namespace,
-		Name:      m.Name,
 	}
 	return &value, true
 }

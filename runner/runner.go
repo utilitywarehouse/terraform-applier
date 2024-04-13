@@ -32,7 +32,7 @@ type Runner struct {
 	Recorder               record.EventRecorder
 	KubeClt                kubernetes.Interface
 	Repos                  git.Repositories
-	Queue                  <-chan *tfaplv1beta1.Request
+	Queue                  <-chan *tfaplv1beta1.Run
 	Log                    *slog.Logger
 	Delegate               DelegateInterface
 	Metrics                metrics.PrometheusInterface
@@ -63,51 +63,51 @@ func (r *Runner) Start(ctx context.Context, done chan bool) {
 			done <- true
 			return
 
-		case req := <-r.Queue:
+		case run := <-r.Queue:
 			wg.Add(1)
-			go func(req *tfaplv1beta1.Request) {
+			go func(run *tfaplv1beta1.Run) {
 				defer wg.Done()
 
-				if err := req.Validate(); err != nil {
-					r.Log.Error("run triggered with invalid request", "req", req, "err", err)
+				if err := run.Request.Validate(); err != nil {
+					r.Log.Error("run triggered with invalid request", "req", run, "err", err)
 					return
 				}
 
 				start := time.Now()
 
-				r.Log.Info("starting run", "module", req.NamespacedName, "type", req.Type)
+				r.Log.Info("starting run", "module", run.Module, "type", run.Request.Type)
 
-				success := r.process(req, cancelChan)
+				success := r.process(run, cancelChan)
 
 				if success {
-					r.Log.Info("run completed successfully", "module", req.NamespacedName)
+					r.Log.Info("run completed successfully", "module", run.Module)
 				} else {
-					r.Log.Error("run completed with error", "module", req.NamespacedName)
+					r.Log.Error("run completed with error", "module", run.Module)
 				}
-				r.Metrics.UpdateModuleSuccess(req.NamespacedName.Name, req.NamespacedName.Namespace, success)
-				r.Metrics.UpdateModuleRunDuration(req.NamespacedName.Name, req.NamespacedName.Namespace, time.Since(start).Seconds(), success)
-			}(req)
+				r.Metrics.UpdateModuleSuccess(run.Module.Name, run.Module.Namespace, success)
+				r.Metrics.UpdateModuleRunDuration(run.Module.Name, run.Module.Namespace, time.Since(start).Seconds(), success)
+			}(run)
 		}
 	}
 }
 
 // process will prepare and run module it returns bool indicating failed run
-func (r *Runner) process(req *tfaplv1beta1.Request, cancelChan <-chan struct{}) bool {
-	log := r.Log.With("module", req.NamespacedName)
+func (r *Runner) process(run *tfaplv1beta1.Run, cancelChan <-chan struct{}) bool {
+	log := r.Log.With("module", run.Module)
 
 	// make sure module is not already running
-	_, ok := r.RunStatus.Load(req.NamespacedName.String())
+	_, ok := r.RunStatus.Load(run.Module.String())
 	if ok {
 		log.Error("skipping run request as another run is in progress on this module")
 		return false
 	}
 	// set running status
-	r.RunStatus.Store(req.NamespacedName.String(), true)
-	defer r.RunStatus.Delete(req.NamespacedName.String())
+	r.RunStatus.Store(run.Module.String(), true)
+	defer r.RunStatus.Delete(run.Module.String())
 
 	// remove pending run request regardless of run outcome
 	defer func() {
-		if err := sysutil.RemoveRequest(context.Background(), r.ClusterClt, req); err != nil {
+		if err := sysutil.RemoveRequest(context.Background(), r.ClusterClt, run.Module, run.Request); err != nil {
 			log.Error("unable to remove run request", "err", err)
 		}
 	}()
@@ -117,7 +117,7 @@ func (r *Runner) process(req *tfaplv1beta1.Request, cancelChan <-chan struct{}) 
 	defer cancel()
 
 	// get Object
-	module, err := sysutil.GetModule(ctx, r.ClusterClt, req.NamespacedName)
+	module, err := sysutil.GetModule(ctx, r.ClusterClt, run.Module)
 	if err != nil {
 		log.Error("unable to fetch terraform module", "err", err)
 		return false
@@ -165,12 +165,12 @@ func (r *Runner) process(req *tfaplv1beta1.Request, cancelChan <-chan struct{}) 
 	if isChannelClosed(cancelChan) {
 		msg := "terraform run interrupted as runner is shutting down"
 		log.Error(msg)
-		r.setFailedStatus(req, module, tfaplv1beta1.ReasonControllerShutdown, msg, r.Clock.Now())
+		r.setFailedStatus(run, module, tfaplv1beta1.ReasonControllerShutdown, msg, r.Clock.Now())
 		return false
 	}
 
 	// Update Status
-	if err = r.SetRunStartedStatus(req, module, "preparing for TF run", commitHash, commitLog, module.Spec.RepoURL, r.Clock.Now()); err != nil {
+	if err = r.SetRunStartedStatus(run, module, "preparing for TF run", commitHash, commitLog, module.Spec.RepoURL, r.Clock.Now()); err != nil {
 		log.Error("unable to set run starting status", "err", err)
 		return false
 	}
@@ -180,7 +180,7 @@ func (r *Runner) process(req *tfaplv1beta1.Request, cancelChan <-chan struct{}) 
 	if err != nil {
 		msg := fmt.Sprintf("unable to get service account token: err:%s", err)
 		log.Error(msg)
-		r.setFailedStatus(req, module, tfaplv1beta1.ReasonDelegationFailed, msg, r.Clock.Now())
+		r.setFailedStatus(run, module, tfaplv1beta1.ReasonDelegationFailed, msg, r.Clock.Now())
 		return false
 	}
 
@@ -188,7 +188,7 @@ func (r *Runner) process(req *tfaplv1beta1.Request, cancelChan <-chan struct{}) 
 	if err != nil {
 		msg := fmt.Sprintf("unable to create kube client: err:%s", err)
 		log.Error(msg)
-		r.setFailedStatus(req, module, tfaplv1beta1.ReasonDelegationFailed, msg, r.Clock.Now())
+		r.setFailedStatus(run, module, tfaplv1beta1.ReasonDelegationFailed, msg, r.Clock.Now())
 		return false
 	}
 
@@ -196,7 +196,7 @@ func (r *Runner) process(req *tfaplv1beta1.Request, cancelChan <-chan struct{}) 
 	if err != nil {
 		msg := fmt.Sprintf("unable to get backend config: err:%s", err)
 		log.Error(msg)
-		r.setFailedStatus(req, module, tfaplv1beta1.ReasonRunPreparationFailed, msg, r.Clock.Now())
+		r.setFailedStatus(run, module, tfaplv1beta1.ReasonRunPreparationFailed, msg, r.Clock.Now())
 		return false
 	}
 
@@ -204,7 +204,7 @@ func (r *Runner) process(req *tfaplv1beta1.Request, cancelChan <-chan struct{}) 
 	if err != nil {
 		msg := fmt.Sprintf("unable to get envs: err:%s", err)
 		log.Error(msg)
-		r.setFailedStatus(req, module, tfaplv1beta1.ReasonRunPreparationFailed, msg, r.Clock.Now())
+		r.setFailedStatus(run, module, tfaplv1beta1.ReasonRunPreparationFailed, msg, r.Clock.Now())
 		return false
 	}
 
@@ -212,7 +212,7 @@ func (r *Runner) process(req *tfaplv1beta1.Request, cancelChan <-chan struct{}) 
 	if err != nil {
 		msg := fmt.Sprintf("unable to get vars: err:%s", err)
 		log.Error(msg)
-		r.setFailedStatus(req, module, tfaplv1beta1.ReasonRunPreparationFailed, msg, r.Clock.Now())
+		r.setFailedStatus(run, module, tfaplv1beta1.ReasonRunPreparationFailed, msg, r.Clock.Now())
 		return false
 	}
 
@@ -222,7 +222,7 @@ func (r *Runner) process(req *tfaplv1beta1.Request, cancelChan <-chan struct{}) 
 			if err != nil {
 				msg := fmt.Sprintf("unable to generate vault aws secrets: err:%s", err)
 				log.Error(msg)
-				r.setFailedStatus(req, module, tfaplv1beta1.ReasonRunPreparationFailed, msg, r.Clock.Now())
+				r.setFailedStatus(run, module, tfaplv1beta1.ReasonRunPreparationFailed, msg, r.Clock.Now())
 				return false
 			}
 		}
@@ -232,29 +232,29 @@ func (r *Runner) process(req *tfaplv1beta1.Request, cancelChan <-chan struct{}) 
 	if err != nil {
 		msg := fmt.Sprintf("unable to create terraform executer: err:%s", err)
 		log.Error(msg)
-		r.setFailedStatus(req, module, tfaplv1beta1.ReasonRunPreparationFailed, msg, r.Clock.Now())
+		r.setFailedStatus(run, module, tfaplv1beta1.ReasonRunPreparationFailed, msg, r.Clock.Now())
 		return false
 	}
 	defer te.cleanUp()
 
 	// Process RUN
-	return r.runTF(ctx, req, module, te, backendConf, commitHash, cancelChan)
+	return r.runTF(ctx, run, module, te, backendConf, commitHash, cancelChan)
 }
 
 // runTF executes terraform commands and updates module status when required.
 // it returns bool indicating success or failure
 func (r *Runner) runTF(
 	ctx context.Context,
-	req *tfaplv1beta1.Request,
+	run *tfaplv1beta1.Run,
 	module *tfaplv1beta1.Module,
 	te TFExecuter,
 	backendConf map[string]string,
 	commitHash string,
 	cancelChan <-chan struct{},
 ) bool {
-	log := r.Log.With("module", req.NamespacedName)
+	log := r.Log.With("module", run.Module)
 
-	if err := r.SetProgressingStatus(req.NamespacedName, module, "Initialising"); err != nil {
+	if err := r.SetProgressingStatus(run.Module, module, "Initialising"); err != nil {
 		log.Error("unable to set init status", "err", err)
 		return false
 	}
@@ -264,7 +264,7 @@ func (r *Runner) runTF(
 		msg := fmt.Sprintf("unable to init module: err:%s", err)
 		// tf err contains new lines not suitable logging
 		log.Error("unable to init module", "err", fmt.Sprintf("%q", err))
-		r.setFailedStatus(req, module, tfaplv1beta1.ReasonInitialiseFailed, msg, r.Clock.Now())
+		r.setFailedStatus(run, module, tfaplv1beta1.ReasonInitialiseFailed, msg, r.Clock.Now())
 		return false
 	}
 
@@ -272,7 +272,7 @@ func (r *Runner) runTF(
 	r.Recorder.Event(module, corev1.EventTypeNormal, tfaplv1beta1.ReasonInitialised, "Initialised successfully")
 
 	// Start Planing
-	if err = r.SetProgressingStatus(req.NamespacedName, module, "Planning"); err != nil {
+	if err = r.SetProgressingStatus(run.Module, module, "Planning"); err != nil {
 		log.Error("unable to set planning status", "err", err)
 		return false
 	}
@@ -281,7 +281,7 @@ func (r *Runner) runTF(
 	if isChannelClosed(cancelChan) {
 		msg := "unable to plan module: terraform run interrupted as runner is shutting down"
 		log.Error(msg)
-		r.setFailedStatus(req, module, tfaplv1beta1.ReasonControllerShutdown, msg, r.Clock.Now())
+		r.setFailedStatus(run, module, tfaplv1beta1.ReasonControllerShutdown, msg, r.Clock.Now())
 		return false
 	}
 
@@ -291,7 +291,7 @@ func (r *Runner) runTF(
 		msg := fmt.Sprintf("unable to plan module: err:%s", err)
 		// tf err contains new lines not suitable logging
 		log.Error("unable to plan module", "err", fmt.Sprintf("%q", err))
-		r.setFailedStatus(req, module, tfaplv1beta1.ReasonPlanFailed, msg, r.Clock.Now())
+		r.setFailedStatus(run, module, tfaplv1beta1.ReasonPlanFailed, msg, r.Clock.Now())
 		return false
 	}
 
@@ -309,14 +309,14 @@ func (r *Runner) runTF(
 		msg := fmt.Sprintf("unable to get saved plan: err:%s", err)
 		// tf err contains new lines not suitable logging
 		log.Error("unable to get saved plan", "err", fmt.Sprintf("%q", err))
-		r.setFailedStatus(req, module, tfaplv1beta1.ReasonPlanFailed, msg, r.Clock.Now())
+		r.setFailedStatus(run, module, tfaplv1beta1.ReasonPlanFailed, msg, r.Clock.Now())
 		return false
 	}
 	module.Status.RunOutput = savedPlan
 
 	// return if no drift detected
 	if !diffDetected {
-		if err = r.SetRunFinishedStatus(req.NamespacedName, module, tfaplv1beta1.ReasonPlanedNoDriftDetected, planStatus, r.Clock.Now()); err != nil {
+		if err = r.SetRunFinishedStatus(run.Module, module, tfaplv1beta1.ReasonPlanedNoDriftDetected, planStatus, r.Clock.Now()); err != nil {
 			log.Error("unable to set no drift status", "err", err)
 			return false
 		}
@@ -324,8 +324,8 @@ func (r *Runner) runTF(
 	}
 
 	// return if plan only mode
-	if req.IsPlanOnly(module) {
-		if err = r.SetRunFinishedStatus(req.NamespacedName, module, tfaplv1beta1.ReasonPlanedDriftDetected, "PlanOnly/"+planStatus, r.Clock.Now()); err != nil {
+	if run.Request.IsPlanOnly(module) {
+		if err = r.SetRunFinishedStatus(run.Module, module, tfaplv1beta1.ReasonPlanedDriftDetected, "PlanOnly/"+planStatus, r.Clock.Now()); err != nil {
 			log.Error("unable to set drift status", "err", err)
 			return false
 		}
@@ -336,12 +336,12 @@ func (r *Runner) runTF(
 	if isChannelClosed(cancelChan) {
 		msg := "unable to apply module: terraform run interrupted as runner is shutting down"
 		log.Error(msg)
-		r.setFailedStatus(req, module, tfaplv1beta1.ReasonControllerShutdown, msg, r.Clock.Now())
+		r.setFailedStatus(run, module, tfaplv1beta1.ReasonControllerShutdown, msg, r.Clock.Now())
 		return false
 	}
 
 	// Start Applying
-	if err = r.SetProgressingStatus(req.NamespacedName, module, "Applying/"+planStatus); err != nil {
+	if err = r.SetProgressingStatus(run.Module, module, "Applying/"+planStatus); err != nil {
 		log.Error("unable to set applying status", "err", err)
 		return false
 	}
@@ -352,7 +352,7 @@ func (r *Runner) runTF(
 		msg := fmt.Sprintf("unable to apply module: err:%s", err)
 		// tf err contains new lines not suitable logging
 		log.Error("unable to apply module", "err", fmt.Sprintf("%q", err))
-		r.setFailedStatus(req, module, tfaplv1beta1.ReasonApplyFailed, msg, r.Clock.Now())
+		r.setFailedStatus(run, module, tfaplv1beta1.ReasonApplyFailed, msg, r.Clock.Now())
 		return false
 	}
 	module.Status.RunOutput = savedPlan + applyOut
@@ -364,7 +364,7 @@ func (r *Runner) runTF(
 
 	log.Info("applied", "status", applyStatus)
 
-	if err = r.SetRunFinishedStatus(req.NamespacedName, module, tfaplv1beta1.ReasonApplied, applyStatus, r.Clock.Now()); err != nil {
+	if err = r.SetRunFinishedStatus(run.Module, module, tfaplv1beta1.ReasonApplied, applyStatus, r.Clock.Now()); err != nil {
 		log.Error("unable to set finished status", "err", err)
 		return false
 	}
@@ -378,10 +378,10 @@ func (r *Runner) SetProgressingStatus(objectKey types.NamespacedName, m *tfaplv1
 	return sysutil.PatchModuleStatus(context.Background(), r.ClusterClt, objectKey, m.Status)
 }
 
-func (r *Runner) SetRunStartedStatus(req *tfaplv1beta1.Request, m *tfaplv1beta1.Module, msg, commitHash, commitMsg, remoteURL string, now time.Time) error {
+func (r *Runner) SetRunStartedStatus(req *tfaplv1beta1.Run, m *tfaplv1beta1.Module, msg, commitHash, commitMsg, remoteURL string, now time.Time) error {
 
 	m.Status.CurrentState = string(tfaplv1beta1.StatusRunning)
-	m.Status.RunType = req.Type
+	m.Status.RunType = req.Request.Type
 	m.Status.RunStartedAt = &metav1.Time{Time: now}
 	m.Status.RunDuration = nil
 	m.Status.ObservedGeneration = m.Generation
@@ -389,11 +389,11 @@ func (r *Runner) SetRunStartedStatus(req *tfaplv1beta1.Request, m *tfaplv1beta1.
 	m.Status.RunCommitMsg = commitMsg
 	m.Status.RemoteURL = remoteURL
 	m.Status.StateMessage = tfaplv1beta1.NormaliseStateMsg(msg)
-	m.Status.StateReason = tfaplv1beta1.RunReason(req.Type)
+	m.Status.StateReason = tfaplv1beta1.RunReason(req.Request.Type)
 
-	r.Recorder.Eventf(m, corev1.EventTypeNormal, tfaplv1beta1.RunReason(req.Type), "%s: type:%s, commit:%s", msg, req.Type, commitHash)
+	r.Recorder.Eventf(m, corev1.EventTypeNormal, tfaplv1beta1.RunReason(req.Request.Type), "%s: type:%s, commit:%s", msg, req.Request.Type, commitHash)
 
-	return sysutil.PatchModuleStatus(context.Background(), r.ClusterClt, req.NamespacedName, m.Status)
+	return sysutil.PatchModuleStatus(context.Background(), r.ClusterClt, req.Module, m.Status)
 }
 
 func (r *Runner) SetRunFinishedStatus(objectKey types.NamespacedName, m *tfaplv1beta1.Module, reason, msg string, now time.Time) error {
@@ -407,7 +407,7 @@ func (r *Runner) SetRunFinishedStatus(objectKey types.NamespacedName, m *tfaplv1
 	return sysutil.PatchModuleStatus(context.Background(), r.ClusterClt, objectKey, m.Status)
 }
 
-func (r *Runner) setFailedStatus(req *tfaplv1beta1.Request, module *tfaplv1beta1.Module, reason, msg string, now time.Time) {
+func (r *Runner) setFailedStatus(req *tfaplv1beta1.Run, module *tfaplv1beta1.Module, reason, msg string, now time.Time) {
 
 	module.Status.CurrentState = string(tfaplv1beta1.StatusErrored)
 	module.Status.RunDuration = &metav1.Duration{Duration: now.Sub(module.Status.RunStartedAt.Time).Round(time.Second)}
@@ -416,7 +416,7 @@ func (r *Runner) setFailedStatus(req *tfaplv1beta1.Request, module *tfaplv1beta1
 
 	r.Recorder.Event(module, corev1.EventTypeWarning, reason, fmt.Sprintf("%q", msg))
 
-	if err := sysutil.PatchModuleStatus(context.Background(), r.ClusterClt, req.NamespacedName, module.Status); err != nil {
+	if err := sysutil.PatchModuleStatus(context.Background(), r.ClusterClt, req.Module, module.Status); err != nil {
 		r.Log.With("module", req).Error("unable to set failed status", "err", err)
 	}
 }

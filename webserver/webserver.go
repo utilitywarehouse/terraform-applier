@@ -227,7 +227,7 @@ func (f *ForceRunHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	req := module.NewRunRequest(reqType)
 
-	err = sysutil.EnsureRequest(r.Context(), f.ClusterClt, req)
+	err = sysutil.EnsureRequest(r.Context(), f.ClusterClt, module.NamespacedName(), req)
 	switch {
 	case err == nil:
 		data.Result = "success"
