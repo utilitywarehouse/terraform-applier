@@ -105,6 +105,8 @@ func (r *Runner) process(run *tfaplv1beta1.Run, cancelChan <-chan struct{}) bool
 	r.RunStatus.Store(run.Module.String(), true)
 	defer r.RunStatus.Delete(run.Module.String())
 
+	run.Status = tfaplv1beta1.StatusRunning
+
 	// remove pending run request regardless of run outcome
 	defer func() {
 		if err := sysutil.RemoveRequest(context.Background(), r.ClusterClt, run.Module, run.Request); err != nil {
@@ -313,10 +315,11 @@ func (r *Runner) runTF(
 		return false
 	}
 	module.Status.RunOutput = savedPlan
+	run.Output = savedPlan
 
 	// return if no drift detected
 	if !diffDetected {
-		if err = r.SetRunFinishedStatus(run.Module, module, tfaplv1beta1.ReasonPlanedNoDriftDetected, planStatus, r.Clock.Now()); err != nil {
+		if err = r.SetRunFinishedStatus(run, module, tfaplv1beta1.ReasonPlanedNoDriftDetected, planStatus, r.Clock.Now()); err != nil {
 			log.Error("unable to set no drift status", "err", err)
 			return false
 		}
@@ -325,7 +328,7 @@ func (r *Runner) runTF(
 
 	// return if plan only mode
 	if run.Request.IsPlanOnly(module) {
-		if err = r.SetRunFinishedStatus(run.Module, module, tfaplv1beta1.ReasonPlanedDriftDetected, "PlanOnly/"+planStatus, r.Clock.Now()); err != nil {
+		if err = r.SetRunFinishedStatus(run, module, tfaplv1beta1.ReasonPlanedDriftDetected, "PlanOnly/"+planStatus, r.Clock.Now()); err != nil {
 			log.Error("unable to set drift status", "err", err)
 			return false
 		}
@@ -356,6 +359,7 @@ func (r *Runner) runTF(
 		return false
 	}
 	module.Status.RunOutput = savedPlan + applyOut
+	run.Output += applyOut
 	module.Status.LastApplyInfo = tfaplv1beta1.OutputStats{Timestamp: &metav1.Time{Time: r.Clock.Now()}, CommitHash: commitHash, Output: savedPlan + applyOut}
 
 	// extract last line of output
@@ -364,7 +368,7 @@ func (r *Runner) runTF(
 
 	log.Info("applied", "status", applyStatus)
 
-	if err = r.SetRunFinishedStatus(run.Module, module, tfaplv1beta1.ReasonApplied, applyStatus, r.Clock.Now()); err != nil {
+	if err = r.SetRunFinishedStatus(run, module, tfaplv1beta1.ReasonApplied, applyStatus, r.Clock.Now()); err != nil {
 		log.Error("unable to set finished status", "err", err)
 		return false
 	}
@@ -378,10 +382,14 @@ func (r *Runner) SetProgressingStatus(objectKey types.NamespacedName, m *tfaplv1
 	return sysutil.PatchModuleStatus(context.Background(), r.ClusterClt, objectKey, m.Status)
 }
 
-func (r *Runner) SetRunStartedStatus(req *tfaplv1beta1.Run, m *tfaplv1beta1.Module, msg, commitHash, commitMsg, remoteURL string, now time.Time) error {
+func (r *Runner) SetRunStartedStatus(run *tfaplv1beta1.Run, m *tfaplv1beta1.Module, msg, commitHash, commitMsg, remoteURL string, now time.Time) error {
+
+	run.StartedAt = &metav1.Time{Time: now}
+	run.CommitHash = commitHash
+	run.CommitMsg = commitMsg
 
 	m.Status.CurrentState = string(tfaplv1beta1.StatusRunning)
-	m.Status.RunType = req.Request.Type
+	m.Status.RunType = run.Request.Type
 	m.Status.RunStartedAt = &metav1.Time{Time: now}
 	m.Status.RunDuration = nil
 	m.Status.ObservedGeneration = m.Generation
@@ -389,14 +397,18 @@ func (r *Runner) SetRunStartedStatus(req *tfaplv1beta1.Run, m *tfaplv1beta1.Modu
 	m.Status.RunCommitMsg = commitMsg
 	m.Status.RemoteURL = remoteURL
 	m.Status.StateMessage = tfaplv1beta1.NormaliseStateMsg(msg)
-	m.Status.StateReason = tfaplv1beta1.RunReason(req.Request.Type)
+	m.Status.StateReason = tfaplv1beta1.RunReason(run.Request.Type)
 
-	r.Recorder.Eventf(m, corev1.EventTypeNormal, tfaplv1beta1.RunReason(req.Request.Type), "%s: type:%s, commit:%s", msg, req.Request.Type, commitHash)
+	r.Recorder.Eventf(m, corev1.EventTypeNormal, tfaplv1beta1.RunReason(run.Request.Type), "%s: type:%s, commit:%s", msg, run.Request.Type, commitHash)
 
-	return sysutil.PatchModuleStatus(context.Background(), r.ClusterClt, req.Module, m.Status)
+	return sysutil.PatchModuleStatus(context.Background(), r.ClusterClt, run.Module, m.Status)
 }
 
-func (r *Runner) SetRunFinishedStatus(objectKey types.NamespacedName, m *tfaplv1beta1.Module, reason, msg string, now time.Time) error {
+func (r *Runner) SetRunFinishedStatus(run *tfaplv1beta1.Run, m *tfaplv1beta1.Module, reason, msg string, now time.Time) error {
+
+	run.Status = tfaplv1beta1.StatusSuccess
+	run.Duration = time.Since(run.StartedAt.Time)
+
 	m.Status.CurrentState = string(tfaplv1beta1.StatusReady)
 	m.Status.RunDuration = &metav1.Duration{Duration: now.Sub(m.Status.RunStartedAt.Time).Round(time.Second)}
 	m.Status.StateMessage = tfaplv1beta1.NormaliseStateMsg(msg)
@@ -404,10 +416,13 @@ func (r *Runner) SetRunFinishedStatus(objectKey types.NamespacedName, m *tfaplv1
 
 	r.Recorder.Event(m, corev1.EventTypeNormal, reason, msg)
 
-	return sysutil.PatchModuleStatus(context.Background(), r.ClusterClt, objectKey, m.Status)
+	return sysutil.PatchModuleStatus(context.Background(), r.ClusterClt, m.NamespacedName(), m.Status)
 }
 
-func (r *Runner) setFailedStatus(req *tfaplv1beta1.Run, module *tfaplv1beta1.Module, reason, msg string, now time.Time) {
+func (r *Runner) setFailedStatus(run *tfaplv1beta1.Run, module *tfaplv1beta1.Module, reason, msg string, now time.Time) {
+
+	run.Status = tfaplv1beta1.StatusErrored
+	run.Duration = time.Since(run.StartedAt.Time)
 
 	module.Status.CurrentState = string(tfaplv1beta1.StatusErrored)
 	module.Status.RunDuration = &metav1.Duration{Duration: now.Sub(module.Status.RunStartedAt.Time).Round(time.Second)}
@@ -416,8 +431,8 @@ func (r *Runner) setFailedStatus(req *tfaplv1beta1.Run, module *tfaplv1beta1.Mod
 
 	r.Recorder.Event(module, corev1.EventTypeWarning, reason, fmt.Sprintf("%q", msg))
 
-	if err := sysutil.PatchModuleStatus(context.Background(), r.ClusterClt, req.Module, module.Status); err != nil {
-		r.Log.With("module", req).Error("unable to set failed status", "err", err)
+	if err := sysutil.PatchModuleStatus(context.Background(), r.ClusterClt, run.Module, module.Status); err != nil {
+		r.Log.With("module", run).Error("unable to set failed status", "err", err)
 	}
 }
 

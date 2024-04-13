@@ -84,6 +84,8 @@ const (
 	StatusReady state = "Ready"
 	// 'Errored' -> last run finished with Error and its waiting on next run/event
 	StatusErrored state = "Errored"
+	// 'Success' ->  last run was a success
+	StatusSuccess state = "Success"
 )
 
 // ModuleSpec defines the desired state of Module

@@ -21,7 +21,7 @@ type Run struct {
 	Module  types.NamespacedName `json:"module,omitempty"`
 	Request *Request             `json:"request,omitempty"`
 
-	Status     string        `json:"status,omitempty"` // 'Running','Success','Error'
+	Status     state         `json:"status,omitempty"` // 'Running','Success','Error'
 	StartedAt  *metav1.Time  `json:"startedAT,omitempty"`
 	Duration   time.Duration `json:"duration,omitempty"`
 	CommitHash string        `json:"commitHash,omitempty"`
