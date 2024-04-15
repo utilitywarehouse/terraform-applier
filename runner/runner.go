@@ -309,6 +309,8 @@ func (r *Runner) runTF(
 		return false
 	}
 
+	run.DiffDetected = diffDetected
+
 	// extract last line of output
 	// Plan: X to add, 0 to change, 0 to destroy.
 	// OR
@@ -369,6 +371,7 @@ func (r *Runner) runTF(
 		r.setFailedStatus(run, module, tfaplv1beta1.ReasonApplyFailed, msg, r.Clock.Now())
 		return false
 	}
+	run.Applied = true
 	run.Output += applyOut
 	module.Status.LastAppliedAt = &metav1.Time{Time: r.Clock.Now()}
 	module.Status.LastAppliedCommitHash = commitHash
@@ -467,13 +470,11 @@ func (r *Runner) updateRedis(ctx context.Context, run *tfaplv1beta1.Run) error {
 		return err
 	}
 
-	if run.PlanOnly {
-		return nil
-	}
-
-	// set default last apply
-	if err := r.Redis.SetDefaultApply(ctx, run); err != nil {
-		return err
+	if run.Applied {
+		// set default last applied run
+		if err := r.Redis.SetDefaultApply(ctx, run); err != nil {
+			return err
+		}
 	}
 
 	return nil

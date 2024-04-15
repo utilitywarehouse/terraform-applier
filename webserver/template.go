@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	tfaplv1beta1 "github.com/utilitywarehouse/terraform-applier/api/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 // createTemplate takes in a path to a template file and parses the file to create a Template instance.
@@ -27,7 +27,7 @@ func createTemplate(statusHTML string) (*template.Template, error) {
 }
 
 // sanitizedUniqueName will return namespaceName with - instead of /
-func sanitizedUniqueName(m tfaplv1beta1.Module) string {
+func sanitizedUniqueName(m types.NamespacedName) string {
 	return m.Namespace + "-" + m.Name
 }
 
@@ -40,11 +40,8 @@ func formattedTime(t *metav1.Time) string {
 }
 
 // duration returns duration in human readable string.
-func duration(d *metav1.Duration) string {
-	if d == nil {
-		return "-"
-	}
-	return d.Duration.Round(time.Second).String()
+func duration(d time.Duration) string {
+	return d.Round(time.Second).String()
 }
 
 // commitURL will return commit url from given repo url and commit hash

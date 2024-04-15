@@ -36,21 +36,6 @@ func (m *MockRedisInterface) EXPECT() *MockRedisInterfaceMockRecorder {
 	return m.recorder
 }
 
-// AllRuns mocks base method.
-func (m *MockRedisInterface) AllRuns(arg0 context.Context, arg1 types.NamespacedName) ([]*v1beta1.Run, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "AllRuns", arg0, arg1)
-	ret0, _ := ret[0].([]*v1beta1.Run)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// AllRuns indicates an expected call of AllRuns.
-func (mr *MockRedisInterfaceMockRecorder) AllRuns(arg0, arg1 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AllRuns", reflect.TypeOf((*MockRedisInterface)(nil).AllRuns), arg0, arg1)
-}
-
 // DefaultApply mocks base method.
 func (m *MockRedisInterface) DefaultApply(arg0 context.Context, arg1 types.NamespacedName) (*v1beta1.Run, error) {
 	m.ctrl.T.Helper()
@@ -94,6 +79,21 @@ func (m *MockRedisInterface) PRLastRun(arg0 context.Context, arg1 types.Namespac
 func (mr *MockRedisInterfaceMockRecorder) PRLastRun(arg0, arg1, arg2 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PRLastRun", reflect.TypeOf((*MockRedisInterface)(nil).PRLastRun), arg0, arg1, arg2)
+}
+
+// Runs mocks base method.
+func (m *MockRedisInterface) Runs(arg0 context.Context, arg1 types.NamespacedName) ([]*v1beta1.Run, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Runs", arg0, arg1)
+	ret0, _ := ret[0].([]*v1beta1.Run)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Runs indicates an expected call of Runs.
+func (mr *MockRedisInterfaceMockRecorder) Runs(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Runs", reflect.TypeOf((*MockRedisInterface)(nil).Runs), arg0, arg1)
 }
 
 // SetDefaultApply mocks base method.

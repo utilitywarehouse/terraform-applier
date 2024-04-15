@@ -689,6 +689,7 @@ func run(c *cli.Context) {
 		ClusterClt:    mgr.GetClient(),
 		KubeClient:    kubeClient,
 		RunStatus:     runStatus,
+		Redis:         sysutil.Redis{Client: rdb},
 		Log:           logger.With("logger", "webserver"),
 	}
 

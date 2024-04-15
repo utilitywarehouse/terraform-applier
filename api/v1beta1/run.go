@@ -21,14 +21,16 @@ type Run struct {
 	Module  types.NamespacedName `json:"module,omitempty"`
 	Request *Request             `json:"request,omitempty"`
 
-	Status     state         `json:"status,omitempty"` // 'Running','Success','Error'
-	StartedAt  *metav1.Time  `json:"startedAT,omitempty"`
-	Duration   time.Duration `json:"duration,omitempty"`
-	PlanOnly   bool          `json:"planOnly,omitempty"`
-	RepoRef    string        `json:"repoRef,omitempty"`
-	CommitHash string        `json:"commitHash,omitempty"`
-	CommitMsg  string        `json:"commitMsg,omitempty"`
-	Output     string        `json:"output,omitempty"`
+	Status       state         `json:"status,omitempty"` // 'Running','Success','Error'
+	StartedAt    *metav1.Time  `json:"startedAT,omitempty"`
+	Duration     time.Duration `json:"duration,omitempty"`
+	PlanOnly     bool          `json:"planOnly,omitempty"`
+	RepoRef      string        `json:"repoRef,omitempty"`
+	CommitHash   string        `json:"commitHash,omitempty"`
+	CommitMsg    string        `json:"commitMsg,omitempty"`
+	DiffDetected bool          `json:"diffDetected,omitempty"`
+	Applied      bool          `json:"applied,omitempty"`
+	Output       string        `json:"output,omitempty"`
 }
 
 func NewRun(module *Module, req *Request) Run {

@@ -22,7 +22,7 @@ type RedisInterface interface {
 	DefaultLastRun(ctx context.Context, module types.NamespacedName) (*tfaplv1beta1.Run, error)
 	DefaultApply(ctx context.Context, module types.NamespacedName) (*tfaplv1beta1.Run, error)
 	PRLastRun(ctx context.Context, module types.NamespacedName, pr int) (*tfaplv1beta1.Run, error)
-	AllRuns(ctx context.Context, module types.NamespacedName) ([]*tfaplv1beta1.Run, error)
+	Runs(ctx context.Context, module types.NamespacedName) ([]*tfaplv1beta1.Run, error)
 
 	SetDefaultLastRun(ctx context.Context, run *tfaplv1beta1.Run) error
 	SetDefaultApply(ctx context.Context, run *tfaplv1beta1.Run) error
@@ -34,19 +34,19 @@ type Redis struct {
 }
 
 func keyPrefix(module types.NamespacedName) string {
-	return fmt.Sprintf("%s:%s", module.Namespace, module.Name)
+	return fmt.Sprintf("%s:%s:", module.Namespace, module.Name)
 }
 
 func defaultLastRunKey(module types.NamespacedName) string {
-	return fmt.Sprintf("%s:default:lastRun", keyPrefix(module))
+	return fmt.Sprintf("%sdefault:lastRun", keyPrefix(module))
 }
 
 func defaultLastApplyKey(module types.NamespacedName) string {
-	return fmt.Sprintf("%s:default:lastApply", keyPrefix(module))
+	return fmt.Sprintf("%sdefault:lastApply", keyPrefix(module))
 }
 
 func defaultPRLastRunsKey(module types.NamespacedName, pr int) string {
-	return fmt.Sprintf("%s:PR:%d:lastRun", keyPrefix(module), pr)
+	return fmt.Sprintf("%sPR:%d:lastRun", keyPrefix(module), pr)
 }
 
 // DefaultLastRun will return last run result for the default branch
@@ -64,8 +64,8 @@ func (r Redis) PRLastRun(ctx context.Context, module types.NamespacedName, pr in
 	return r.getKV(ctx, defaultPRLastRunsKey(module, pr))
 }
 
-// AllRuns will return all the runs stored for the given module
-func (r Redis) AllRuns(ctx context.Context, module types.NamespacedName) ([]*tfaplv1beta1.Run, error) {
+// Runs will return all the runs stored for the given module
+func (r Redis) Runs(ctx context.Context, module types.NamespacedName) ([]*tfaplv1beta1.Run, error) {
 	var runs []*tfaplv1beta1.Run
 
 	keys, err := r.Client.Keys(ctx, keyPrefix(module)+"*").Result()
