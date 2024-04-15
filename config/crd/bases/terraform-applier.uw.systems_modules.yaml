@@ -353,7 +353,9 @@ spec:
                   type: object
                 type: array
               repoName:
-                description: Name of the repository containing Terraform module directory.
+                description: |-
+                  Name of the repository containing Terraform module directory.
+                  Deprecated will be removed in next version
                 type: string
               repoRef:
                 default: HEAD
@@ -536,48 +538,45 @@ spec:
                   'Ready' -> last run finished successfully and its waiting for next run/event
                   'Errored' -> last run finished with Error and its waiting for next run/event
                 type: string
-              lastApplyInfo:
-                description: LastApplyInfo is the stdout of apply command. it may
-                  contain error stream
-                properties:
-                  hash:
-                    description: CommitHash is the hash of git commit of this output.
-                    type: string
-                  output:
-                    description: Output is the stdout of terraform command. it may
-                      contain error stream
-                    type: string
-                  timestamp:
-                    description: Timestamp when logs was captured.
-                    format: date-time
-                    type: string
-                type: object
+              lastAppliedAt:
+                description: Information when was the last time the module was successfully
+                  applied.
+                format: date-time
+                type: string
+              lastAppliedCommitHash:
+                description: LastAppliedCommitHash is the hash of git commit of last
+                  successful apply.
+                type: string
+              lastDefaultRunCommitHash:
+                description: |-
+                  LastDefaultRunCommitHash is the hash of git commit of last run.
+                  Default Runs are runs happens on default repo ref set by user.
+                  This field used in Reconcile loop
+                type: string
+              lastDefaultRunStartedAt:
+                description: |-
+                  LastDefaultRunStartedAt when was the last time the run was started.
+                  Default Runs are runs happens on default repo ref set by user.
+                  This field used in Reconcile loop
+                format: date-time
+                type: string
               observedGeneration:
                 description: ObservedGeneration is the last reconciled generation.
                 format: int64
                 type: integer
-              remoteURL:
-                description: RemoteURL is the URL of the modules git repo
-                type: string
               runCommitHash:
-                description: RunCommitHash is the hash of git commit of last run.
-                type: string
-              runCommitMsg:
-                description: RunCommitMsg is the message of git commit of last run.
-                type: string
-              runDuration:
-                description: The duration of the last terraform run.
-                type: string
-              runOutput:
-                description: runOutput is the stdout of terraform command. it may
-                  contain error stream
+                description: |-
+                  RunCommitHash is the hash of git commit of last run.
+                  Deprecated will be removed in next version
                 type: string
               runStartedAt:
-                description: Information when was the last time the run was started.
+                description: |-
+                  Information when was the last time the run was started.
+                  Deprecated will be removed in next version
                 format: date-time
                 type: string
               runType:
-                description: RunType is a short description of the kind of terraform
+                description: LastRunType is a short description of the kind of terraform
                   run that was attempted.
                 type: string
               stateMessage:

@@ -75,9 +75,17 @@ var _ = Describe("Module controller with Runner", func() {
 				repoURL    = "https://host.xy/dummy/repo.git"
 				path       = "hello"
 			)
-
-			testRedis.EXPECT().SetDefaultLastRun(gomock.Any(), gomock.Any()).Return(nil)
-			testRedis.EXPECT().SetDefaultApply(gomock.Any(), gomock.Any()).Return(nil)
+			var lastRun, lastApplyRun *tfaplv1beta1.Run
+			testRedis.EXPECT().SetDefaultLastRun(gomock.Any(), gomock.Any()).
+				DoAndReturn(func(ctx context.Context, run *tfaplv1beta1.Run) error {
+					lastRun = run
+					return nil
+				})
+			testRedis.EXPECT().SetDefaultApply(gomock.Any(), gomock.Any()).
+				DoAndReturn(func(ctx context.Context, run *tfaplv1beta1.Run) error {
+					lastApplyRun = run
+					return nil
+				})
 
 			By("By creating a new Module")
 			ctx := context.Background()
@@ -119,11 +127,9 @@ var _ = Describe("Module controller with Runner", func() {
 			}, time.Second*30, interval).Should(Not(Equal("")))
 
 			Expect(fetchedModule.Status.CurrentState).Should(Equal("Running"))
-			Expect(fetchedModule.Status.RunStartedAt.UTC()).Should(Equal(fakeClock.T.UTC()))
-			Expect(fetchedModule.Status.RunDuration).Should(BeNil())
+			Expect(fetchedModule.Status.LastDefaultRunStartedAt.UTC()).Should(Equal(fakeClock.T.UTC()))
 			Expect(fetchedModule.Status.ObservedGeneration).Should(Equal(fetchedModule.ObjectMeta.Generation))
-			Expect(fetchedModule.Status.RunCommitHash).Should(Equal(commitHash))
-			Expect(fetchedModule.Status.RunCommitMsg).Should(Equal(commitMsg))
+			Expect(fetchedModule.Status.LastDefaultRunCommitHash).Should(Equal(commitHash))
 
 			// advance time for testing
 			fakeClock.T = time.Date(2022, 02, 01, 01, 01, 00, 0000, time.UTC)
@@ -138,18 +144,17 @@ var _ = Describe("Module controller with Runner", func() {
 			}, time.Second*30, interval).Should(Not(Equal("Running")))
 
 			Expect(fetchedModule.Status.CurrentState).Should(Equal("Ready"))
-			Expect(fetchedModule.Status.RunDuration.Duration.String()).Should(Equal("1m0s"))
 			Expect(fetchedModule.Status.StateMessage).Should(ContainSubstring("Apply complete"))
 
 			// Make sure LastDriftInfo & LastApplyInfo is also set
-			Expect(fetchedModule.Status.RunOutput).Should(ContainSubstring("Plan:"))
+			Expect(lastRun.Output).Should(ContainSubstring("Plan:"))
 
-			Expect(fetchedModule.Status.LastApplyInfo.CommitHash).Should(Equal(commitHash))
-			Expect(fetchedModule.Status.LastApplyInfo.Output).Should(ContainSubstring("Apply complete!"))
-			Expect(fetchedModule.Status.LastApplyInfo.Timestamp.UTC()).Should(Equal(fakeClock.T.UTC()))
+			Expect(fetchedModule.Status.LastAppliedCommitHash).Should(Equal(commitHash))
+			Expect(lastApplyRun.Output).Should(ContainSubstring("Apply complete!"))
+			Expect(fetchedModule.Status.LastAppliedAt.UTC()).Should(Equal(fakeClock.T.UTC()))
 
 			// make sure secret values are there in output (strongbox decryption was successful)
-			Expect(fetchedModule.Status.LastApplyInfo.Output).Should(ContainSubstring("TOP_SECRET_VALUE"))
+			Expect(lastApplyRun.Output).Should(ContainSubstring("TOP_SECRET_VALUE"))
 
 			// delete module to stopping requeue
 			Expect(k8sClient.Delete(ctx, module)).Should(Succeed())
@@ -162,7 +167,12 @@ var _ = Describe("Module controller with Runner", func() {
 				path       = "hello"
 			)
 
-			testRedis.EXPECT().SetDefaultLastRun(gomock.Any(), gomock.Any()).Return(nil)
+			var lastRun *tfaplv1beta1.Run
+			testRedis.EXPECT().SetDefaultLastRun(gomock.Any(), gomock.Any()).
+				DoAndReturn(func(ctx context.Context, run *tfaplv1beta1.Run) error {
+					lastRun = run
+					return nil
+				})
 
 			By("By creating a new Module")
 			ctx := context.Background()
@@ -205,11 +215,9 @@ var _ = Describe("Module controller with Runner", func() {
 			}, time.Second*30, interval).Should(Not(Equal("")))
 
 			Expect(fetchedModule.Status.CurrentState).Should(Equal("Running"))
-			Expect(fetchedModule.Status.RunStartedAt.UTC()).Should(Equal(fakeClock.T.UTC()))
-			Expect(fetchedModule.Status.RunDuration).Should(BeNil())
+			Expect(fetchedModule.Status.LastDefaultRunStartedAt.UTC()).Should(Equal(fakeClock.T.UTC()))
 			Expect(fetchedModule.Status.ObservedGeneration).Should(Equal(fetchedModule.ObjectMeta.Generation))
-			Expect(fetchedModule.Status.RunCommitHash).Should(Equal(commitHash))
-			Expect(fetchedModule.Status.RunCommitMsg).Should(Equal(commitMsg))
+			Expect(fetchedModule.Status.LastDefaultRunCommitHash).Should(Equal(commitHash))
 
 			// advance time for testing
 			fakeClock.T = time.Date(2022, 02, 01, 01, 01, 00, 0000, time.UTC)
@@ -224,14 +232,12 @@ var _ = Describe("Module controller with Runner", func() {
 			}, time.Second*30, interval).Should(Not(Equal("Running")))
 
 			Expect(fetchedModule.Status.CurrentState).Should(Equal("Ready"))
-			Expect(fetchedModule.Status.RunDuration.Duration.String()).Should(Equal("1m0s"))
 			Expect(fetchedModule.Status.StateMessage).Should(ContainSubstring("PlanOnly"))
-			Expect(fetchedModule.Status.RunOutput).Should(ContainSubstring("Plan:"))
+			Expect(lastRun.Output).Should(ContainSubstring("Plan:"))
 
 			// Make sure LastApplyInfo is also set
-			Expect(fetchedModule.Status.LastApplyInfo.CommitHash).Should(Equal(""))
-			Expect(fetchedModule.Status.LastApplyInfo.Output).Should(ContainSubstring(""))
-			Expect(fetchedModule.Status.LastApplyInfo.Timestamp).Should(BeNil())
+			Expect(fetchedModule.Status.LastAppliedCommitHash).Should(Equal(""))
+			Expect(fetchedModule.Status.LastAppliedAt).Should(BeNil())
 
 			// delete module to stopping requeue
 			Expect(k8sClient.Delete(ctx, module)).Should(Succeed())
@@ -244,8 +250,17 @@ var _ = Describe("Module controller with Runner", func() {
 				path       = "hello"
 			)
 
-			testRedis.EXPECT().SetDefaultLastRun(gomock.Any(), gomock.Any()).Return(nil)
-			testRedis.EXPECT().SetDefaultApply(gomock.Any(), gomock.Any()).Return(nil)
+			var lastRun, lastApplyRun *tfaplv1beta1.Run
+			testRedis.EXPECT().SetDefaultLastRun(gomock.Any(), gomock.Any()).
+				DoAndReturn(func(ctx context.Context, run *tfaplv1beta1.Run) error {
+					lastRun = run
+					return nil
+				})
+			testRedis.EXPECT().SetDefaultApply(gomock.Any(), gomock.Any()).
+				DoAndReturn(func(ctx context.Context, run *tfaplv1beta1.Run) error {
+					lastApplyRun = run
+					return nil
+				})
 
 			By("By creating a new Module")
 			ctx := context.Background()
@@ -331,11 +346,9 @@ var _ = Describe("Module controller with Runner", func() {
 			}, time.Second*30, interval).Should(Not(Equal("")))
 
 			Expect(fetchedModule.Status.CurrentState).Should(Equal("Running"))
-			Expect(fetchedModule.Status.RunStartedAt.UTC()).Should(Equal(fakeClock.T.UTC()))
-			Expect(fetchedModule.Status.RunDuration).Should(BeNil())
+			Expect(fetchedModule.Status.LastDefaultRunStartedAt.UTC()).Should(Equal(fakeClock.T.UTC()))
 			Expect(fetchedModule.Status.ObservedGeneration).Should(Equal(fetchedModule.ObjectMeta.Generation))
-			Expect(fetchedModule.Status.RunCommitHash).Should(Equal(commitHash))
-			Expect(fetchedModule.Status.RunCommitMsg).Should(Equal(commitMsg))
+			Expect(fetchedModule.Status.LastDefaultRunCommitHash).Should(Equal(commitHash))
 
 			// advance time for testing
 			fakeClock.T = time.Date(2022, 02, 01, 01, 01, 00, 0000, time.UTC)
@@ -350,22 +363,21 @@ var _ = Describe("Module controller with Runner", func() {
 			}, time.Second*30, interval).Should(Not(Equal("Running")))
 
 			Expect(fetchedModule.Status.CurrentState).Should(Equal("Ready"))
-			Expect(fetchedModule.Status.RunDuration.Duration.String()).Should(Equal("1m0s"))
 			Expect(fetchedModule.Status.StateMessage).Should(ContainSubstring("Apply complete"))
 
-			Expect(fetchedModule.Status.RunOutput).Should(ContainSubstring("Plan:"))
+			Expect(lastRun.Output).Should(ContainSubstring("Plan:"))
 
-			Expect(fetchedModule.Status.LastApplyInfo.CommitHash).Should(Equal(commitHash))
-			Expect(fetchedModule.Status.LastApplyInfo.Timestamp.UTC()).Should(Equal(fakeClock.T.UTC()))
+			Expect(fetchedModule.Status.LastAppliedCommitHash).Should(Equal(commitHash))
+			Expect(fetchedModule.Status.LastAppliedAt.UTC()).Should(Equal(fakeClock.T.UTC()))
 
 			// make sure all values are there in output
-			Expect(fetchedModule.Status.LastApplyInfo.Output).Should(ContainSubstring("TOP_SECRET_VALUE"))
-			Expect(fetchedModule.Status.LastApplyInfo.Output).Should(ContainSubstring("ENV-VALUE1"))
-			Expect(fetchedModule.Status.LastApplyInfo.Output).Should(ContainSubstring("ENV-VALUE2"))
-			Expect(fetchedModule.Status.LastApplyInfo.Output).Should(ContainSubstring("ENV-VALUE3"))
-			Expect(fetchedModule.Status.LastApplyInfo.Output).Should(ContainSubstring("VAR-VALUE1"))
-			Expect(fetchedModule.Status.LastApplyInfo.Output).Should(ContainSubstring("VAR-VALUE2"))
-			Expect(fetchedModule.Status.LastApplyInfo.Output).Should(ContainSubstring("VAR-VALUE3"))
+			Expect(lastApplyRun.Output).Should(ContainSubstring("TOP_SECRET_VALUE"))
+			Expect(lastApplyRun.Output).Should(ContainSubstring("ENV-VALUE1"))
+			Expect(lastApplyRun.Output).Should(ContainSubstring("ENV-VALUE2"))
+			Expect(lastApplyRun.Output).Should(ContainSubstring("ENV-VALUE3"))
+			Expect(lastApplyRun.Output).Should(ContainSubstring("VAR-VALUE1"))
+			Expect(lastApplyRun.Output).Should(ContainSubstring("VAR-VALUE2"))
+			Expect(lastApplyRun.Output).Should(ContainSubstring("VAR-VALUE3"))
 
 			// make sure state file is created by local backend
 			Expect(testStateFilePath).Should(BeAnExistingFile())
@@ -381,8 +393,17 @@ var _ = Describe("Module controller with Runner", func() {
 				path       = "hello"
 			)
 
-			testRedis.EXPECT().SetDefaultLastRun(gomock.Any(), gomock.Any()).Return(nil)
-			testRedis.EXPECT().SetDefaultApply(gomock.Any(), gomock.Any()).Return(nil)
+			var lastRun, lastApplyRun *tfaplv1beta1.Run
+			testRedis.EXPECT().SetDefaultLastRun(gomock.Any(), gomock.Any()).
+				DoAndReturn(func(ctx context.Context, run *tfaplv1beta1.Run) error {
+					lastRun = run
+					return nil
+				})
+			testRedis.EXPECT().SetDefaultApply(gomock.Any(), gomock.Any()).
+				DoAndReturn(func(ctx context.Context, run *tfaplv1beta1.Run) error {
+					lastApplyRun = run
+					return nil
+				})
 
 			By("By creating a new Module")
 			ctx := context.Background()
@@ -447,11 +468,11 @@ var _ = Describe("Module controller with Runner", func() {
 			}, time.Second*30, interval).Should(Not(Equal("Running")))
 
 			Expect(fetchedModule.Status.CurrentState).Should(Equal("Ready"))
-			Expect(fetchedModule.Status.RunDuration.Duration.String()).Should(Equal("1m0s"))
 			Expect(fetchedModule.Status.StateMessage).Should(ContainSubstring("Apply complete"))
 
 			// make sure all values are there in output
-			Expect(fetchedModule.Status.LastApplyInfo.Output).Should(ContainSubstring("AWS_KEY_ABCD1234"))
+			Expect(lastRun.Output).Should(ContainSubstring("AWS_KEY_ABCD1234"))
+			Expect(lastApplyRun.Output).Should(ContainSubstring("AWS_KEY_ABCD1234"))
 
 			// delete module to stopping requeue
 			Expect(k8sClient.Delete(ctx, module)).Should(Succeed())

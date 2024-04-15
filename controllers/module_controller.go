@@ -98,6 +98,14 @@ func (r *ModuleReconciler) Reconcile(ctx context.Context, req reconcile.Request)
 		// fixes the repoURL, so don't return an error
 		return ctrl.Result{}, nil
 	}
+	// copy value form old Deprecated field to new field
+	// not required after first run
+	if module.Status.LastDefaultRunStartedAt.IsZero() {
+		module.Status.LastDefaultRunStartedAt = module.Status.RunStartedAt
+	}
+	if module.Status.LastDefaultRunCommitHash == "" {
+		module.Status.LastDefaultRunCommitHash = module.Status.RunCommitHash
+	}
 
 	// pollIntervalDuration is used as minimum duration for re-queue
 	pollIntervalDuration := time.Duration(module.Spec.PollInterval) * time.Second
@@ -135,7 +143,7 @@ func (r *ModuleReconciler) Reconcile(ctx context.Context, req reconcile.Request)
 	// case 2:
 	// check for initial run
 	//
-	if module.Status.RunCommitHash == "" {
+	if module.Status.LastDefaultRunCommitHash == "" {
 		log.Debug("requesting initial run")
 		// use next poll internal as minimum queue duration as status change will not trigger Reconcile
 		return r.triggerRunORRequeue(module, module.NewRunRequest(tfaplv1beta1.PollingRun), pollIntervalDuration)
@@ -153,8 +161,8 @@ func (r *ModuleReconciler) Reconcile(ctx context.Context, req reconcile.Request)
 		return ctrl.Result{RequeueAfter: pollIntervalDuration}, nil
 	}
 
-	if hash != module.Status.RunCommitHash {
-		log.Debug("requesting run as revision is changed on module path", "lastRun", module.Status.RunCommitHash, "current", hash)
+	if hash != module.Status.LastDefaultRunCommitHash {
+		log.Debug("requesting run as revision is changed on module path", "lastRun", module.Status.LastDefaultRunCommitHash, "current", hash)
 		// use next poll internal as minimum queue duration as status change will not trigger Reconcile
 		return r.triggerRunORRequeue(module, module.NewRunRequest(tfaplv1beta1.PollingRun), pollIntervalDuration)
 	}
@@ -220,8 +228,8 @@ func NextSchedule(module *tfaplv1beta1.Module, now time.Time, minIntervalBetween
 	}
 
 	earliestTime := module.ObjectMeta.CreationTimestamp.Time
-	if module.Status.RunStartedAt != nil {
-		earliestTime = module.Status.RunStartedAt.Time
+	if module.Status.LastDefaultRunStartedAt != nil {
+		earliestTime = module.Status.LastDefaultRunStartedAt.Time
 	}
 
 	if earliestTime.After(now) {
@@ -292,8 +300,7 @@ func (r *ModuleReconciler) setFailedStatus(req ctrl.Request, module *tfaplv1beta
 	module.Status.CurrentState = string(tfaplv1beta1.StatusErrored)
 	module.Status.StateMessage = tfaplv1beta1.NormaliseStateMsg(msg)
 	module.Status.StateReason = reason
-	module.Status.RunStartedAt = nil
-	module.Status.RunDuration = nil
+	module.Status.LastDefaultRunStartedAt = nil
 	module.Status.ObservedGeneration = module.Generation
 
 	r.Recorder.Event(module, corev1.EventTypeWarning, reason, msg)

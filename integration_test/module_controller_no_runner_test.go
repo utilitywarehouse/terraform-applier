@@ -91,8 +91,8 @@ var _ = Describe("Module controller without runner", func() {
 
 			// trick controller to accept mocked test time as earliestTime as we cannot control created time
 			// also add commit of initial run
-			module.Status.RunCommitHash = "CommitAbc123"
-			module.Status.RunStartedAt = &metav1.Time{Time: time.Date(2022, 02, 01, 01, 00, 30, 0000, time.UTC)}
+			module.Status.LastDefaultRunCommitHash = "CommitAbc123"
+			module.Status.LastDefaultRunStartedAt = &metav1.Time{Time: time.Date(2022, 02, 01, 01, 00, 30, 0000, time.UTC)}
 			Expect(k8sClient.Status().Update(ctx, module)).Should(Succeed())
 
 			testRepos.EXPECT().Hash(gomock.Any(), repoURL, "HEAD", path).Return("CommitAbc123", nil)
@@ -172,7 +172,7 @@ var _ = Describe("Module controller without runner", func() {
 
 			// trick controller to accept mocked test time as earliestTime as we cannot control created time
 			// also add commit of initial run
-			module.Status.RunCommitHash = "CommitAbc123"
+			module.Status.LastDefaultRunCommitHash = "CommitAbc123"
 			Expect(k8sClient.Status().Update(ctx, module)).Should(Succeed())
 
 			By("By making sure job was sent to jobQueue when commit hash is changed")
@@ -235,7 +235,7 @@ var _ = Describe("Module controller without runner", func() {
 				}
 			}, time.Second*60, interval).Should(Equal(moduleLookupKey))
 			// add fake last run commit hash
-			module.Status.RunCommitHash = "CommitAbc123"
+			module.Status.LastDefaultRunCommitHash = "CommitAbc123"
 			Expect(k8sClient.Status().Update(ctx, module)).Should(Succeed())
 
 			testRepos.EXPECT().Hash(gomock.Any(), repoURL, "HEAD", path).Return("CommitAbc123", nil)
@@ -298,7 +298,7 @@ var _ = Describe("Module controller without runner", func() {
 				}
 			}, time.Second*60, interval).Should(Equal(moduleLookupKey))
 			// add fake last run commit hash
-			module.Status.RunCommitHash = "CommitAbc123"
+			module.Status.LastDefaultRunCommitHash = "CommitAbc123"
 			Expect(k8sClient.Status().Update(ctx, module)).Should(Succeed())
 
 			testRepos.EXPECT().Hash(gomock.Any(), repoURL, "HEAD", path).Return("", fmt.Errorf("some git error"))

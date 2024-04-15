@@ -301,7 +301,7 @@ func (r *Runner) runTF(
 
 	diffDetected, planOut, err := te.plan(ctx)
 	if err != nil {
-		module.Status.RunOutput = planOut
+		run.Output = planOut
 		msg := fmt.Sprintf("unable to plan module: err:%s", err)
 		// tf err contains new lines not suitable logging
 		log.Error("unable to plan module", "err", fmt.Sprintf("%q", err))
@@ -326,7 +326,6 @@ func (r *Runner) runTF(
 		r.setFailedStatus(run, module, tfaplv1beta1.ReasonPlanFailed, msg, r.Clock.Now())
 		return false
 	}
-	module.Status.RunOutput = savedPlan
 	run.Output = savedPlan
 
 	// return if no drift detected
@@ -363,16 +362,16 @@ func (r *Runner) runTF(
 
 	applyOut, err := te.apply(ctx)
 	if err != nil {
-		module.Status.RunOutput = savedPlan + applyOut
+		run.Output += applyOut
 		msg := fmt.Sprintf("unable to apply module: err:%s", err)
 		// tf err contains new lines not suitable logging
 		log.Error("unable to apply module", "err", fmt.Sprintf("%q", err))
 		r.setFailedStatus(run, module, tfaplv1beta1.ReasonApplyFailed, msg, r.Clock.Now())
 		return false
 	}
-	module.Status.RunOutput = savedPlan + applyOut
 	run.Output += applyOut
-	module.Status.LastApplyInfo = tfaplv1beta1.OutputStats{Timestamp: &metav1.Time{Time: r.Clock.Now()}, CommitHash: commitHash, Output: savedPlan + applyOut}
+	module.Status.LastAppliedAt = &metav1.Time{Time: r.Clock.Now()}
+	module.Status.LastAppliedCommitHash = commitHash
 
 	// extract last line of output
 	// Apply complete! Resources: 1 added, 0 changed, 0 destroyed.
@@ -401,13 +400,10 @@ func (r *Runner) SetRunStartedStatus(run *tfaplv1beta1.Run, m *tfaplv1beta1.Modu
 	run.CommitMsg = commitMsg
 
 	m.Status.CurrentState = string(tfaplv1beta1.StatusRunning)
-	m.Status.RunType = run.Request.Type
-	m.Status.RunStartedAt = &metav1.Time{Time: now}
-	m.Status.RunDuration = nil
+	m.Status.LastRunType = run.Request.Type
+	m.Status.LastDefaultRunStartedAt = &metav1.Time{Time: now}
 	m.Status.ObservedGeneration = m.Generation
-	m.Status.RunCommitHash = commitHash
-	m.Status.RunCommitMsg = commitMsg
-	m.Status.RemoteURL = remoteURL
+	m.Status.LastDefaultRunCommitHash = commitHash
 	m.Status.StateMessage = tfaplv1beta1.NormaliseStateMsg(msg)
 	m.Status.StateReason = tfaplv1beta1.RunReason(run.Request.Type)
 
@@ -422,7 +418,6 @@ func (r *Runner) SetRunFinishedStatus(run *tfaplv1beta1.Run, m *tfaplv1beta1.Mod
 	run.Duration = time.Since(run.StartedAt.Time)
 
 	m.Status.CurrentState = string(tfaplv1beta1.StatusReady)
-	m.Status.RunDuration = &metav1.Duration{Duration: now.Sub(m.Status.RunStartedAt.Time).Round(time.Second)}
 	m.Status.StateMessage = tfaplv1beta1.NormaliseStateMsg(msg)
 	m.Status.StateReason = reason
 
@@ -437,7 +432,6 @@ func (r *Runner) setFailedStatus(run *tfaplv1beta1.Run, module *tfaplv1beta1.Mod
 	run.Duration = time.Since(run.StartedAt.Time)
 
 	module.Status.CurrentState = string(tfaplv1beta1.StatusErrored)
-	module.Status.RunDuration = &metav1.Duration{Duration: now.Sub(module.Status.RunStartedAt.Time).Round(time.Second)}
 	module.Status.StateMessage = tfaplv1beta1.NormaliseStateMsg(msg)
 	module.Status.StateReason = reason
 
