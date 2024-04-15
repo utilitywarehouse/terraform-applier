@@ -84,6 +84,7 @@ var (
 	testRepos        *git.MockRepositories
 	testMetrics      *metrics.MockPrometheusInterface
 	testDelegate     *runner.MockDelegateInterface
+	testRedis        *sysutil.MockRedisInterface
 	testRunner       runner.Runner
 	testReconciler   *controllers.ModuleReconciler
 	testVaultAWSConf *vault.MockAWSSecretsEngineInterface
@@ -164,6 +165,7 @@ var _ = BeforeSuite(func() {
 	testRepos = git.NewMockRepositories(goMockCtrl)
 	testMetrics = metrics.NewMockPrometheusInterface(goMockCtrl)
 	testDelegate = runner.NewMockDelegateInterface(goMockCtrl)
+	testRedis = sysutil.NewMockRedisInterface(goMockCtrl)
 
 	testVaultAWSConf = vault.NewMockAWSSecretsEngineInterface(goMockCtrl)
 
@@ -227,6 +229,7 @@ var _ = BeforeSuite(func() {
 		AWSSecretsEngineConfig: testVaultAWSConf,
 		TerminationGracePeriod: 10 * time.Second,
 		RunStatus:              runStatus,
+		Redis:                  testRedis,
 	}
 
 	pwd, err := os.Getwd()

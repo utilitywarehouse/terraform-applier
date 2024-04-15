@@ -33,6 +33,7 @@ type Runner struct {
 	KubeClt                kubernetes.Interface
 	Repos                  git.Repositories
 	Queue                  <-chan *tfaplv1beta1.Run
+	Redis                  sysutil.RedisInterface
 	Log                    *slog.Logger
 	Delegate               DelegateInterface
 	Metrics                metrics.PrometheusInterface
@@ -109,8 +110,19 @@ func (r *Runner) process(run *tfaplv1beta1.Run, cancelChan <-chan struct{}) bool
 
 	// remove pending run request regardless of run outcome
 	defer func() {
+		// there are no annotations for schedule and polling runs
+		if run.Request.Type == tfaplv1beta1.ScheduledRun ||
+			run.Request.Type == tfaplv1beta1.PollingRun {
+			return
+		}
 		if err := sysutil.RemoveRequest(context.Background(), r.ClusterClt, run.Module, run.Request); err != nil {
 			log.Error("unable to remove run request", "err", err)
+		}
+	}()
+
+	defer func() {
+		if err := r.updateRedis(context.Background(), run); err != nil {
+			log.Error("unable to store run details", "err", err)
 		}
 	}()
 
@@ -327,7 +339,7 @@ func (r *Runner) runTF(
 	}
 
 	// return if plan only mode
-	if run.Request.IsPlanOnly(module) {
+	if run.PlanOnly {
 		if err = r.SetRunFinishedStatus(run, module, tfaplv1beta1.ReasonPlanedDriftDetected, "PlanOnly/"+planStatus, r.Clock.Now()); err != nil {
 			log.Error("unable to set drift status", "err", err)
 			return false
@@ -446,4 +458,29 @@ func isChannelClosed(cancelChan <-chan struct{}) bool {
 		return false
 	}
 	return false
+}
+
+// updateRedis will add given run to Redis
+func (r *Runner) updateRedis(ctx context.Context, run *tfaplv1beta1.Run) error {
+
+	// if its PR run only update relevant PR key
+	if run.Request.Type == tfaplv1beta1.PRPlan {
+		return r.Redis.SetPRLastRun(ctx, run)
+	}
+
+	// set default last run
+	if err := r.Redis.SetDefaultLastRun(ctx, run); err != nil {
+		return err
+	}
+
+	if run.PlanOnly {
+		return nil
+	}
+
+	// set default last apply
+	if err := r.Redis.SetDefaultApply(ctx, run); err != nil {
+		return err
+	}
+
+	return nil
 }

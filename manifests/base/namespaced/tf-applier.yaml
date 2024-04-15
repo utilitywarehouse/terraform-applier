@@ -33,6 +33,8 @@ spec:
           env:
             - name: TERMINATION_GRACE_PERIOD
               value: "240"
+            - name: REDIS_URL
+              value: terraform-applier-redis:6379
           image: quay.io/utilitywarehouse/terraform-applier:master
           livenessProbe:
             httpGet:

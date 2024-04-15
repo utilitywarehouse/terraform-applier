@@ -3,6 +3,7 @@ kind: Kustomization
 resources:
   - leader_election_role.yaml
   - leader_election_role_binding.yaml
+  - redis.yaml
   - sa-rbac.yaml
   - service.yaml
   - tf-applier.yaml

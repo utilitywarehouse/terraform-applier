@@ -23,7 +23,6 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -275,13 +274,7 @@ func NextSchedule(module *tfaplv1beta1.Module, now time.Time, minIntervalBetween
 // triggerRunORRequeue will check controller capacity before triggering a run
 // if max limit is reached it will re-queue module to try again
 func (r *ModuleReconciler) triggerRunORRequeue(m *tfaplv1beta1.Module, runReq *tfaplv1beta1.Request, requeueAfter time.Duration) (ctrl.Result, error) {
-	run := tfaplv1beta1.Run{
-		Module: types.NamespacedName{
-			Namespace: m.Namespace,
-			Name:      m.Name,
-		},
-		Request: runReq,
-	}
+	run := tfaplv1beta1.NewRun(m, runReq)
 
 	runningModuleCount := r.RunStatus.Len()
 	if r.MaxConcurrentRuns <= 0 || runningModuleCount < r.MaxConcurrentRuns {

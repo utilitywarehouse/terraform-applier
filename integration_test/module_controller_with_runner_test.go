@@ -76,6 +76,9 @@ var _ = Describe("Module controller with Runner", func() {
 				path       = "hello"
 			)
 
+			testRedis.EXPECT().SetDefaultLastRun(gomock.Any(), gomock.Any()).Return(nil)
+			testRedis.EXPECT().SetDefaultApply(gomock.Any(), gomock.Any()).Return(nil)
+
 			By("By creating a new Module")
 			ctx := context.Background()
 			module := &tfaplv1beta1.Module{
@@ -159,6 +162,8 @@ var _ = Describe("Module controller with Runner", func() {
 				path       = "hello"
 			)
 
+			testRedis.EXPECT().SetDefaultLastRun(gomock.Any(), gomock.Any()).Return(nil)
+
 			By("By creating a new Module")
 			ctx := context.Background()
 			module := &tfaplv1beta1.Module{
@@ -238,6 +243,9 @@ var _ = Describe("Module controller with Runner", func() {
 				repoURL    = "https://host.xy/dummy/repo.git"
 				path       = "hello"
 			)
+
+			testRedis.EXPECT().SetDefaultLastRun(gomock.Any(), gomock.Any()).Return(nil)
+			testRedis.EXPECT().SetDefaultApply(gomock.Any(), gomock.Any()).Return(nil)
 
 			By("By creating a new Module")
 			ctx := context.Background()
@@ -372,6 +380,9 @@ var _ = Describe("Module controller with Runner", func() {
 				repoURL    = "https://host.xy/dummy/repo.git"
 				path       = "hello"
 			)
+
+			testRedis.EXPECT().SetDefaultLastRun(gomock.Any(), gomock.Any()).Return(nil)
+			testRedis.EXPECT().SetDefaultApply(gomock.Any(), gomock.Any()).Return(nil)
 
 			By("By creating a new Module")
 			ctx := context.Background()
