@@ -53,10 +53,10 @@ const (
 	ReasonPlanFailed       = "PlanFailed"
 	ReasonApplyFailed      = "ApplyFailed"
 
-	ReasonInitialised           = "Initialised"
-	ReasonPlanedDriftDetected   = "PlanedDriftDetected"
-	ReasonPlanedNoDriftDetected = "PlanedNoDriftDetected"
-	ReasonApplied               = "Applied"
+	ReasonInitialised            = "Initialised"
+	ReasonPlannedDriftDetected   = "PlannedDriftDetected"
+	ReasonPlannedNoDriftDetected = "PlannedNoDriftDetected"
+	ReasonApplied                = "Applied"
 
 	stateMsgCharLimit = 1024
 )

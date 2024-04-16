@@ -123,7 +123,7 @@ func Test_ExecuteTemplate(t *testing.T) {
 						Module:     types.NamespacedName{Name: "groups", Namespace: "bar"},
 						Request:    &tfaplv1beta1.Request{Type: tfaplv1beta1.PollingRun, RequestedAt: getMetaTime(3, 4, 2)},
 						Status:     tfaplv1beta1.StatusSuccess,
-						StartedAt:  getMetaTime(2, 10, 1),
+						StartedAt:  getMetaTime(11, 10, 1),
 						Duration:   60 * time.Second,
 						CommitHash: "abcccf2a0f758ba0d8e88a834a2acdba5885577c",
 						CommitMsg:  `initial commit (john)`,
