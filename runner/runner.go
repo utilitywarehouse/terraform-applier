@@ -317,7 +317,7 @@ func (r *Runner) runTF(
 	// No changes. Your infrastructure matches the configuration.
 	planStatus := rePlanStatus.FindString(planOut)
 
-	log.Info("planed", "status", planStatus)
+	log.Info("planned", "status", planStatus)
 
 	// get saved plan to update status
 	savedPlan, err := te.showPlanFileRaw(ctx)
@@ -332,7 +332,7 @@ func (r *Runner) runTF(
 
 	// return if no drift detected
 	if !diffDetected {
-		if err = r.SetRunFinishedStatus(run, module, tfaplv1beta1.ReasonPlanedNoDriftDetected, planStatus, r.Clock.Now()); err != nil {
+		if err = r.SetRunFinishedStatus(run, module, tfaplv1beta1.ReasonPlannedNoDriftDetected, planStatus, r.Clock.Now()); err != nil {
 			log.Error("unable to set no drift status", "err", err)
 			return false
 		}
@@ -341,7 +341,7 @@ func (r *Runner) runTF(
 
 	// return if plan only mode
 	if run.PlanOnly {
-		if err = r.SetRunFinishedStatus(run, module, tfaplv1beta1.ReasonPlanedDriftDetected, "PlanOnly/"+planStatus, r.Clock.Now()); err != nil {
+		if err = r.SetRunFinishedStatus(run, module, tfaplv1beta1.ReasonPlannedDriftDetected, "PlanOnly/"+planStatus, r.Clock.Now()); err != nil {
 			log.Error("unable to set drift status", "err", err)
 			return false
 		}

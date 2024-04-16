@@ -70,7 +70,7 @@
                                     <h6><span class='badge rounded-pill text-bg-secondary'>plan only</span></h6>
                                     {{end}}
                                     <h6>
-                                        <span {{if or (eq .Module.Status.StateReason "PlanedDriftDetected" ) (eq
+                                        <span {{if or (eq .Module.Status.StateReason "PlannedDriftDetected" ) (eq
                                             .Module.Status.StateReason "Applied" ) }}
                                             class='badge rounded-pill bg-primary' {{else if eq
                                             .Module.Status.CurrentState "Errored" }}
@@ -148,7 +148,7 @@
                         <div class="col-6">
                             <dt>Status</dt>
                             <dd class="fw-semibold">
-                                <span {{if or (eq .Module.Status.StateReason "PlanedDriftDetected" ) (eq
+                                <span {{if or (eq .Module.Status.StateReason "PlannedDriftDetected" ) (eq
                                     .Module.Status.StateReason "Applied" ) }} class='text-primary' {{else if eq
                                     .Module.Status.CurrentState "Errored" }} class='text-danger' {{end}}>
                                     {{.Module.Status.CurrentState}} ({{.Module.Status.StateReason}})
