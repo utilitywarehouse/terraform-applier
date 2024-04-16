@@ -63,7 +63,7 @@ func (f Filter) Update(e event.UpdateEvent) bool {
 	}
 
 	// ignore updates to CR status fields
-	f.Log.Log(context.TODO(), 0, "skipping module update event", "module", fmt.Sprintf("%s/%s", e.ObjectNew.GetNamespace(), e.ObjectNew.GetName()))
+	f.Log.Log(context.TODO(), trace, "skipping module update event", "module", fmt.Sprintf("%s/%s", e.ObjectNew.GetNamespace(), e.ObjectNew.GetName()))
 	return false
 }
 
