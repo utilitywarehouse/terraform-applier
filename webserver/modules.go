@@ -2,7 +2,6 @@ package webserver
 
 import (
 	"context"
-	"fmt"
 	"slices"
 	"sort"
 
@@ -46,9 +45,6 @@ func createNamespaceMap(ctx context.Context, modules []tfaplv1beta1.Module, redi
 		// remove duplicate runs (scenario when last run is also a apply run)
 		module.Runs = slices.CompactFunc(module.Runs, func(a *tfaplv1beta1.Run, b *tfaplv1beta1.Run) bool {
 			if a != nil && b != nil {
-				fmt.Println(a.Request.ID, a.Request.RequestedAt)
-				fmt.Println(b.Request.ID, b.Request.RequestedAt)
-				fmt.Println(a.StartedAt.Compare(b.StartedAt.Time))
 				return a.Request.ID == b.Request.ID &&
 					a.StartedAt.Compare(b.StartedAt.Time) == 0
 			}
