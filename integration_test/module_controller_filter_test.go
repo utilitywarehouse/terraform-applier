@@ -70,8 +70,8 @@ var _ = Describe("Module controller without runner with label selector", func() 
 				timer := time.NewTimer(time.Second)
 				for {
 					select {
-					case req := <-testFilterControllerQueue:
-						return req.NamespacedName
+					case run := <-testFilterControllerQueue:
+						return run.Module
 					case <-timer.C:
 						return types.NamespacedName{}
 					}
@@ -108,8 +108,8 @@ var _ = Describe("Module controller without runner with label selector", func() 
 				timer := time.NewTimer(time.Second)
 				for {
 					select {
-					case req := <-testFilterControllerQueue:
-						return req.NamespacedName
+					case run := <-testFilterControllerQueue:
+						return run.Module
 					case <-timer.C:
 						return types.NamespacedName{}
 					}
@@ -146,8 +146,8 @@ var _ = Describe("Module controller without runner with label selector", func() 
 				timer := time.NewTimer(time.Second)
 				for {
 					select {
-					case req := <-testFilterControllerQueue:
-						return req.NamespacedName
+					case run := <-testFilterControllerQueue:
+						return run.Module
 					case <-timer.C:
 						return types.NamespacedName{}
 					}
@@ -183,8 +183,8 @@ var _ = Describe("Module controller without runner with label selector", func() 
 				timer := time.NewTimer(time.Second)
 				for {
 					select {
-					case req := <-testFilterControllerQueue:
-						return req.NamespacedName
+					case run := <-testFilterControllerQueue:
+						return run.Module
 					case <-timer.C:
 						return types.NamespacedName{}
 					}

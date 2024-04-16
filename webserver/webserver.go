@@ -36,6 +36,7 @@ type WebServer struct {
 	Authenticator *oidc.Authenticator
 	ClusterClt    client.Client
 	KubeClient    kubernetes.Interface
+	Redis         sysutil.RedisInterface
 	RunStatus     *sysutil.RunStatus
 	Log           *slog.Logger
 }
@@ -45,6 +46,7 @@ type StatusPageHandler struct {
 	Template      *template.Template
 	Authenticator *oidc.Authenticator
 	ClusterClt    client.Client
+	Redis         sysutil.RedisInterface
 	Log           *slog.Logger
 }
 
@@ -77,7 +79,7 @@ func (s *StatusPageHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result := createNamespaceMap(modules)
+	result := createNamespaceMap(r.Context(), modules, s.Redis)
 
 	if err := s.Template.ExecuteTemplate(w, "index", result); err != nil {
 		http.Error(w, "Error: Unable to execute HTML template", http.StatusInternalServerError)
@@ -227,7 +229,7 @@ func (f *ForceRunHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	req := module.NewRunRequest(reqType)
 
-	err = sysutil.EnsureRequest(r.Context(), f.ClusterClt, req)
+	err = sysutil.EnsureRequest(r.Context(), f.ClusterClt, module.NamespacedName(), req)
 	switch {
 	case err == nil:
 		data.Result = "success"
@@ -267,6 +269,7 @@ func (ws *WebServer) Start(ctx context.Context) error {
 		template,
 		ws.Authenticator,
 		ws.ClusterClt,
+		ws.Redis,
 		ws.Log,
 	}
 	forceRunHandler := &ForceRunHandler{

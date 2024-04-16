@@ -22,6 +22,7 @@ import (
 	"github.com/hashicorp/hc-install/releases"
 	"github.com/hashicorp/hc-install/src"
 	"github.com/hashicorp/terraform-exec/tfexec"
+	"github.com/redis/go-redis/v9"
 	"github.com/urfave/cli/v2"
 
 	"github.com/utilitywarehouse/git-mirror/pkg/mirror"
@@ -248,6 +249,12 @@ var (
 			Name:  "health-probe-bind-address",
 			Value: ":8082",
 			Usage: "The address the probe endpoint binds to.",
+		},
+		&cli.StringFlag{
+			Name:     "redis-url",
+			EnvVars:  []string{"REDIS_URL"},
+			Required: true,
+			Usage:    "redis url to store run output and metadata",
 		},
 	}
 )
@@ -500,10 +507,21 @@ func run(c *cli.Context) {
 	// runStatus keeps track of currently running modules
 	runStatus := sysutil.NewRunStatus()
 
-	moduleQueue := make(chan *tfaplv1beta1.Request)
+	moduleQueue := make(chan *tfaplv1beta1.Run)
 	done := make(chan bool, 1)
 
 	clock := &sysutil.Clock{}
+
+	rdb := redis.NewClient(&redis.Options{
+		Addr:     c.String("redis-url"),
+		Password: "", // no password set
+		DB:       0,  // use default DB
+	})
+
+	if _, err := rdb.Ping(ctx).Result(); err != nil {
+		logger.Error("unable to ping redis", "err", err)
+		os.Exit(1)
+	}
 
 	metrics := &metrics.Prometheus{}
 	metrics.Init()
@@ -648,6 +666,7 @@ func run(c *cli.Context) {
 		},
 		GlobalENV: globalRunEnv,
 		RunStatus: runStatus,
+		Redis:     sysutil.Redis{Client: rdb},
 	}
 
 	if c.IsSet("oidc-issuer") {
@@ -670,6 +689,7 @@ func run(c *cli.Context) {
 		ClusterClt:    mgr.GetClient(),
 		KubeClient:    kubeClient,
 		RunStatus:     runStatus,
+		Redis:         sysutil.Redis{Client: rdb},
 		Log:           logger.With("logger", "webserver"),
 	}
 

@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"fmt"
+	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -15,13 +16,43 @@ var (
 	ErrRunRequestMismatch = fmt.Errorf("run request ID doesn't match pending request id")
 )
 
+// Run represents a complete run result of the terraform run
+type Run struct {
+	Module  types.NamespacedName `json:"module,omitempty"`
+	Request *Request             `json:"request,omitempty"`
+
+	Status       state         `json:"status,omitempty"` // 'Running','Success','Error'
+	StartedAt    *metav1.Time  `json:"startedAT,omitempty"`
+	Duration     time.Duration `json:"duration,omitempty"`
+	PlanOnly     bool          `json:"planOnly,omitempty"`
+	RepoRef      string        `json:"repoRef,omitempty"`
+	CommitHash   string        `json:"commitHash,omitempty"`
+	CommitMsg    string        `json:"commitMsg,omitempty"`
+	DiffDetected bool          `json:"diffDetected,omitempty"`
+	Applied      bool          `json:"applied,omitempty"`
+	Output       string        `json:"output,omitempty"`
+}
+
+func NewRun(module *Module, req *Request) Run {
+	run := Run{
+		Module: types.NamespacedName{
+			Namespace: module.Namespace,
+			Name:      module.Name,
+		},
+		Request: req,
+	}
+
+	run.PlanOnly = req.IsPlanOnly(module)
+	run.RepoRef = req.RepoRef(module)
+	return run
+}
+
 // Request represents terraform run request
 type Request struct {
-	NamespacedName types.NamespacedName `json:"-"`
-	ID             string               `json:"id,omitempty"`
-	RequestedAt    *metav1.Time         `json:"reqAt,omitempty"`
-	Type           string               `json:"type,omitempty"`
-	PR             *PullRequest         `json:"pr,omitempty"`
+	ID          string       `json:"id,omitempty"`
+	RequestedAt *metav1.Time `json:"reqAt,omitempty"`
+	Type        string       `json:"type,omitempty"`
+	PR          *PullRequest `json:"pr,omitempty"`
 }
 
 type PullRequest struct {
@@ -31,12 +62,7 @@ type PullRequest struct {
 }
 
 func (req *Request) Validate() error {
-	if req.NamespacedName.Namespace == "" {
-		return fmt.Errorf("namespace is required")
-	}
-	if req.NamespacedName.Name == "" {
-		return fmt.Errorf("name is required")
-	}
+
 	if req.RequestedAt.IsZero() {
 		return fmt.Errorf("valid timestamp is required for 'RequestedAt'")
 	}

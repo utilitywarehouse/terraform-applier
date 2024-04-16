@@ -1,0 +1,71 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: terraform-applier-redis
+  labels:
+    app: terraform-applier-redis
+spec:
+  ports:
+    - port: 6379
+      protocol: TCP
+  selector:
+    app: terraform-applier-redis
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: terraform-applier-redis
+spec:
+  replicas: 1
+  serviceName: terraform-applier-redis
+  selector:
+    matchLabels:
+      app: terraform-applier-redis
+  template:
+    metadata:
+      labels:
+        app: terraform-applier-redis
+    spec:
+      containers:
+        - name: redis
+          image: redis:alpine
+          imagePullPolicy: IfNotPresent
+          args: []
+          ports:
+            - name: redis
+              containerPort: 6379
+              protocol: TCP
+          livenessProbe:
+            tcpSocket:
+              port: 6379
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 2
+            successThreshold: 1
+            failureThreshold: 3
+          readinessProbe:
+            tcpSocket:
+              port: 6379
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 2
+            successThreshold: 1
+            failureThreshold: 3
+          volumeMounts:
+            - name: terraform-applier-redis-data
+              mountPath: /data
+          resources:
+            limits:
+              cpu: 500m
+              memory: 300Mi
+            requests:
+              cpu: 0
+              memory: 0
+  volumeClaimTemplates:
+    - metadata:
+        name: terraform-applier-redis-data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 1Gi

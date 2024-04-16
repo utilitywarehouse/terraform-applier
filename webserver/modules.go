@@ -2,20 +2,27 @@ package webserver
 
 import (
 	"context"
+	"slices"
 	"sort"
 
 	tfaplv1beta1 "github.com/utilitywarehouse/terraform-applier/api/v1beta1"
+	"github.com/utilitywarehouse/terraform-applier/sysutil"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // namespace stores the current state of the waybill and events of a namespace.
 type Namespace struct {
-	Modules []tfaplv1beta1.Module
+	Modules []Module
 	// Events        []corev1.Event
 	DiffURLFormat string
 }
 
-func createNamespaceMap(modules []tfaplv1beta1.Module) map[string]*Namespace {
+type Module struct {
+	Module tfaplv1beta1.Module
+	Runs   []*tfaplv1beta1.Run
+}
+
+func createNamespaceMap(ctx context.Context, modules []tfaplv1beta1.Module, redis sysutil.RedisInterface) map[string]*Namespace {
 	namespaces := make(map[string]*Namespace)
 
 	for _, m := range modules {
@@ -23,7 +30,28 @@ func createNamespaceMap(modules []tfaplv1beta1.Module) map[string]*Namespace {
 		if !ok {
 			namespaces[m.Namespace] = &Namespace{}
 		}
-		namespaces[m.Namespace].Modules = append(namespaces[m.Namespace].Modules, m)
+		module := Module{Module: m}
+
+		// error can be skipped here
+		module.Runs, _ = redis.Runs(ctx, m.NamespacedName())
+
+		// sort runs by StartedAt DESC
+		slices.SortFunc(module.Runs, func(a *tfaplv1beta1.Run, b *tfaplv1beta1.Run) int {
+			if a != nil && b != nil {
+				return b.StartedAt.Compare(a.StartedAt.Time)
+			}
+			return 0
+		})
+		// remove duplicate runs (scenario when last run is also a apply run)
+		module.Runs = slices.CompactFunc(module.Runs, func(a *tfaplv1beta1.Run, b *tfaplv1beta1.Run) bool {
+			if a != nil && b != nil {
+				return a.Request.ID == b.Request.ID &&
+					a.StartedAt.Compare(b.StartedAt.Time) == 0
+			}
+			return false
+		})
+
+		namespaces[m.Namespace].Modules = append(namespaces[m.Namespace].Modules, module)
 	}
 
 	return namespaces

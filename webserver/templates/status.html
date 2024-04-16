@@ -60,21 +60,23 @@
                     <div id="module-list" class="list-group list-group-flush overflow-auto" style="max-height: 90vh;">
                         {{range $k, $v := . }}
                         {{ range $i, $m := $v.Modules }}
-                        <a href="#{{ sanitizedUniqueName .}}" id="{{ sanitizedUniqueName .}}-list" data-filter="{{$k}}"
+                        <a href="#{{ sanitizedUniqueName .Module.NamespacedName}}"
+                            id="{{ sanitizedUniqueName .Module.NamespacedName}}-list" data-filter="{{$k}}"
                             class="list-group-item list-group-item-action py-3 lh-sm d-none">
                             <div class="d-flex justify-content-between align-items-center">
-                                <h5 class="mb-1">{{$m.Name}}</h5>
+                                <h5 class="mb-1">{{$m.Module.Name}}</h5>
                                 <div class="d-flex flex-column align-items-end">
-                                    {{ if .IsPlanOnly}}
+                                    {{ if .Module.IsPlanOnly}}
                                     <h6><span class='badge rounded-pill text-bg-secondary'>plan only</span></h6>
                                     {{end}}
                                     <h6>
-                                        <span {{if or (eq .Status.StateReason "PlanedDriftDetected" ) (eq
-                                            .Status.StateReason "Applied" ) }} class='badge rounded-pill bg-primary'
-                                            {{else if eq .Status.CurrentState "Errored" }}
+                                        <span {{if or (eq .Module.Status.StateReason "PlanedDriftDetected" ) (eq
+                                            .Module.Status.StateReason "Applied" ) }}
+                                            class='badge rounded-pill bg-primary' {{else if eq
+                                            .Module.Status.CurrentState "Errored" }}
                                             class='badge rounded-pill bg-danger' {{else}}
                                             class='badge rounded-pill bg-light text-dark' {{end}}>
-                                            {{$m.Status.CurrentState}} ({{$m.Status.StateReason}})
+                                            {{$m.Module.Status.CurrentState}} ({{$m.Module.Status.StateReason}})
                                         </span>
                                     </h6>
                                 </div>
@@ -118,23 +120,24 @@
 
 <!-- modules -->
 {{define "module"}}
-<div id="{{sanitizedUniqueName .}}" class="d-none">
-    <div class='card {{if eq .Status.CurrentState "Running"}}border-info{{end}}'>
+{{$m := .}}
+<div id="{{sanitizedUniqueName .Module.NamespacedName}}" class="d-none">
+    <div class='card {{if eq .Module.Status.CurrentState "Running"}}border-info{{end}}'>
         <div class="card-header bg-transparent">
-            <div href="#{{ sanitizedUniqueName .}}-info">
+            <div href="#{{ sanitizedUniqueName .Module.NamespacedName}}-info">
                 <div class="d-flex justify-content-between align-items-center mb-1">
-                    <h3 class="fw-bold" style="color: #550091;">{{.Name}}
-                        {{ if .IsPlanOnly}}
+                    <h3 class="fw-bold" style="color: #550091;">{{.Module.Name}}
+                        {{ if .Module.IsPlanOnly}}
                         <span class='badge rounded-pill text-bg-secondary'>plan only</span>
                         {{end}}
                     </h3>
                     <div>
-                        <button data-namespace="{{ .Namespace }}" data-name="{{ .Name }}" data-plan-only="true"
-                            class="force-button force-module-button btn btn-info btn-s">
+                        <button data-namespace="{{ .Module.Namespace }}" data-name="{{ .Module.Name }}"
+                            data-plan-only="true" class="force-button force-module-button btn btn-info btn-s">
                             <strong>Force Plan</strong>
                         </button>
-                        <button data-namespace="{{ .Namespace }}" data-name="{{ .Name }}" data-plan-only="false"
-                            class="force-button force-module-button btn btn-warning btn-s">
+                        <button data-namespace="{{ .Module.Namespace }}" data-name="{{ .Module.Name }}"
+                            data-plan-only="false" class="force-button force-module-button btn btn-warning btn-s">
                             <strong>Force Apply</strong>
                         </button>
                     </div>
@@ -145,17 +148,17 @@
                         <div class="col-6">
                             <dt>Status</dt>
                             <dd class="fw-semibold">
-                                <span {{if or (eq .Status.StateReason "PlanedDriftDetected" ) (eq
-                                    .Status.StateReason "Applied" ) }} class='text-primary' {{else if eq
-                                    .Status.CurrentState "Errored" }} class='text-danger' {{end}}>
-                                    {{.Status.CurrentState}} ({{.Status.StateReason}})
+                                <span {{if or (eq .Module.Status.StateReason "PlanedDriftDetected" ) (eq
+                                    .Module.Status.StateReason "Applied" ) }} class='text-primary' {{else if eq
+                                    .Module.Status.CurrentState "Errored" }} class='text-danger' {{end}}>
+                                    {{.Module.Status.CurrentState}} ({{.Module.Status.StateReason}})
                                 </span>
                             </dd>
                         </div>
-                        {{if .Spec.Schedule}}
+                        {{if .Module.Spec.Schedule}}
                         <div class="col-6">
                             <dt>Schedule</dt>
-                            <dd>{{ .Spec.Schedule }}</dd>
+                            <dd>{{ .Module.Spec.Schedule }}</dd>
                         </div>
                         {{end}}
 
@@ -164,102 +167,92 @@
                         <div class="col-6">
                             <dt>Repo</dt>
                             <dd>
-                                <a href="{{ commitURL .Spec.RepoURL `` }}">
-                                    {{.Spec.RepoURL }}</a>
+                                <a href="{{ commitURL .Module.Spec.RepoURL `` }}">
+                                    {{.Module.Spec.RepoURL }}</a>
                             </dd>
                         </div>
                         <div class="col-2">
                             <dt>Ref</dt>
-                            <dd>{{.Spec.RepoRef}}</dd>
+                            <dd>{{.Module.Spec.RepoRef}}</dd>
                         </div>
                         <div class="col-4">
                             <dt>Path</dt>
-                            <dd><a href="{{commitURL .Spec.RepoURL ``}}/tree/{{.Spec.RepoRef}}/{{ .Spec.Path }}">
-                                    {{ .Spec.Path }}</a>
+                            <dd><a
+                                    href="{{commitURL .Module.Spec.RepoURL ``}}/tree/{{.Module.Spec.RepoRef}}/{{ .Module.Spec.Path }}">
+                                    {{ .Module.Spec.Path }}</a>
                             </dd>
                         </div>
                         <div class="w-100 d-none d-md-block"></div>
-                        <div class="col-12">
+                        <div class="col-8">
                             <dt>Pending request</dt>
                             <dd>
-                                <pre><code>{{index .ObjectMeta.Annotations "terraform-applier.uw.systems/run-request"}}</code></pre>
+                                <pre><code>{{index .Module.ObjectMeta.Annotations "terraform-applier.uw.systems/run-request"}}</code></pre>
                             </dd>
+                        </div>
+                        <div class="col-4">
+                            <dt>Last run type</dt>
+                            <dd>{{ .Module.Status.LastRunType }}</dd>
                         </div>
                         <div class="w-100 d-none d-md-block"></div>
                         <div class="col-12">
                             <dt>Message</dt>
-                            <dd>{{.Status.StateMessage}}</dd>
+                            <dd>{{.Module.Status.StateMessage}}</dd>
                         </div>
                     </div>
                 </dl>
             </div>
         </div>
-        <div id="{{sanitizedUniqueName .}}-info">
+        <div id="{{sanitizedUniqueName .Module.NamespacedName}}-info">
             <div class="card-body">
                 <div>
-                    <dl>
-                        <div class="row">
-                            <div class="col-6">
-                                <dt>Last run type</dt>
-                                <dd>{{ .Status.RunType }}</dd>
-                            </div>
-                            <div class="col-6">
-                                <dt>Last run started at</dt>
-                                <dd>{{ formattedTime .Status.RunStartedAt }}
-                                    (took {{ duration
-                                    .Status.RunDuration }})
-                                </dd>
-                            </div>
-                            <div class="col-6">
-                                <dt>Last run commit hash</dt>
-                                <dd><a href="{{ commitURL .Status.RemoteURL .Status.RunCommitHash}}">
-                                        {{.Status.RunCommitHash}}</a>
-                                </dd>
-                            </div>
-                            <div class="col-6">
-                                <dt>Last run commit message</dt>
-                                <dd> {{.Status.RunCommitMsg}}</dd>
-                            </div>
-                            <div class="col-6">
-                                <dt>Last applied commit hash</dt>
-                                <dd><a href="{{ commitURL .Status.RemoteURL .Status.LastApplyInfo.CommitHash}}">
-                                        {{.Status.LastApplyInfo.CommitHash}}
-                                    </a>
-                                </dd>
-                            </div>
-                            <div class="col-6">
-                                <dt>Last applied at</dt>
-                                <dd>{{ formattedTime .Status.LastApplyInfo.Timestamp }}</dd>
-                            </div>
-                        </div>
-                    </dl>
                 </div>
                 <div>
                     <nav>
                         <div class="nav nav-tabs" role="tablist">
-                            <a class="nav-link active" href="#{{sanitizedUniqueName .}}-nav-plan" data-bs-toggle="tab"
-                                role="tab">Last Run Output
+                            {{ range $i, $run := .Runs }}
+                            <a class="nav-link" href="#{{sanitizedUniqueName .Module}}-{{$i}}" data-bs-toggle="tab"
+                                role="tab">
+                                {{$run.Request.Type}} {{if $run.Applied}}(Applied){{end}} {{if
+                                $run.Request.PR}}(#{{$run.Request.PR.Number}}){{end}}
                             </a>
-                            <a class="nav-link" href="#{{sanitizedUniqueName .}}-nav-apply" data-bs-toggle="tab"
-                                role="tab">Last Apply Output
-                            </a>
+                            {{end}}
                         </div>
                     </nav>
+                    {{if .Runs}}
                     <div class="tab-content">
-                        <div class="tab-pane fade show active" id="{{sanitizedUniqueName .}}-nav-plan" role="tabpanel">
-                            <pre class="file-output font-monospace p-3"
+                        {{ range $i, $run := .Runs }}
+                        <div class="tab-pane fade" id="{{sanitizedUniqueName .Module}}-{{$i}}" role="tabpanel">
+                            <dl class="p-2">
+                                <div class="row">
+                                    <div class="col-6">
+                                        <dt>Status</dt>
+                                        <dd>{{$run.Status}}</dd>
+                                    </div>
+                                    <div class="col-6">
+                                        <dt>Started at</dt>
+                                        <dd>{{ formattedTime $run.StartedAt }} (took {{ duration
+                                            $run.Duration }})</dd>
+                                    </div>
+                                    <div class="col-6">
+                                        <dt>Commit hash</dt>
+                                        <dd><a href="{{ commitURL $m.Module.Spec.RepoURL $run.CommitHash}}">
+                                                {{$run.CommitHash}}</a>
+                                        </dd>
+                                    </div>
+                                    <div class="col-6">
+                                        <dt>Commit message</dt>
+                                        <dd>{{$run.CommitMsg}}</dd>
+                                    </div>
+                                </div>
+                            </dl>
+                            <pre class="file-output font-monospace p-2"
                                 style="max-height: 40em; background-color: #f5f5f5;">
-                                <small>{{.Status.RunOutput}}</small>
-                            </pre>
+                            <small>{{$run.Output}}</small>
+                        </pre>
                         </div>
-                        <div class="tab-pane fade" id="{{sanitizedUniqueName .}}-nav-apply" role="tabpanel">
-                            <pre class="file-output font-monospace p-3"
-                                style="max-height: 40em; background-color: #f5f5f5;">
-<!-- to remove left margin on first line -->
-<small>{{.Status.LastApplyInfo.Output}}</small>
-                            </pre>
-                        </div>
+                        {{end}}
                     </div>
+                    {{end}}
                 </div>
             </div>
         </div>

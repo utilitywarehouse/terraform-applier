@@ -84,6 +84,8 @@ const (
 	StatusReady state = "Ready"
 	// 'Errored' -> last run finished with Error and its waiting on next run/event
 	StatusErrored state = "Errored"
+	// 'Success' ->  last run was a success
+	StatusSuccess state = "Success"
 )
 
 // ModuleSpec defines the desired state of Module
@@ -92,6 +94,7 @@ type ModuleSpec struct {
 	// Important: Run "make" to regenerate code after modifying this file
 
 	// Name of the repository containing Terraform module directory.
+	// Deprecated will be removed in next version
 	// +optional
 	RepoName string `json:"repoName"`
 
@@ -184,36 +187,39 @@ type ModuleStatus struct {
 	// +optional
 	StateReason string `json:"stateReason,omitempty"`
 
-	// RunType is a short description of the kind of terraform run that was attempted.
+	// LastRunType is a short description of the kind of terraform run that was attempted.
 	// +optional
-	RunType string `json:"runType,omitempty"`
+	LastRunType string `json:"runType,omitempty"`
+
+	// LastDefaultRunStartedAt when was the last time the run was started.
+	// Default Runs are runs happens on default repo ref set by user.
+	// This field used in Reconcile loop
+	// +optional
+	LastDefaultRunStartedAt *metav1.Time `json:"lastDefaultRunStartedAt,omitempty"`
+
+	// LastDefaultRunCommitHash is the hash of git commit of last run.
+	// Default Runs are runs happens on default repo ref set by user.
+	// This field used in Reconcile loop
+	// +optional
+	LastDefaultRunCommitHash string `json:"lastDefaultRunCommitHash,omitempty"`
+
+	// Information when was the last time the module was successfully applied.
+	// +optional
+	LastAppliedAt *metav1.Time `json:"lastAppliedAt,omitempty"`
+
+	// LastAppliedCommitHash is the hash of git commit of last successful apply.
+	// +optional
+	LastAppliedCommitHash string `json:"lastAppliedCommitHash,omitempty"`
 
 	// Information when was the last time the run was started.
+	// Deprecated will be removed in next version
 	// +optional
 	RunStartedAt *metav1.Time `json:"runStartedAt,omitempty"`
 
-	// The duration of the last terraform run.
-	// +optional
-	RunDuration *metav1.Duration `json:"runDuration,omitempty"`
-
-	// RemoteURL is the URL of the modules git repo
-	// +optional
-	RemoteURL string `json:"remoteURL,omitempty"`
-
 	// RunCommitHash is the hash of git commit of last run.
+	// Deprecated will be removed in next version
 	// +optional
 	RunCommitHash string `json:"runCommitHash,omitempty"`
-	// RunCommitMsg is the message of git commit of last run.
-	// +optional
-	RunCommitMsg string `json:"runCommitMsg,omitempty"`
-
-	// runOutput is the stdout of terraform command. it may contain error stream
-	// +optional
-	RunOutput string `json:"runOutput,omitempty"`
-
-	// LastApplyInfo is the stdout of apply command. it may contain error stream
-	// +optional
-	LastApplyInfo OutputStats `json:"lastApplyInfo,omitempty"`
 }
 
 //+kubebuilder:object:root=true
@@ -249,20 +255,6 @@ type ModuleList struct {
 
 func init() {
 	SchemeBuilder.Register(&Module{}, &ModuleList{})
-}
-
-type OutputStats struct {
-	// Timestamp when logs was captured.
-	// +optional
-	Timestamp *metav1.Time `json:"timestamp,omitempty"`
-
-	// CommitHash is the hash of git commit of this output.
-	// +optional
-	CommitHash string `json:"hash,omitempty"`
-
-	// Output is the stdout of terraform command. it may contain error stream
-	// +optional
-	Output string `json:"output,omitempty"`
 }
 
 type VaultRequests struct {
@@ -312,16 +304,19 @@ type Subject struct {
 	Name string `json:"name,omitempty"`
 }
 
+func (m *Module) NamespacedName() types.NamespacedName {
+	return types.NamespacedName{
+		Namespace: m.Namespace,
+		Name:      m.Name,
+	}
+}
+
 func (m *Module) IsPlanOnly() bool {
 	return m.Spec.PlanOnly != nil && *m.Spec.PlanOnly
 }
 
 func (m *Module) NewRunRequest(reqType string) *Request {
 	req := Request{
-		NamespacedName: types.NamespacedName{
-			Namespace: m.Namespace,
-			Name:      m.Name,
-		},
 		RequestedAt: &metav1.Time{Time: time.Now()},
 		ID:          NewRequestID(),
 		Type:        reqType,
@@ -342,10 +337,6 @@ func (m *Module) PendingRunRequest() (*Request, bool) {
 		// it can be treated as no request pending and module can override it
 		// with new valid request
 		return nil, false
-	}
-	value.NamespacedName = types.NamespacedName{
-		Namespace: m.Namespace,
-		Name:      m.Name,
 	}
 	return &value, true
 }

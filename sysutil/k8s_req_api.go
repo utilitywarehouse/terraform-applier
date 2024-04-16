@@ -6,18 +6,19 @@ import (
 	"fmt"
 
 	tfaplv1beta1 "github.com/utilitywarehouse/terraform-applier/api/v1beta1"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // EnsureRequest will try to add run request annotation with back-off
-func EnsureRequest(ctx context.Context, client client.Client, req *tfaplv1beta1.Request) error {
+func EnsureRequest(ctx context.Context, client client.Client, key types.NamespacedName, req *tfaplv1beta1.Request) error {
 	if err := req.Validate(); err != nil {
 		return err
 	}
 
 	tryUpdate := func(ctx context.Context) error {
 		// refetch module on every try
-		module, err := GetModule(ctx, client, req.NamespacedName)
+		module, err := GetModule(ctx, client, key)
 		if err != nil {
 			return err
 		}
@@ -56,10 +57,10 @@ func EnsureRequest(ctx context.Context, client client.Client, req *tfaplv1beta1.
 
 // RemoveRequest will try to remove given run request
 // it will error if given request id doesn't match existing pending request ID
-func RemoveRequest(ctx context.Context, client client.Client, req *tfaplv1beta1.Request) error {
+func RemoveRequest(ctx context.Context, client client.Client, key types.NamespacedName, req *tfaplv1beta1.Request) error {
 	tryUpdate := func(ctx context.Context) error {
 		// refetch module on every try
-		module, err := GetModule(ctx, client, req.NamespacedName)
+		module, err := GetModule(ctx, client, key)
 		if err != nil {
 			return err
 		}
