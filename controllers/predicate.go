@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 
+	tfaplv1beta1 "github.com/utilitywarehouse/terraform-applier/api/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
@@ -48,12 +49,21 @@ func (f Filter) Update(e event.UpdateEvent) bool {
 		return false
 	}
 
-	// Ignore updates to CR status in which case metadata.Generation does not change
+	// trigger a reconcile if generation is changed. ie module spec changed
 	if e.ObjectOld.GetGeneration() != e.ObjectNew.GetGeneration() {
 		return true
 	}
 
-	f.Log.Log(context.TODO(), trace, "skipping module update event", "module", fmt.Sprintf("%s/%s", e.ObjectNew.GetNamespace(), e.ObjectNew.GetName()))
+	// trigger a reconcile if there is change in run request annotation
+	annotationsOld := e.ObjectOld.GetAnnotations()
+	annotationsNew := e.ObjectNew.GetAnnotations()
+	if annotationsOld[tfaplv1beta1.RunRequestAnnotationKey] !=
+		annotationsNew[tfaplv1beta1.RunRequestAnnotationKey] {
+		return true
+	}
+
+	// ignore updates to CR status fields
+	f.Log.Log(context.TODO(), 0, "skipping module update event", "module", fmt.Sprintf("%s/%s", e.ObjectNew.GetNamespace(), e.ObjectNew.GetName()))
 	return false
 }
 
