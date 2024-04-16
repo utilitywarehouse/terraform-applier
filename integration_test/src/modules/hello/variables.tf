@@ -12,3 +12,8 @@ variable "variable3" {
   description = "variable3"
   default     = "not-set"
 }
+
+variable "sleep" {
+  description = "sleep"
+  default     = "1"
+}
