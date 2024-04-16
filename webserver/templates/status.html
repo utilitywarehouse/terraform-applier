@@ -210,10 +210,15 @@
                     <nav>
                         <div class="nav nav-tabs" role="tablist">
                             {{ range $i, $run := .Runs }}
-                            <a class="nav-link" href="#{{sanitizedUniqueName .Module}}-{{$i}}" data-bs-toggle="tab"
-                                role="tab">
-                                {{$run.Request.Type}} {{if $run.Applied}}(Applied){{end}} {{if
-                                $run.Request.PR}}(#{{$run.Request.PR.Number}}){{end}}
+                            <a class="nav-link {{if eq $i 0}}active{{end}}"
+                                href="#{{sanitizedUniqueName .Module}}-{{$i}}" data-bs-toggle="tab" role="tab">
+                                {{if $run.Request.PR}}
+                                PR #{{$run.Request.PR.Number}} Run
+                                {{else if $run.Applied}}
+                                Last Applied Run
+                                {{else}}
+                                Last Planned Run
+                                {{end}}
                             </a>
                             {{end}}
                         </div>
@@ -221,14 +226,19 @@
                     {{if .Runs}}
                     <div class="tab-content">
                         {{ range $i, $run := .Runs }}
-                        <div class="tab-pane fade" id="{{sanitizedUniqueName .Module}}-{{$i}}" role="tabpanel">
+                        <div class="tab-pane fade {{if eq $i 0}}active show{{end}}"
+                            id="{{sanitizedUniqueName .Module}}-{{$i}}" role="tabpanel">
                             <dl class="p-2">
                                 <div class="row">
-                                    <div class="col-6">
+                                    <div class="col-4">
                                         <dt>Status</dt>
                                         <dd>{{$run.Status}}</dd>
                                     </div>
-                                    <div class="col-6">
+                                    <div class="col-4">
+                                        <dt>Type</dt>
+                                        <dd>{{$run.Request.Type}}</dd>
+                                    </div>
+                                    <div class="col-4">
                                         <dt>Started at</dt>
                                         <dd>{{ formattedTime $run.StartedAt }} (took {{ duration
                                             $run.Duration }})</dd>
