@@ -76,3 +76,13 @@ resource "null_resource" "echo_AWS_KEY" {
     null_resource.echo_env3
   ]
 }
+
+resource "null_resource" "slow_provider" {
+  provisioner "local-exec" {
+    command = "echo progressing...;sleep ${var.sleep};echo done"
+  }
+
+  depends_on = [
+    null_resource.echo_env3
+  ]
+}
