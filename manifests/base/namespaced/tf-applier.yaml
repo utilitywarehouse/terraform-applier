@@ -48,6 +48,13 @@ spec:
               port: 8082
             initialDelaySeconds: 5
             periodSeconds: 10
+          # initial repo clone might take some time
+          startupProbe:
+            httpGet:
+              path: /readyz
+              port: 8082
+            failureThreshold: 30
+            periodSeconds: 10
           resources:
             limits:
               cpu: 2000m
