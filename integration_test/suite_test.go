@@ -42,6 +42,7 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/config"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
@@ -72,23 +73,18 @@ var (
 	fakeClock  *sysutil.FakeClock
 	goMockCtrl *gomock.Controller
 	testLogger *slog.Logger
-	// testControllerQueue only used for controller behaviour testing
-	testControllerQueue       chan *tfaplv1beta1.Run
-	testFilterControllerQueue chan *tfaplv1beta1.Run
 
 	testStateFilePath string
 	testFilter        *controllers.Filter
 
-	// testRunnerQueue only used for send job to runner of runner testing
-	testRunnerQueue  chan *tfaplv1beta1.Run
 	testRepos        *git.MockRepositories
 	testMetrics      *metrics.MockPrometheusInterface
 	testDelegate     *runner.MockDelegateInterface
 	testRedis        *sysutil.MockRedisInterface
 	testRunner       runner.Runner
+	testMockRunner   *runner.MockRunnerInterface //only used for controller behaviour testing without runner
 	testReconciler   *controllers.ModuleReconciler
 	testVaultAWSConf *vault.MockAWSSecretsEngineInterface
-	testRunnerDone   chan bool
 )
 
 func TestAPIs(t *testing.T) {
@@ -146,6 +142,10 @@ var _ = BeforeSuite(func() {
 
 	k8sManager, err := ctrl.NewManager(cfg, ctrl.Options{
 		Scheme: scheme.Scheme,
+		Controller: config.Controller{
+			// always test with concurrency
+			MaxConcurrentReconciles: 10,
+		},
 	})
 	Expect(err).ToNot(HaveOccurred())
 
@@ -156,15 +156,13 @@ var _ = BeforeSuite(func() {
 	runStatus := sysutil.NewRunStatus()
 
 	minIntervalBetweenRunsDuration := 1 * time.Minute
-	testControllerQueue = make(chan *tfaplv1beta1.Run)
-	testFilterControllerQueue = make(chan *tfaplv1beta1.Run)
-	testRunnerQueue = make(chan *tfaplv1beta1.Run)
 
 	goMockCtrl = gomock.NewController(RecoveringGinkgoT())
 
 	testRepos = git.NewMockRepositories(goMockCtrl)
 	testMetrics = metrics.NewMockPrometheusInterface(goMockCtrl)
 	testDelegate = runner.NewMockDelegateInterface(goMockCtrl)
+	testMockRunner = runner.NewMockRunnerInterface(goMockCtrl)
 	testRedis = sysutil.NewMockRedisInterface(goMockCtrl)
 
 	testVaultAWSConf = vault.NewMockAWSSecretsEngineInterface(goMockCtrl)
@@ -174,7 +172,6 @@ var _ = BeforeSuite(func() {
 		Scheme:                 k8sManager.GetScheme(),
 		Recorder:               k8sManager.GetEventRecorderFor("terraform-applier"),
 		Clock:                  fakeClock,
-		Queue:                  testControllerQueue,
 		Repos:                  testRepos,
 		Log:                    testLogger.With("logger", "manager"),
 		MinIntervalBetweenRuns: minIntervalBetweenRunsDuration,
@@ -214,13 +211,11 @@ var _ = BeforeSuite(func() {
 	execPath, err := setupTFBin()
 	Expect(err).NotTo(HaveOccurred())
 
-	testRunnerDone = make(chan bool, 1)
 	testRunner = runner.Runner{
 		Clock:                  fakeClock,
 		ClusterClt:             k8sManager.GetClient(),
 		Recorder:               k8sManager.GetEventRecorderFor("terraform-applier"),
 		KubeClt:                fakeClient,
-		Queue:                  testRunnerQueue,
 		Repos:                  testRepos,
 		Delegate:               testDelegate,
 		Log:                    testLogger.With("logger", "runner"),
@@ -238,13 +233,11 @@ var _ = BeforeSuite(func() {
 
 	go func() {
 		defer GinkgoRecover()
-		testRunner.Start(ctx, testRunnerDone)
 	}()
 })
 
 var _ = AfterSuite(func() {
 	cancel()
-	<-testRunnerDone
 	By("tearing down the test environment")
 	err := testEnv.Stop()
 	Expect(err).NotTo(HaveOccurred())

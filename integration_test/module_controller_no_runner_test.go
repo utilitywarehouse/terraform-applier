@@ -25,7 +25,7 @@ var _ = Describe("Module controller without runner", func() {
 		BeforeEach(func() {
 			// reset Time
 			fakeClock.T = time.Date(2022, 02, 01, 01, 00, 00, 0000, time.UTC)
-			testReconciler.Queue = testControllerQueue
+			testReconciler.Runner = testMockRunner
 
 			// remove any label selector
 			testFilter.LabelSelectorKey = ""
@@ -58,12 +58,18 @@ var _ = Describe("Module controller without runner", func() {
 					Path:     path,
 				},
 			}
+			// expect call before crete
+			gotRun := types.NamespacedName{}
+			testMockRunner.EXPECT().Start(gomock.Any(), gomock.Any()).
+				DoAndReturn(func(run *tfaplv1beta1.Run, _ chan struct{}) bool {
+					gotRun = run.Module
+					return true
+				})
 			Expect(k8sClient.Create(ctx, module)).Should(Succeed())
 
 			// After creating this Module, let's check that the Module's Spec fields match what we passed in.
 			moduleLookupKey := types.NamespacedName{Name: moduleName, Namespace: moduleNamespace}
 			createdModule := &tfaplv1beta1.Module{}
-
 			Eventually(func() bool {
 				err := k8sClient.Get(ctx, moduleLookupKey, createdModule)
 				return err == nil
@@ -78,15 +84,7 @@ var _ = Describe("Module controller without runner", func() {
 
 			By("By absorbing initial run due to no run commit history and updating status with commit hash")
 			Eventually(func() types.NamespacedName {
-				timer := time.NewTimer(time.Second)
-				for {
-					select {
-					case run := <-testControllerQueue:
-						return run.Module
-					case <-timer.C:
-						return types.NamespacedName{}
-					}
-				}
+				return gotRun
 			}, time.Second*60, interval).Should(Equal(moduleLookupKey))
 
 			// trick controller to accept mocked test time as earliestTime as we cannot control created time
@@ -99,32 +97,23 @@ var _ = Describe("Module controller without runner", func() {
 
 			By("By making sure job is not sent to job queue before schedule")
 			fakeClock.T = time.Date(2022, 02, 01, 01, 00, 40, 0000, time.UTC)
-			Consistently(func() types.NamespacedName {
-				timer := time.NewTimer(time.Second)
-				for {
-					select {
-					case run := <-testControllerQueue:
-						return run.Module
-					case <-timer.C:
-						return types.NamespacedName{}
-					}
-				}
-			}, time.Second*15, interval).Should(Equal(types.NamespacedName{}))
+			// since there is not testMockRunner.EXPECT() if controller calls Start it will panic
+			time.Sleep(time.Second * 15)
 
 			// advance time
 			By("By making sure job was sent to jobQueue at schedule after advancing time")
 			fakeClock.T = time.Date(2022, 02, 01, 01, 01, 00, 0000, time.UTC)
+
+			gotRun = types.NamespacedName{}
+			testMockRunner.EXPECT().Start(gomock.Any(), gomock.Any()).
+				DoAndReturn(func(run *tfaplv1beta1.Run, _ chan struct{}) bool {
+					gotRun = run.Module
+					return true
+				})
 			Eventually(func() types.NamespacedName {
-				timer := time.NewTimer(time.Second)
-				for {
-					select {
-					case run := <-testControllerQueue:
-						return run.Module
-					case <-timer.C:
-						return types.NamespacedName{}
-					}
-				}
+				return gotRun
 			}, time.Second*60, interval).Should(Equal(moduleLookupKey))
+
 			// delete module to stopping requeue
 			Expect(k8sClient.Delete(ctx, module)).Should(Succeed())
 		})
@@ -153,21 +142,20 @@ var _ = Describe("Module controller without runner", func() {
 					Path:     path,
 				},
 			}
+			// expect call before crete
+			gotRun := types.NamespacedName{}
+			testMockRunner.EXPECT().Start(gomock.Any(), gomock.Any()).
+				DoAndReturn(func(run *tfaplv1beta1.Run, _ chan struct{}) bool {
+					gotRun = run.Module
+					return true
+				})
 			Expect(k8sClient.Create(ctx, module)).Should(Succeed())
 
 			moduleLookupKey := types.NamespacedName{Name: moduleName, Namespace: moduleNamespace}
 
 			By("By absorbing initial run due to no run commit history and updating status with commit hash")
 			Eventually(func() types.NamespacedName {
-				timer := time.NewTimer(time.Second)
-				for {
-					select {
-					case run := <-testControllerQueue:
-						return run.Module
-					case <-timer.C:
-						return types.NamespacedName{}
-					}
-				}
+				return gotRun
 			}, time.Second*60, interval).Should(Equal(moduleLookupKey))
 
 			// trick controller to accept mocked test time as earliestTime as we cannot control created time
@@ -177,18 +165,15 @@ var _ = Describe("Module controller without runner", func() {
 
 			By("By making sure job was sent to jobQueue when commit hash is changed")
 			testRepos.EXPECT().Hash(gomock.Any(), repoURL, "HEAD", path).Return("CommitAbc456", nil)
-
+			gotRun = types.NamespacedName{}
+			testMockRunner.EXPECT().Start(gomock.Any(), gomock.Any()).
+				DoAndReturn(func(run *tfaplv1beta1.Run, _ chan struct{}) bool {
+					gotRun = run.Module
+					return true
+				})
 			// wait for just about 60 sec default poll interval
 			Eventually(func() types.NamespacedName {
-				timer := time.NewTimer(time.Second)
-				for {
-					select {
-					case run := <-testControllerQueue:
-						return run.Module
-					case <-timer.C:
-						return types.NamespacedName{}
-					}
-				}
+				return gotRun
 			}, time.Second*70, interval).Should(Equal(moduleLookupKey))
 			// delete module to stopping requeue
 			Expect(k8sClient.Delete(ctx, module)).Should(Succeed())
@@ -218,21 +203,19 @@ var _ = Describe("Module controller without runner", func() {
 					Path:     path,
 				},
 			}
+			gotRun := types.NamespacedName{}
+			testMockRunner.EXPECT().Start(gomock.Any(), gomock.Any()).
+				DoAndReturn(func(run *tfaplv1beta1.Run, _ chan struct{}) bool {
+					gotRun = run.Module
+					return true
+				})
 			Expect(k8sClient.Create(ctx, module)).Should(Succeed())
 
 			moduleLookupKey := types.NamespacedName{Name: moduleName, Namespace: moduleNamespace}
 
 			By("By absorbing initial run due to no run commit history and updating status with commit hash")
 			Eventually(func() types.NamespacedName {
-				timer := time.NewTimer(time.Second)
-				for {
-					select {
-					case run := <-testControllerQueue:
-						return run.Module
-					case <-timer.C:
-						return types.NamespacedName{}
-					}
-				}
+				return gotRun
 			}, time.Second*60, interval).Should(Equal(moduleLookupKey))
 			// add fake last run commit hash
 			module.Status.LastDefaultRunCommitHash = "CommitAbc123"
@@ -281,21 +264,19 @@ var _ = Describe("Module controller without runner", func() {
 					Path:     path,
 				},
 			}
+			gotRun := types.NamespacedName{}
+			testMockRunner.EXPECT().Start(gomock.Any(), gomock.Any()).
+				DoAndReturn(func(run *tfaplv1beta1.Run, _ chan struct{}) bool {
+					gotRun = run.Module
+					return true
+				})
 			Expect(k8sClient.Create(ctx, module)).Should(Succeed())
 
 			moduleLookupKey := types.NamespacedName{Name: moduleName, Namespace: moduleNamespace}
 
 			By("By absorbing initial run due to no run commit history and updating status with commit hash")
 			Eventually(func() types.NamespacedName {
-				timer := time.NewTimer(time.Second)
-				for {
-					select {
-					case run := <-testControllerQueue:
-						return run.Module
-					case <-timer.C:
-						return types.NamespacedName{}
-					}
-				}
+				return gotRun
 			}, time.Second*60, interval).Should(Equal(moduleLookupKey))
 			// add fake last run commit hash
 			module.Status.LastDefaultRunCommitHash = "CommitAbc123"
@@ -346,6 +327,12 @@ var _ = Describe("Module controller without runner", func() {
 					Path:    path,
 				},
 			}
+			gotRun := types.NamespacedName{}
+			testMockRunner.EXPECT().Start(gomock.Any(), gomock.Any()).
+				DoAndReturn(func(run *tfaplv1beta1.Run, _ chan struct{}) bool {
+					gotRun = run.Module
+					return true
+				})
 			Expect(k8sClient.Create(ctx, module)).Should(Succeed())
 
 			moduleLookupKey := types.NamespacedName{Name: moduleName, Namespace: moduleNamespace}
@@ -353,15 +340,7 @@ var _ = Describe("Module controller without runner", func() {
 			By("By making sure job was sent to jobQueue")
 			// wait for just about 60 sec default poll interval
 			Eventually(func() types.NamespacedName {
-				timer := time.NewTimer(time.Second)
-				for {
-					select {
-					case run := <-testControllerQueue:
-						return run.Module
-					case <-timer.C:
-						return types.NamespacedName{}
-					}
-				}
+				return gotRun
 			}, time.Second*70, interval).Should(Equal(moduleLookupKey))
 			// delete module to stopping requeue
 			Expect(k8sClient.Delete(ctx, module)).Should(Succeed())
