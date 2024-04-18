@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log/slog"
 	"regexp"
-	"sync"
 	"time"
 
 	tfaplv1beta1 "github.com/utilitywarehouse/terraform-applier/api/v1beta1"
@@ -26,13 +25,18 @@ var (
 	reApplyStatus = regexp.MustCompile(`.*(Apply complete! .* destroyed)`)
 )
 
+//go:generate go run github.com/golang/mock/mockgen -package runner -destination runnner_mock.go github.com/utilitywarehouse/terraform-applier/runner RunnerInterface
+
+type RunnerInterface interface {
+	Start(run *tfaplv1beta1.Run, cancelChan chan struct{}) bool
+}
+
 type Runner struct {
 	Clock                  sysutil.ClockInterface
 	ClusterClt             client.Client
 	Recorder               record.EventRecorder
 	KubeClt                kubernetes.Interface
 	Repos                  git.Repositories
-	Queue                  <-chan *tfaplv1beta1.Run
 	Redis                  sysutil.RedisInterface
 	Log                    *slog.Logger
 	Delegate               DelegateInterface
@@ -44,52 +48,31 @@ type Runner struct {
 	GlobalENV              map[string]string
 }
 
-// Start runs a continuous loop that starts a new run when a request comes into the queue channel.
-func (r *Runner) Start(ctx context.Context, done chan bool) {
-	wg := &sync.WaitGroup{}
+func (r *Runner) Start(run *tfaplv1beta1.Run, cancelChan chan struct{}) bool {
 
-	if r.Delegate == nil {
-		r.Delegate = &Delegate{}
+	if err := run.Request.Validate(); err != nil {
+		r.Log.Error("run triggered with invalid request", "req", run, "err", err)
+		return false
 	}
 
-	cancelChan := make(chan struct{})
+	r.Log.Info("starting run", "module", run.Module, "type", run.Request.Type)
 
-	for {
-		select {
-		case <-ctx.Done():
-			// notify workers
-			close(cancelChan)
-			// wait for all run to finish
-			wg.Wait()
-			done <- true
-			return
+	start := time.Now()
 
-		case run := <-r.Queue:
-			wg.Add(1)
-			go func(run *tfaplv1beta1.Run) {
-				defer wg.Done()
+	success := r.process(run, cancelChan)
 
-				if err := run.Request.Validate(); err != nil {
-					r.Log.Error("run triggered with invalid request", "req", run, "err", err)
-					return
-				}
+	dur := time.Since(start).Seconds()
 
-				start := time.Now()
+	r.Metrics.UpdateModuleSuccess(run.Module.Name, run.Module.Namespace, success)
+	r.Metrics.UpdateModuleRunDuration(run.Module.Name, run.Module.Namespace, dur, success)
 
-				r.Log.Info("starting run", "module", run.Module, "type", run.Request.Type)
-
-				success := r.process(run, cancelChan)
-
-				if success {
-					r.Log.Info("run completed successfully", "module", run.Module)
-				} else {
-					r.Log.Error("run completed with error", "module", run.Module)
-				}
-				r.Metrics.UpdateModuleSuccess(run.Module.Name, run.Module.Namespace, success)
-				r.Metrics.UpdateModuleRunDuration(run.Module.Name, run.Module.Namespace, time.Since(start).Seconds(), success)
-			}(run)
-		}
+	if success {
+		r.Log.Info("run completed successfully", "module", run.Module, "duration", dur)
+	} else {
+		r.Log.Error("run completed with error", "module", run.Module, "duration", dur)
 	}
+
+	return success
 }
 
 // process will prepare and run module it returns bool indicating failed run

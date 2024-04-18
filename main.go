@@ -8,10 +8,8 @@ import (
 	"log/slog"
 	"os"
 	"os/exec"
-	"os/signal"
 	"path/filepath"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -47,6 +45,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/config"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	runTimeMetrics "sigs.k8s.io/controller-runtime/pkg/metrics"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
@@ -492,15 +491,12 @@ func main() {
 }
 
 func run(c *cli.Context) {
-	ctx, cancel := context.WithCancel(c.Context)
+	ctx := ctrl.SetupSignalHandler()
 
 	ctrl.SetLogger(logr.FromSlogHandler(logger.Handler()))
 
 	// runStatus keeps track of currently running modules
 	runStatus := sysutil.NewRunStatus()
-
-	moduleQueue := make(chan *tfaplv1beta1.Run)
-	done := make(chan bool, 1)
 
 	clock := &sysutil.Clock{}
 
@@ -563,6 +559,12 @@ func run(c *cli.Context) {
 	}
 	logger.Info("found terraform binary", "version", version)
 
+	kubeClient, err := kubeClient()
+	if err != nil {
+		logger.Error("unable to create kube client", "err", err)
+		os.Exit(1)
+	}
+
 	if electionID == "" {
 		electionID = generateElectionID("4ee367ac", labelSelectorKey, labelSelectorValue, watchNamespaces)
 	}
@@ -573,6 +575,9 @@ func run(c *cli.Context) {
 		HealthProbeBindAddress: c.String("health-probe-bind-address"),
 		LeaderElection:         c.Bool("leader-elect"),
 		LeaderElectionID:       electionID,
+		Controller: config.Controller{
+			MaxConcurrentReconciles: c.Int("max-concurrent-runs"),
+		},
 	}
 
 	var labelSelector labels.Selector
@@ -609,18 +614,37 @@ func run(c *cli.Context) {
 		os.Exit(1)
 	}
 
+	runner := runner.Runner{
+		Clock:                  clock,
+		KubeClt:                kubeClient,
+		Repos:                  repos,
+		Log:                    logger.With("logger", "runner"),
+		Metrics:                metrics,
+		TerraformExecPath:      execPath,
+		TerminationGracePeriod: time.Duration(c.Int("termination-grace-period")) * time.Second,
+		AWSSecretsEngineConfig: &vault.AWSSecretsEngineConfig{
+			SecretsEngPath: c.String("vault-aws-secret-engine-path"),
+			AuthPath:       c.String("vault-kube-auth-path"),
+		},
+		GlobalENV:  globalRunEnv,
+		RunStatus:  runStatus,
+		Redis:      sysutil.Redis{Client: rdb},
+		Delegate:   &runner.Delegate{},
+		ClusterClt: mgr.GetClient(),
+		Recorder:   mgr.GetEventRecorderFor("terraform-applier"),
+	}
+
 	if err = (&controllers.ModuleReconciler{
 		Client:                 mgr.GetClient(),
 		Scheme:                 mgr.GetScheme(),
 		Recorder:               mgr.GetEventRecorderFor("terraform-applier"),
 		Clock:                  clock,
-		Queue:                  moduleQueue,
 		Repos:                  repos,
 		Log:                    logger.With("logger", "manager"),
 		MinIntervalBetweenRuns: time.Duration(c.Int("min-interval-between-runs")) * time.Second,
-		MaxConcurrentRuns:      c.Int("max-concurrent-runs"),
 		RunStatus:              runStatus,
 		Metrics:                metrics,
+		Runner:                 &runner,
 	}).SetupWithManager(mgr, filter); err != nil {
 		logger.Error("unable to create module controller", "err", err)
 		os.Exit(1)
@@ -634,31 +658,6 @@ func run(c *cli.Context) {
 	if err := mgr.AddReadyzCheck("readyz", healthz.Ping); err != nil {
 		logger.Error("unable to set up ready check", "err", err)
 		os.Exit(1)
-	}
-
-	kubeClient, err := kubeClient()
-	if err != nil {
-		logger.Error("unable to create kube client", "err", err)
-		os.Exit(1)
-	}
-	runner := runner.Runner{
-		Clock:                  clock,
-		ClusterClt:             mgr.GetClient(),
-		Recorder:               mgr.GetEventRecorderFor("terraform-applier"),
-		KubeClt:                kubeClient,
-		Queue:                  moduleQueue,
-		Repos:                  repos,
-		Log:                    logger.With("logger", "runner"),
-		Metrics:                metrics,
-		TerraformExecPath:      execPath,
-		TerminationGracePeriod: time.Duration(c.Int("termination-grace-period")) * time.Second,
-		AWSSecretsEngineConfig: &vault.AWSSecretsEngineConfig{
-			SecretsEngPath: c.String("vault-aws-secret-engine-path"),
-			AuthPath:       c.String("vault-kube-auth-path"),
-		},
-		GlobalENV: globalRunEnv,
-		RunStatus: runStatus,
-		Redis:     sysutil.Redis{Client: rdb},
 	}
 
 	if c.IsSet("oidc-issuer") {
@@ -685,7 +684,6 @@ func run(c *cli.Context) {
 		Log:           logger.With("logger", "webserver"),
 	}
 
-	go runner.Start(ctx, done)
 	go func() {
 		err := webserver.Start(ctx)
 		if err != nil {
@@ -693,38 +691,9 @@ func run(c *cli.Context) {
 		}
 	}()
 
-	go func() {
-		logger.Info("starting manager")
-		if err := mgr.Start(ctx); err != nil {
-			logger.Error("problem running manager", "err", err)
-		}
-	}()
+	logger.Info("starting manager")
+	if err := mgr.Start(ctx); err != nil {
+		logger.Error("problem running manager", "err", err)
+	}
 
-	// Wait for apply runs to finish before exiting when a SIGINT or SIGTERM
-	// is received. This should prevent state locks being left behind by
-	// interrupted terraform commands.
-	go func(cancel context.CancelFunc) {
-		sigCh := make(chan os.Signal, 1)
-		signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
-
-		sig := <-sigCh
-		logger.Info("received Term signal, waiting for all running modules to finish before exiting", "signal", sig)
-
-		// signal runner to start shutting down...
-		cancel()
-
-		for {
-			select {
-			case sig := <-sigCh:
-				logger.Error("received a second signal, force exiting", "signal", sig)
-				os.Exit(1)
-
-			// wait for runner to finish
-			case <-done:
-				logger.Info("runner successfully shutdown")
-			}
-		}
-	}(cancel)
-
-	<-done
 }

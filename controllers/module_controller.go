@@ -32,6 +32,7 @@ import (
 	tfaplv1beta1 "github.com/utilitywarehouse/terraform-applier/api/v1beta1"
 	"github.com/utilitywarehouse/terraform-applier/git"
 	"github.com/utilitywarehouse/terraform-applier/metrics"
+	"github.com/utilitywarehouse/terraform-applier/runner"
 	"github.com/utilitywarehouse/terraform-applier/sysutil"
 	corev1 "k8s.io/api/core/v1"
 )
@@ -45,12 +46,11 @@ type ModuleReconciler struct {
 	Recorder               record.EventRecorder
 	Clock                  sysutil.ClockInterface
 	Repos                  git.Repositories
-	Queue                  chan<- *tfaplv1beta1.Run
 	Log                    *slog.Logger
 	MinIntervalBetweenRuns time.Duration
-	MaxConcurrentRuns      int
 	RunStatus              *sysutil.RunStatus
 	Metrics                metrics.PrometheusInterface
+	Runner                 runner.RunnerInterface
 }
 
 //+kubebuilder:rbac:groups="",resources=events,verbs=create;patch
@@ -136,7 +136,8 @@ func (r *ModuleReconciler) Reconcile(ctx context.Context, req reconcile.Request)
 	if ok {
 		log.Debug("processing pending run request", "req", runReq, "delay", time.Since(runReq.RequestedAt.Time))
 		// use next poll internal as minimum queue duration as status change will not trigger Reconcile
-		return r.triggerRunORRequeue(module, runReq, pollIntervalDuration)
+		r.triggerRun(ctx, module, runReq)
+		return ctrl.Result{RequeueAfter: pollIntervalDuration}, nil
 
 	}
 
@@ -146,7 +147,8 @@ func (r *ModuleReconciler) Reconcile(ctx context.Context, req reconcile.Request)
 	if module.Status.LastDefaultRunCommitHash == "" {
 		log.Debug("requesting initial run")
 		// use next poll internal as minimum queue duration as status change will not trigger Reconcile
-		return r.triggerRunORRequeue(module, module.NewRunRequest(tfaplv1beta1.PollingRun), pollIntervalDuration)
+		r.triggerRun(ctx, module, module.NewRunRequest(tfaplv1beta1.PollingRun))
+		return ctrl.Result{RequeueAfter: pollIntervalDuration}, nil
 	}
 
 	// case 3:
@@ -164,7 +166,8 @@ func (r *ModuleReconciler) Reconcile(ctx context.Context, req reconcile.Request)
 	if hash != module.Status.LastDefaultRunCommitHash {
 		log.Debug("requesting run as revision is changed on module path", "lastRun", module.Status.LastDefaultRunCommitHash, "current", hash)
 		// use next poll internal as minimum queue duration as status change will not trigger Reconcile
-		return r.triggerRunORRequeue(module, module.NewRunRequest(tfaplv1beta1.PollingRun), pollIntervalDuration)
+		r.triggerRun(ctx, module, module.NewRunRequest(tfaplv1beta1.PollingRun))
+		return ctrl.Result{RequeueAfter: pollIntervalDuration}, nil
 	}
 
 	// case 4:
@@ -190,7 +193,8 @@ func (r *ModuleReconciler) Reconcile(ctx context.Context, req reconcile.Request)
 	if numOfMissedRuns > 0 {
 		log.Debug("requesting scheduled run", "missed-runs", numOfMissedRuns)
 		// use next poll internal as minimum queue duration as status change will not trigger Reconcile
-		return r.triggerRunORRequeue(module, module.NewRunRequest(tfaplv1beta1.ScheduledRun), pollIntervalDuration)
+		r.triggerRun(ctx, module, module.NewRunRequest(tfaplv1beta1.ScheduledRun))
+		return ctrl.Result{RequeueAfter: pollIntervalDuration}, nil
 	}
 
 	// default:
@@ -279,20 +283,25 @@ func NextSchedule(module *tfaplv1beta1.Module, now time.Time, minIntervalBetween
 	return numOfMissedRuns, sched.Next(now), nil
 }
 
-// triggerRunORRequeue will check controller capacity before triggering a run
+// triggerRun will check controller capacity before triggering a run
 // if max limit is reached it will re-queue module to try again
-func (r *ModuleReconciler) triggerRunORRequeue(m *tfaplv1beta1.Module, runReq *tfaplv1beta1.Request, requeueAfter time.Duration) (ctrl.Result, error) {
+func (r *ModuleReconciler) triggerRun(ctx context.Context, m *tfaplv1beta1.Module, runReq *tfaplv1beta1.Request) {
 	run := tfaplv1beta1.NewRun(m, runReq)
 
-	runningModuleCount := r.RunStatus.Len()
-	if r.MaxConcurrentRuns <= 0 || runningModuleCount < r.MaxConcurrentRuns {
-		r.Queue <- &run
-		r.Metrics.SetRunPending(run.Module.Namespace, run.Module.Name, false)
-	} else {
-		r.Metrics.SetRunPending(run.Module.Namespace, run.Module.Name, true)
-		r.Log.Warn("skipping run max concurrent run limit reached", "module", run.Module, "count", runningModuleCount)
-	}
-	return ctrl.Result{RequeueAfter: requeueAfter}, nil
+	cancelChan := make(chan struct{})
+	go func() {
+		// for range ctx.Done() {} doesn't work
+		for {
+			select {
+			case <-ctx.Done():
+				r.Log.With("module", m.NamespacedName()).Info("sending cancel signal")
+				close(cancelChan)
+				return
+			}
+		}
+	}()
+
+	r.Runner.Start(&run, cancelChan)
 }
 
 func (r *ModuleReconciler) setFailedStatus(req ctrl.Request, module *tfaplv1beta1.Module, reason, msg string) {
