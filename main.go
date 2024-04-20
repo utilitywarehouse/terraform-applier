@@ -634,6 +634,11 @@ func run(c *cli.Context) {
 		Recorder:   mgr.GetEventRecorderFor("terraform-applier"),
 	}
 
+	if err := runner.EnablePluginCachePool(c.Int("max-concurrent-runs")); err != nil {
+		logger.Error("unable to create plugin cache pool", "err", err)
+		os.Exit(1)
+	}
+
 	if err = (&controllers.ModuleReconciler{
 		Client:                 mgr.GetClient(),
 		Scheme:                 mgr.GetScheme(),

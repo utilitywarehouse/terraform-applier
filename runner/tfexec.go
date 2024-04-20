@@ -84,11 +84,6 @@ func (r *Runner) NewTFRunner(
 	runEnv := make(map[string]string)
 	var strongboxKeyringData string
 
-	// first add Global ENV and then module ENVs
-	// this way user can override Global ENV if needed
-	for key := range r.GlobalENV {
-		runEnv[key] = r.GlobalENV[key]
-	}
 	for key := range envs {
 		// get SB keyring data if corresponding ENV is set
 		if key == strongBoxEnv {

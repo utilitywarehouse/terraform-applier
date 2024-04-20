@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"os"
+	"path"
 	"regexp"
 	"time"
 
@@ -12,6 +14,7 @@ import (
 	"github.com/utilitywarehouse/terraform-applier/metrics"
 	"github.com/utilitywarehouse/terraform-applier/sysutil"
 	"github.com/utilitywarehouse/terraform-applier/vault"
+	"golang.org/x/exp/maps"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -23,6 +26,8 @@ import (
 var (
 	rePlanStatus  = regexp.MustCompile(`.*((Plan:|No changes.) .*)`)
 	reApplyStatus = regexp.MustCompile(`.*(Apply complete! .* destroyed)`)
+
+	pluginCacheRoot = path.Join(os.TempDir(), "plugin-cache-root")
 )
 
 //go:generate go run github.com/golang/mock/mockgen -package runner -destination runnner_mock.go github.com/utilitywarehouse/terraform-applier/runner RunnerInterface
@@ -46,20 +51,68 @@ type Runner struct {
 	AWSSecretsEngineConfig vault.AWSSecretsEngineInterface
 	RunStatus              *sysutil.RunStatus
 	GlobalENV              map[string]string
+	pluginCacheEnabled     bool
+	pluginCacheDirPool     chan string
 }
 
-func (r *Runner) Start(run *tfaplv1beta1.Run, cancelChan chan struct{}) bool {
+// EnablePluginCachePool will create plugin cache dirs and fill in
+// buffered chan `pluginCacheDirPool` which can be used concurrently by runners
+// if number concurrent runners is more then given `maxRunners` then those will be blocked
+// until plugin cache is available. hence its important that we create same number of
+// dirs as maximum number of concurrent runners/reconcilers
+func (r *Runner) EnablePluginCachePool(maxRunners int) error {
+	r.pluginCacheDirPool = make(chan string, maxRunners)
 
+	err := os.Mkdir(pluginCacheRoot, 0700)
+	if err != nil {
+		return fmt.Errorf("unable to create plugin cache root err:%w", err)
+	}
+
+	// create temp plugin cache folders which can be used by concurrent
+	// runs
+	for i := 0; i < maxRunners; i++ {
+		// setup plugin cache
+		pluginCacheDir := path.Join(pluginCacheRoot, fmt.Sprintf("plugin-cache-%d", i))
+
+		err := os.Mkdir(pluginCacheDir, 0700)
+		if err != nil {
+			return fmt.Errorf("unable to create plugin cache dir err:%w", err)
+		}
+		r.pluginCacheDirPool <- pluginCacheDir
+	}
+	r.pluginCacheEnabled = true
+	return nil
+}
+
+func (r *Runner) CleanUp() {
+	os.RemoveAll(pluginCacheRoot)
+}
+
+// Start will start given run and return true if run is successful
+// This function is concurrency safe
+func (r *Runner) Start(run *tfaplv1beta1.Run, cancelChan chan struct{}) bool {
 	if err := run.Request.Validate(); err != nil {
 		r.Log.Error("run triggered with invalid request", "req", run, "err", err)
 		return false
+	}
+	envs := make(map[string]string)
+	maps.Copy(envs, r.GlobalENV)
+
+	if r.pluginCacheEnabled {
+		// borrow plugin cache folder from the pool and return it back once done
+		pluginCacheDir := <-r.pluginCacheDirPool
+		defer func() {
+			r.pluginCacheDirPool <- pluginCacheDir
+		}()
+
+		envs["TF_PLUGIN_CACHE_DIR"] = pluginCacheDir
 	}
 
 	r.Log.Info("starting run", "module", run.Module, "type", run.Request.Type)
 
 	start := time.Now()
 
-	success := r.process(run, cancelChan)
+	success := r.process(run, cancelChan, envs)
 
 	dur := time.Since(start).Seconds()
 
@@ -76,7 +129,7 @@ func (r *Runner) Start(run *tfaplv1beta1.Run, cancelChan chan struct{}) bool {
 }
 
 // process will prepare and run module it returns bool indicating failed run
-func (r *Runner) process(run *tfaplv1beta1.Run, cancelChan <-chan struct{}) bool {
+func (r *Runner) process(run *tfaplv1beta1.Run, cancelChan <-chan struct{}, envs map[string]string) bool {
 	log := r.Log.With("module", run.Module)
 
 	// make sure module is not already running
@@ -197,13 +250,16 @@ func (r *Runner) process(run *tfaplv1beta1.Run, cancelChan <-chan struct{}) bool
 		return false
 	}
 
-	envs, err := fetchEnvVars(ctx, delegatedClient, module, module.Spec.Env)
+	moduleEnvs, err := fetchEnvVars(ctx, delegatedClient, module, module.Spec.Env)
 	if err != nil {
 		msg := fmt.Sprintf("unable to get envs: err:%s", err)
 		log.Error(msg)
 		r.setFailedStatus(run, module, tfaplv1beta1.ReasonRunPreparationFailed, msg, r.Clock.Now())
 		return false
 	}
+
+	// copy module Env to given env so that user can override Global ENV if needed
+	maps.Copy(envs, moduleEnvs)
 
 	vars, err := fetchEnvVars(ctx, delegatedClient, module, module.Spec.Var)
 	if err != nil {
