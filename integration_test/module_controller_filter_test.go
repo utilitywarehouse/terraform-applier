@@ -28,7 +28,7 @@ var _ = Describe("Module controller without runner with label selector", func() 
 		BeforeEach(func() {
 			// reset Time
 			fakeClock.T = time.Date(2022, 02, 01, 01, 00, 00, 0000, time.UTC)
-			testReconciler.Queue = testFilterControllerQueue
+			testReconciler.Runner = testMockRunner1
 
 			// add label selector
 			testFilter.LabelSelectorKey = labelSelectorKey
@@ -61,21 +61,20 @@ var _ = Describe("Module controller without runner with label selector", func() 
 				},
 				Spec: tfaplv1beta1.ModuleSpec{Schedule: "1 * * * *", RepoURL: repoURL, Path: path},
 			}
+			// expect call before crete
+			gotRun := types.NamespacedName{}
+			testMockRunner1.EXPECT().Start(gomock.Any(), gomock.Any()).
+				DoAndReturn(func(run *tfaplv1beta1.Run, _ chan struct{}) bool {
+					gotRun = run.Module
+					return true
+				})
 			Expect(k8sClient.Create(ctx, module)).Should(Succeed())
 
 			moduleLookupKey := types.NamespacedName{Name: moduleName, Namespace: moduleNamespace}
 
 			By("By making sure job was sent to jobQueue")
 			Eventually(func() types.NamespacedName {
-				timer := time.NewTimer(time.Second)
-				for {
-					select {
-					case run := <-testFilterControllerQueue:
-						return run.Module
-					case <-timer.C:
-						return types.NamespacedName{}
-					}
-				}
+				return gotRun
 			}, time.Second*10, interval).Should(Equal(moduleLookupKey))
 			// delete module to stopping requeue
 			Expect(k8sClient.Delete(ctx, module)).Should(Succeed())
@@ -99,21 +98,20 @@ var _ = Describe("Module controller without runner with label selector", func() 
 				},
 				Spec: tfaplv1beta1.ModuleSpec{Schedule: "1 * * * *", RepoURL: repoURL, Path: path},
 			}
+			// expect call before crete
+			gotRun := types.NamespacedName{}
+			testMockRunner1.EXPECT().Start(gomock.Any(), gomock.Any()).
+				DoAndReturn(func(run *tfaplv1beta1.Run, _ chan struct{}) bool {
+					gotRun = run.Module
+					return true
+				}).AnyTimes()
 			Expect(k8sClient.Create(ctx, module)).Should(Succeed())
 
 			moduleLookupKey := types.NamespacedName{Name: moduleName, Namespace: moduleNamespace}
 
 			By("By making sure job was not sent to jobQueue")
 			Consistently(func() types.NamespacedName {
-				timer := time.NewTimer(time.Second)
-				for {
-					select {
-					case run := <-testFilterControllerQueue:
-						return run.Module
-					case <-timer.C:
-						return types.NamespacedName{}
-					}
-				}
+				return gotRun
 			}, time.Second*10, interval).Should(Not(Equal(moduleLookupKey)))
 			// delete module to stopping requeue
 			Expect(k8sClient.Delete(ctx, module)).Should(Succeed())
@@ -137,21 +135,20 @@ var _ = Describe("Module controller without runner with label selector", func() 
 				},
 				Spec: tfaplv1beta1.ModuleSpec{Schedule: "1 * * * *", RepoURL: repoURL, Path: path},
 			}
+			// expect call before crete
+			gotRun := types.NamespacedName{}
+			testMockRunner1.EXPECT().Start(gomock.Any(), gomock.Any()).
+				DoAndReturn(func(run *tfaplv1beta1.Run, _ chan struct{}) bool {
+					gotRun = run.Module
+					return true
+				}).AnyTimes()
 			Expect(k8sClient.Create(ctx, module)).Should(Succeed())
 
 			moduleLookupKey := types.NamespacedName{Name: moduleName, Namespace: moduleNamespace}
 
 			By("By making sure job was not sent to jobQueue")
 			Consistently(func() types.NamespacedName {
-				timer := time.NewTimer(time.Second)
-				for {
-					select {
-					case run := <-testFilterControllerQueue:
-						return run.Module
-					case <-timer.C:
-						return types.NamespacedName{}
-					}
-				}
+				return gotRun
 			}, time.Second*10, interval).Should(Not(Equal(moduleLookupKey)))
 			// delete module to stopping requeue
 			Expect(k8sClient.Delete(ctx, module)).Should(Succeed())
@@ -174,21 +171,20 @@ var _ = Describe("Module controller without runner with label selector", func() 
 				},
 				Spec: tfaplv1beta1.ModuleSpec{Schedule: "1 * * * *", RepoURL: repoURL, Path: path},
 			}
+			// expect call before crete
+			gotRun := types.NamespacedName{}
+			testMockRunner1.EXPECT().Start(gomock.Any(), gomock.Any()).
+				DoAndReturn(func(run *tfaplv1beta1.Run, _ chan struct{}) bool {
+					gotRun = run.Module
+					return true
+				}).AnyTimes()
 			Expect(k8sClient.Create(ctx, module)).Should(Succeed())
 
 			moduleLookupKey := types.NamespacedName{Name: moduleName, Namespace: moduleNamespace}
 
 			By("By making sure job was not sent to jobQueue")
 			Consistently(func() types.NamespacedName {
-				timer := time.NewTimer(time.Second)
-				for {
-					select {
-					case run := <-testFilterControllerQueue:
-						return run.Module
-					case <-timer.C:
-						return types.NamespacedName{}
-					}
-				}
+				return gotRun
 			}, time.Second*10, interval).Should(Not(Equal(moduleLookupKey)))
 			// delete module to stopping requeue
 			Expect(k8sClient.Delete(ctx, module)).Should(Succeed())

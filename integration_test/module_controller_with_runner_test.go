@@ -42,7 +42,7 @@ var _ = Describe("Module controller with Runner", func() {
 		BeforeEach(func() {
 			// reset Time
 			fakeClock.T = time.Date(2022, 02, 01, 01, 00, 00, 0000, time.UTC)
-			testReconciler.Queue = testRunnerQueue
+			testReconciler.Runner = &testRunner
 
 			// remove any label selector
 			testFilter.LabelSelectorKey = ""
