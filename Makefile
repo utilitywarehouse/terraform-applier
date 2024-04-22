@@ -34,7 +34,7 @@ docker-build: test ## Build docker image with the manager.
 	docker build -t ${IMG} .
 
 
-BJS_VERSION="5.2.3"
+BJS_VERSION="5.3.3"
 update-bootstrap-js:
 	(cd /tmp/ && curl -L -O https://github.com/twbs/bootstrap/releases/download/v$(BJS_VERSION)/bootstrap-$(BJS_VERSION)-dist.zip)
 	(cd /tmp/ && unzip bootstrap-$(BJS_VERSION)-dist.zip)
