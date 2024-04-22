@@ -289,6 +289,12 @@ func (r *ModuleReconciler) triggerRun(ctx context.Context, m *tfaplv1beta1.Modul
 	run := tfaplv1beta1.NewRun(m, runReq)
 
 	cancelChan := make(chan struct{})
+	done := make(chan struct{})
+
+	// close ctx monitor loop
+	defer close(done)
+
+	// start ctx monitor loop
 	go func() {
 		// for range ctx.Done() {} doesn't work
 		for {
@@ -296,6 +302,8 @@ func (r *ModuleReconciler) triggerRun(ctx context.Context, m *tfaplv1beta1.Modul
 			case <-ctx.Done():
 				r.Log.With("module", m.NamespacedName()).Info("sending cancel signal")
 				close(cancelChan)
+				return
+			case <-done:
 				return
 			}
 		}
