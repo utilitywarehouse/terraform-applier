@@ -25,7 +25,7 @@ var _ = Describe("Module controller without runner", func() {
 		BeforeEach(func() {
 			// reset Time
 			fakeClock.T = time.Date(2022, 02, 01, 01, 00, 00, 0000, time.UTC)
-			testReconciler.Runner = testMockRunner
+			testReconciler.Runner = testMockRunner2
 
 			// remove any label selector
 			testFilter.LabelSelectorKey = ""
@@ -60,7 +60,7 @@ var _ = Describe("Module controller without runner", func() {
 			}
 			// expect call before crete
 			gotRun := types.NamespacedName{}
-			testMockRunner.EXPECT().Start(gomock.Any(), gomock.Any()).
+			testMockRunner2.EXPECT().Start(gomock.Any(), gomock.Any()).
 				DoAndReturn(func(run *tfaplv1beta1.Run, _ chan struct{}) bool {
 					gotRun = run.Module
 					return true
@@ -97,7 +97,7 @@ var _ = Describe("Module controller without runner", func() {
 
 			By("By making sure job is not sent to job queue before schedule")
 			fakeClock.T = time.Date(2022, 02, 01, 01, 00, 40, 0000, time.UTC)
-			// since there is not testMockRunner.EXPECT() if controller calls Start it will panic
+			// since there is not testMockRunner2.EXPECT() if controller calls Start it will panic
 			time.Sleep(time.Second * 15)
 
 			// advance time
@@ -105,7 +105,7 @@ var _ = Describe("Module controller without runner", func() {
 			fakeClock.T = time.Date(2022, 02, 01, 01, 01, 00, 0000, time.UTC)
 
 			gotRun = types.NamespacedName{}
-			testMockRunner.EXPECT().Start(gomock.Any(), gomock.Any()).
+			testMockRunner2.EXPECT().Start(gomock.Any(), gomock.Any()).
 				DoAndReturn(func(run *tfaplv1beta1.Run, _ chan struct{}) bool {
 					gotRun = run.Module
 					return true
@@ -144,7 +144,7 @@ var _ = Describe("Module controller without runner", func() {
 			}
 			// expect call before crete
 			gotRun := types.NamespacedName{}
-			testMockRunner.EXPECT().Start(gomock.Any(), gomock.Any()).
+			testMockRunner2.EXPECT().Start(gomock.Any(), gomock.Any()).
 				DoAndReturn(func(run *tfaplv1beta1.Run, _ chan struct{}) bool {
 					gotRun = run.Module
 					return true
@@ -166,7 +166,7 @@ var _ = Describe("Module controller without runner", func() {
 			By("By making sure job was sent to jobQueue when commit hash is changed")
 			testRepos.EXPECT().Hash(gomock.Any(), repoURL, "HEAD", path).Return("CommitAbc456", nil)
 			gotRun = types.NamespacedName{}
-			testMockRunner.EXPECT().Start(gomock.Any(), gomock.Any()).
+			testMockRunner2.EXPECT().Start(gomock.Any(), gomock.Any()).
 				DoAndReturn(func(run *tfaplv1beta1.Run, _ chan struct{}) bool {
 					gotRun = run.Module
 					return true
@@ -204,7 +204,7 @@ var _ = Describe("Module controller without runner", func() {
 				},
 			}
 			gotRun := types.NamespacedName{}
-			testMockRunner.EXPECT().Start(gomock.Any(), gomock.Any()).
+			testMockRunner2.EXPECT().Start(gomock.Any(), gomock.Any()).
 				DoAndReturn(func(run *tfaplv1beta1.Run, _ chan struct{}) bool {
 					gotRun = run.Module
 					return true
@@ -265,7 +265,7 @@ var _ = Describe("Module controller without runner", func() {
 				},
 			}
 			gotRun := types.NamespacedName{}
-			testMockRunner.EXPECT().Start(gomock.Any(), gomock.Any()).
+			testMockRunner2.EXPECT().Start(gomock.Any(), gomock.Any()).
 				DoAndReturn(func(run *tfaplv1beta1.Run, _ chan struct{}) bool {
 					gotRun = run.Module
 					return true
@@ -328,7 +328,7 @@ var _ = Describe("Module controller without runner", func() {
 				},
 			}
 			gotRun := types.NamespacedName{}
-			testMockRunner.EXPECT().Start(gomock.Any(), gomock.Any()).
+			testMockRunner2.EXPECT().Start(gomock.Any(), gomock.Any()).
 				DoAndReturn(func(run *tfaplv1beta1.Run, _ chan struct{}) bool {
 					gotRun = run.Module
 					return true

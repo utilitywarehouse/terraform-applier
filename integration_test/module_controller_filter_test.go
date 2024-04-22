@@ -28,7 +28,7 @@ var _ = Describe("Module controller without runner with label selector", func() 
 		BeforeEach(func() {
 			// reset Time
 			fakeClock.T = time.Date(2022, 02, 01, 01, 00, 00, 0000, time.UTC)
-			testReconciler.Runner = testMockRunner
+			testReconciler.Runner = testMockRunner1
 
 			// add label selector
 			testFilter.LabelSelectorKey = labelSelectorKey
@@ -63,7 +63,7 @@ var _ = Describe("Module controller without runner with label selector", func() 
 			}
 			// expect call before crete
 			gotRun := types.NamespacedName{}
-			testMockRunner.EXPECT().Start(gomock.Any(), gomock.Any()).
+			testMockRunner1.EXPECT().Start(gomock.Any(), gomock.Any()).
 				DoAndReturn(func(run *tfaplv1beta1.Run, _ chan struct{}) bool {
 					gotRun = run.Module
 					return true
@@ -100,7 +100,7 @@ var _ = Describe("Module controller without runner with label selector", func() 
 			}
 			// expect call before crete
 			gotRun := types.NamespacedName{}
-			testMockRunner.EXPECT().Start(gomock.Any(), gomock.Any()).
+			testMockRunner1.EXPECT().Start(gomock.Any(), gomock.Any()).
 				DoAndReturn(func(run *tfaplv1beta1.Run, _ chan struct{}) bool {
 					gotRun = run.Module
 					return true
@@ -137,7 +137,7 @@ var _ = Describe("Module controller without runner with label selector", func() 
 			}
 			// expect call before crete
 			gotRun := types.NamespacedName{}
-			testMockRunner.EXPECT().Start(gomock.Any(), gomock.Any()).
+			testMockRunner1.EXPECT().Start(gomock.Any(), gomock.Any()).
 				DoAndReturn(func(run *tfaplv1beta1.Run, _ chan struct{}) bool {
 					gotRun = run.Module
 					return true
@@ -173,7 +173,7 @@ var _ = Describe("Module controller without runner with label selector", func() 
 			}
 			// expect call before crete
 			gotRun := types.NamespacedName{}
-			testMockRunner.EXPECT().Start(gomock.Any(), gomock.Any()).
+			testMockRunner1.EXPECT().Start(gomock.Any(), gomock.Any()).
 				DoAndReturn(func(run *tfaplv1beta1.Run, _ chan struct{}) bool {
 					gotRun = run.Module
 					return true

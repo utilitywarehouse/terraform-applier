@@ -82,7 +82,8 @@ var (
 	testDelegate     *runner.MockDelegateInterface
 	testRedis        *sysutil.MockRedisInterface
 	testRunner       runner.Runner
-	testMockRunner   *runner.MockRunnerInterface //only used for controller behaviour testing without runner
+	testMockRunner1  *runner.MockRunnerInterface //only used for controller behaviour testing without runner
+	testMockRunner2  *runner.MockRunnerInterface //only used for controller behaviour testing without runner
 	testReconciler   *controllers.ModuleReconciler
 	testVaultAWSConf *vault.MockAWSSecretsEngineInterface
 )
@@ -162,7 +163,8 @@ var _ = BeforeSuite(func() {
 	testRepos = git.NewMockRepositories(goMockCtrl)
 	testMetrics = metrics.NewMockPrometheusInterface(goMockCtrl)
 	testDelegate = runner.NewMockDelegateInterface(goMockCtrl)
-	testMockRunner = runner.NewMockRunnerInterface(goMockCtrl)
+	testMockRunner1 = runner.NewMockRunnerInterface(goMockCtrl)
+	testMockRunner2 = runner.NewMockRunnerInterface(goMockCtrl)
 	testRedis = sysutil.NewMockRedisInterface(goMockCtrl)
 
 	testVaultAWSConf = vault.NewMockAWSSecretsEngineInterface(goMockCtrl)
