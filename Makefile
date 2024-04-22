@@ -45,6 +45,12 @@ update-bootstrap-js:
 	cp /tmp/bootstrap-$(BJS_VERSION)-dist/css/bootstrap.min.css webserver/static/bootstrap/css/bootstrap.min.css
 	cp /tmp/bootstrap-$(BJS_VERSION)-dist/css/bootstrap.min.css.map webserver/static/bootstrap/css/bootstrap.min.css.map
 
+PRISM_VERSION="1.29.0"
+update-prism:
+	curl https://cdnjs.cloudflare.com/ajax/libs/prism/$(PRISM_VERSION)/themes/prism.min.css >> webserver/static/prism/css/prism.min.css
+	curl https://cdnjs.cloudflare.com/ajax/libs/prism/$(PRISM_VERSION)/components/prism-core.min.js >> webserver/static/prism/js/prism-core.min.js
+	curl https://cdnjs.cloudflare.com/ajax/libs/prism/$(PRISM_VERSION)/components/prism-hcl.min.js >> webserver/static/prism/js/prism-hcl.min.js
+
 release:
 	@sd "master" "$(VERSION)" manifests/base/namespaced/tf-applier.yaml
 	@git add -- manifests/base/namespaced/tf-applier.yaml

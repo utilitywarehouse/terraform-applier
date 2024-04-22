@@ -8,12 +8,17 @@
     <script src="static/js/main.js"></script>
     <link rel="stylesheet" href="static/stylesheets/main.css">
     <link rel="stylesheet" href="static/bootstrap/css/bootstrap.min.css">
-    <script src="static/bootstrap/js/bootstrap.min.js"></script>
+    <link rel="stylesheet" href="static/prism/css/prism.min.css">
     <style>
         .list-group {
             --bs-list-group-active-color: #550091;
             --bs-list-group-active-bg: #f5f0f8;
             --bs-list-group-active-border-color: #f5f0f8;
+        }
+
+        code[class*="language-"],
+        pre[class*="language-"] {
+            font-size: 14px;
         }
     </style>
 </head>
@@ -114,6 +119,10 @@
         make
         sure it is running properly.</h4>
     {{ end }}
+
+    <script src="static/bootstrap/js/bootstrap.min.js"></script>
+    <script src="static/prism/js/prism-core.min.js"></script>
+    <script src="static/prism/js/prism-hcl.min.js"></script>
 </body>
 
 </html>
@@ -255,10 +264,9 @@
                                     </div>
                                 </div>
                             </dl>
-                            <pre class="file-output font-monospace p-2"
-                                style="max-height: 40em; background-color: #f5f5f5;">
-                            <small>{{$run.Output}}</small>
-                        </pre>
+                            <pre class="py-1">
+<code class="language-hcl">{{$run.Output}}</code>
+</pre>
                         </div>
                         {{end}}
                     </div>
