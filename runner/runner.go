@@ -64,7 +64,7 @@ func (r *Runner) EnablePluginCachePool(maxRunners int) error {
 	r.pluginCacheDirPool = make(chan string, maxRunners)
 
 	err := os.Mkdir(pluginCacheRoot, 0700)
-	if err != nil {
+	if err != nil && !os.IsExist(err) {
 		return fmt.Errorf("unable to create plugin cache root err:%w", err)
 	}
 
@@ -75,7 +75,7 @@ func (r *Runner) EnablePluginCachePool(maxRunners int) error {
 		pluginCacheDir := path.Join(pluginCacheRoot, fmt.Sprintf("plugin-cache-%d", i))
 
 		err := os.Mkdir(pluginCacheDir, 0700)
-		if err != nil {
+		if err != nil && !os.IsExist(err) {
 			return fmt.Errorf("unable to create plugin cache dir err:%w", err)
 		}
 		r.pluginCacheDirPool <- pluginCacheDir
