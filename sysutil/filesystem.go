@@ -4,8 +4,20 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path"
 )
+
+// RemoveAll will remove given dir and sub dir recursively using exec 'rm -rf'
+// given dir path should be absolute
+func RemoveAll(dir string) error {
+	if !path.IsAbs(dir) {
+		return fmt.Errorf("dir path needs to be absolute given:%s", dir)
+	}
+
+	cmd := exec.Command("rm", "-r", "-f", dir)
+	return cmd.Run()
+}
 
 // CopyFile copies a file
 func CopyFile(src, dst string) error {

@@ -85,7 +85,7 @@ func (r *Runner) EnablePluginCachePool(maxRunners int) error {
 }
 
 func (r *Runner) CleanUp() {
-	os.RemoveAll(pluginCacheRoot)
+	sysutil.RemoveAll(pluginCacheRoot)
 }
 
 // Start will start given run and return true if run is successful

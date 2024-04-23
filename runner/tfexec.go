@@ -13,6 +13,7 @@ import (
 	"github.com/hashicorp/terraform-exec/tfexec"
 	tfaplv1beta1 "github.com/utilitywarehouse/terraform-applier/api/v1beta1"
 	"github.com/utilitywarehouse/terraform-applier/metrics"
+	"github.com/utilitywarehouse/terraform-applier/sysutil"
 )
 
 const strongBoxEnv = "TF_APPLIER_STRONGBOX_KEYRING"
@@ -55,7 +56,7 @@ func (r *Runner) NewTFRunner(
 		// calling function can only run cleanUp() if TFExecuter is successfully created
 		// hence cleanup temp repo dir if errored
 		if err != nil {
-			os.RemoveAll(tmpRoot)
+			sysutil.RemoveAll(tmpRoot)
 		}
 	}()
 
@@ -125,7 +126,7 @@ func (r *Runner) NewTFRunner(
 }
 
 func (te *tfRunner) cleanUp() {
-	os.RemoveAll(te.rootDir)
+	sysutil.RemoveAll(te.rootDir)
 }
 
 func (te *tfRunner) init(ctx context.Context, backendConf map[string]string) (string, error) {
