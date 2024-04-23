@@ -255,6 +255,12 @@ var (
 			Required: true,
 			Usage:    "redis url to store run output and metadata",
 		},
+		&cli.BoolFlag{
+			Name:    "disable-plugin-cache",
+			EnvVars: []string{"DISABLE_PLUGIN_CACHE"},
+			Value:   false,
+			Usage:   "disable plugin cache created / reconciler",
+		},
 	}
 )
 
@@ -634,9 +640,11 @@ func run(c *cli.Context) {
 		Recorder:   mgr.GetEventRecorderFor("terraform-applier"),
 	}
 
-	if err := runner.EnablePluginCachePool(c.Int("max-concurrent-runs")); err != nil {
-		logger.Error("unable to create plugin cache pool", "err", err)
-		os.Exit(1)
+	if !c.Bool("disable-plugin-cache") {
+		if err := runner.EnablePluginCachePool(c.Int("max-concurrent-runs")); err != nil {
+			logger.Error("unable to create plugin cache pool", "err", err)
+			os.Exit(1)
+		}
 	}
 
 	if err = (&controllers.ModuleReconciler{
