@@ -72,14 +72,14 @@ spec:
           volumeMounts:
             - mountPath: /src
               name: git-repo
-            - mountPath: /tmp
-              name: tmp
+            - mountPath: /data
+              name: data
       volumes:
         - name: git-repo
           emptyDir: {}
   volumeClaimTemplates:
     - metadata:
-        name: tmp
+        name: data
       spec:
         accessModes:
           - ReadWriteOnce

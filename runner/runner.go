@@ -27,7 +27,8 @@ var (
 	rePlanStatus  = regexp.MustCompile(`.*((Plan:|No changes.) .*)`)
 	reApplyStatus = regexp.MustCompile(`.*(Apply complete! .* destroyed)`)
 
-	pluginCacheRoot = path.Join(os.TempDir(), "plugin-cache-root")
+	pluginCacheRoot = "plugin-cache-root"
+	runTmpRoot      = "run-tmp-root"
 )
 
 //go:generate go run github.com/golang/mock/mockgen -package runner -destination runnner_mock.go github.com/utilitywarehouse/terraform-applier/runner RunnerInterface
@@ -53,6 +54,7 @@ type Runner struct {
 	GlobalENV              map[string]string
 	pluginCacheEnabled     bool
 	pluginCacheDirPool     chan string
+	DataRootPath           string
 }
 
 // EnablePluginCachePool will create plugin cache dirs and fill in
@@ -61,10 +63,11 @@ type Runner struct {
 // until plugin cache is available. hence its important that we create same number of
 // dirs as maximum number of concurrent runners/reconcilers
 func (r *Runner) EnablePluginCachePool(maxRunners int) error {
+	pluginCacheRootPath := path.Join(r.DataRootPath, pluginCacheRoot)
 	r.pluginCacheDirPool = make(chan string, maxRunners)
 
-	err := os.Mkdir(pluginCacheRoot, 0700)
-	if err != nil && !os.IsExist(err) {
+	err := os.MkdirAll(pluginCacheRootPath, 0700)
+	if err != nil {
 		return fmt.Errorf("unable to create plugin cache root err:%w", err)
 	}
 
@@ -72,10 +75,10 @@ func (r *Runner) EnablePluginCachePool(maxRunners int) error {
 	// runs
 	for i := 0; i < maxRunners; i++ {
 		// setup plugin cache
-		pluginCacheDir := path.Join(pluginCacheRoot, fmt.Sprintf("plugin-cache-%d", i))
+		pluginCacheDir := path.Join(pluginCacheRootPath, fmt.Sprintf("plugin-cache-%d", i))
 
-		err := os.Mkdir(pluginCacheDir, 0700)
-		if err != nil && !os.IsExist(err) {
+		err := os.MkdirAll(pluginCacheDir, 0700)
+		if err != nil {
 			return fmt.Errorf("unable to create plugin cache dir err:%w", err)
 		}
 		r.pluginCacheDirPool <- pluginCacheDir
@@ -85,7 +88,8 @@ func (r *Runner) EnablePluginCachePool(maxRunners int) error {
 }
 
 func (r *Runner) CleanUp() {
-	sysutil.RemoveAll(pluginCacheRoot)
+	pluginCacheRootPath := path.Join(r.DataRootPath, pluginCacheRoot)
+	sysutil.RemoveAll(pluginCacheRootPath)
 }
 
 // Start will start given run and return true if run is successful

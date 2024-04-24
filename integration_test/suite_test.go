@@ -227,6 +227,7 @@ var _ = BeforeSuite(func() {
 		TerminationGracePeriod: 10 * time.Second,
 		RunStatus:              runStatus,
 		Redis:                  testRedis,
+		DataRootPath:           os.TempDir(),
 	}
 
 	pwd, err := os.Getwd()

@@ -64,6 +64,7 @@ var (
 
 	logLevel           string
 	reposRootPath      string
+	dataRootPath       string
 	labelSelectorKey   string
 	labelSelectorValue string
 	electionID         string
@@ -88,6 +89,14 @@ var (
 			Destination: &reposRootPath,
 			Usage: "Absolute path to the directory containing all repositories of the modules. " +
 				"The immediate subdirectories of this directory should contain the module repo directories and directory name should match repoName referenced in  module.",
+		},
+		&cli.StringFlag{
+			Name:        "data-root-path",
+			EnvVars:     []string{"DATA_ROOT_PATH"},
+			Value:       "/data",
+			Destination: &dataRootPath,
+			Usage: "Absolute path to the directory where run time data can be stored. " +
+				"data will include plugin cache, temp module run time dir and other run time configs",
 		},
 		&cli.StringFlag{
 			Name:    "config",
@@ -632,12 +641,13 @@ func run(c *cli.Context) {
 			SecretsEngPath: c.String("vault-aws-secret-engine-path"),
 			AuthPath:       c.String("vault-kube-auth-path"),
 		},
-		GlobalENV:  globalRunEnv,
-		RunStatus:  runStatus,
-		Redis:      sysutil.Redis{Client: rdb},
-		Delegate:   &runner.Delegate{},
-		ClusterClt: mgr.GetClient(),
-		Recorder:   mgr.GetEventRecorderFor("terraform-applier"),
+		GlobalENV:    globalRunEnv,
+		RunStatus:    runStatus,
+		Redis:        sysutil.Redis{Client: rdb},
+		Delegate:     &runner.Delegate{},
+		ClusterClt:   mgr.GetClient(),
+		Recorder:     mgr.GetEventRecorderFor("terraform-applier"),
+		DataRootPath: dataRootPath,
 	}
 
 	if !c.Bool("disable-plugin-cache") {
