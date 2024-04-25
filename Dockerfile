@@ -33,20 +33,23 @@ RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go generate ./...
 
 FROM alpine:3.19
 
-ENV USER_ID=65532
+# ENV USER_ID=65532
 
-RUN adduser -S -H -u $USER_ID tf-applier \
-      && apk --no-cache add ca-certificates git openssh-client
+# RUN adduser -S -H -u $USER_ID tf-applier \
+#       && apk --no-cache add ca-certificates git openssh-client
+
+
+RUN apk --no-cache add ca-certificates git openssh-client
 
 COPY --from=builder /usr/local/bin/strongbox /usr/local/bin/
 
 WORKDIR /
 COPY --from=builder /workspace/tf-applier .
 
-ENV USER=tf-applier
+# ENV USER=tf-applier
 # Setting HOME ensures git can write config file .gitconfig.
 ENV HOME=/tmp
 
-USER $USER_ID
+# USER $USER_ID
 
 ENTRYPOINT ["/tf-applier"]
