@@ -18,6 +18,9 @@ spec:
         control-plane: terraform-applier
     spec:
       securityContext:
+        # This GID is added to each container to share folder and
+        # read mounted secrets
+        fsGroup: 101
         runAsNonRoot: true
         seccompProfile:
           type: RuntimeDefault
