@@ -650,11 +650,9 @@ func run(c *cli.Context) {
 		DataRootPath: dataRootPath,
 	}
 
-	if !c.Bool("disable-plugin-cache") {
-		if err := runner.EnablePluginCachePool(c.Int("max-concurrent-runs")); err != nil {
-			logger.Error("unable to create plugin cache pool", "err", err)
-			os.Exit(1)
-		}
+	if err := runner.Init(!c.Bool("disable-plugin-cache"), c.Int("max-concurrent-runs")); err != nil {
+		logger.Error("unable to init runner", "err", err)
+		os.Exit(1)
 	}
 
 	if err = (&controllers.ModuleReconciler{

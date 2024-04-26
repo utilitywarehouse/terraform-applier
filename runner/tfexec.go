@@ -6,10 +6,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"math/rand"
 	"os"
 	"os/exec"
-	"path"
 	"path/filepath"
 
 	"github.com/hashicorp/terraform-exec/tfexec"
@@ -50,12 +48,7 @@ func (r *Runner) NewTFRunner(
 ) (te TFExecuter, err error) {
 
 	// create module temp root to copy repo path to a temporary directory
-	tmpRoot := path.Join(
-		r.DataRootPath,
-		runTmpRoot,
-		fmt.Sprintf("%s-%s-%d", module.Namespace, module.Name, rand.Uint32()),
-	)
-	err = os.MkdirAll(tmpRoot, 0700)
+	tmpRoot, err := os.MkdirTemp(r.runTmpRootPath(), module.Namespace+"-"+module.Name+"-*")
 	if err != nil {
 		return nil, fmt.Errorf("unable to create tmp dir %w", err)
 	}

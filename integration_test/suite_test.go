@@ -230,6 +230,9 @@ var _ = BeforeSuite(func() {
 		DataRootPath:           os.TempDir(),
 	}
 
+	err = testRunner.Init(false, 10)
+	Expect(err).NotTo(HaveOccurred())
+
 	pwd, err := os.Getwd()
 	Expect(err).NotTo(HaveOccurred())
 	testStateFilePath = filepath.Join(pwd, "src", "modules", "hello", "terraform.tfstate")

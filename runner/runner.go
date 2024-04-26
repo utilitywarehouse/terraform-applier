@@ -3,6 +3,7 @@ package runner
 import (
 	"context"
 	"fmt"
+	"io/fs"
 	"log/slog"
 	"os"
 	"path"
@@ -29,6 +30,8 @@ var (
 
 	pluginCacheRoot = "plugin-cache-root"
 	runTmpRoot      = "run-tmp-root"
+
+	defaultDirMode fs.FileMode = os.FileMode(0700) // 'rwx------'
 )
 
 //go:generate go run github.com/golang/mock/mockgen -package runner -destination runnner_mock.go github.com/utilitywarehouse/terraform-applier/runner RunnerInterface
@@ -57,25 +60,51 @@ type Runner struct {
 	DataRootPath           string
 }
 
-// EnablePluginCachePool will create plugin cache dirs and fill in
+func (r *Runner) Init(enablePluginCache bool, maxRunners int) error {
+
+	if enablePluginCache {
+		if err := r.enablePluginCachePool(maxRunners); err != nil {
+			return err
+		}
+	}
+	// create plugin cache root dir if doesn't exists
+	err := os.MkdirAll(r.pluginCacheRootPath(), defaultDirMode)
+	if err != nil {
+		return fmt.Errorf("unable to create plugin cache root err:%w", err)
+	}
+
+	// remove tmp root if exits and re-create it
+	if err := os.RemoveAll(r.runTmpRootPath()); err != nil {
+		return fmt.Errorf("can't delete tmp root dir: %w", err)
+	}
+	if err := os.MkdirAll(r.runTmpRootPath(), defaultDirMode); err != nil {
+		return fmt.Errorf("unable to create tmp root dir err:%w", err)
+	}
+	return nil
+}
+
+func (r *Runner) pluginCacheRootPath() string {
+	return path.Join(r.DataRootPath, pluginCacheRoot)
+}
+
+func (r *Runner) runTmpRootPath() string {
+	return path.Join(r.DataRootPath, runTmpRoot)
+}
+
+// enablePluginCachePool will create plugin cache dirs and fill in
 // buffered chan `pluginCacheDirPool` which can be used concurrently by runners
 // if number concurrent runners is more then given `maxRunners` then those will be blocked
 // until plugin cache is available. hence its important that we create same number of
 // dirs as maximum number of concurrent runners/reconcilers
-func (r *Runner) EnablePluginCachePool(maxRunners int) error {
-	pluginCacheRootPath := path.Join(r.DataRootPath, pluginCacheRoot)
+func (r *Runner) enablePluginCachePool(maxRunners int) error {
+	// pluginCacheRootPath := path.Join(r.DataRootPath, pluginCacheRoot)
 	r.pluginCacheDirPool = make(chan string, maxRunners)
-
-	err := os.MkdirAll(pluginCacheRootPath, 0700)
-	if err != nil {
-		return fmt.Errorf("unable to create plugin cache root err:%w", err)
-	}
 
 	// create temp plugin cache folders which can be used by concurrent
 	// runs
 	for i := 0; i < maxRunners; i++ {
 		// setup plugin cache
-		pluginCacheDir := path.Join(pluginCacheRootPath, fmt.Sprintf("plugin-cache-%d", i))
+		pluginCacheDir := path.Join(r.pluginCacheRootPath(), fmt.Sprintf("plugin-cache-%d", i))
 
 		err := os.MkdirAll(pluginCacheDir, 0700)
 		if err != nil {
