@@ -109,6 +109,15 @@ func (r *Runner) NewTFRunner(
 		}
 	}
 
+	// For those teams that don't preserve the dependency lock file in their
+	// version control systems between runs, Terraform allows an additional CLI
+	// Configuration setting which tells Terraform to always treat a package in
+	// the cache directory as valid even if there isn't already an entry in the
+	// dependency lock file to confirm it:
+	if !tfr.isLockFileExists() {
+		runEnv["TF_PLUGIN_CACHE_MAY_BREAK_DEPENDENCY_LOCK_FILE"] = "1"
+	}
+
 	tf.SetEnv(runEnv)
 
 	// Setup *.auto.tfvars.json file to auto load TF variables during plan and apply
@@ -124,6 +133,21 @@ func (r *Runner) NewTFRunner(
 
 	tfr.tf = tf
 	return tfr, nil
+}
+
+// isLockFileExists checks if ".terraform.lock.hcl" is present in the module's dir
+func (te *tfRunner) isLockFileExists() bool {
+	fileDescriptors, err := os.ReadDir(te.workingDir)
+	if err != nil {
+		return false
+	}
+
+	for _, fd := range fileDescriptors {
+		if fd.Name() == ".terraform.lock.hcl" {
+			return true
+		}
+	}
+	return false
 }
 
 func (te *tfRunner) cleanUp() {

@@ -28,8 +28,7 @@ var (
 	rePlanStatus  = regexp.MustCompile(`.*((Plan:|No changes.) .*)`)
 	reApplyStatus = regexp.MustCompile(`.*(Apply complete! .* destroyed)`)
 
-	pluginCacheRoot = "plugin-cache-root"
-	runTmpRoot      = "run-tmp-root"
+	runTmpRoot = "run-tmp-root"
 
 	defaultDirMode fs.FileMode = os.FileMode(0700) // 'rwx------'
 )
@@ -56,69 +55,39 @@ type Runner struct {
 	RunStatus              *sysutil.RunStatus
 	GlobalENV              map[string]string
 	pluginCacheEnabled     bool
-	pluginCacheDirPool     chan string
+	pluginCache            *pluginCache
 	DataRootPath           string
 }
 
 func (r *Runner) Init(enablePluginCache bool, maxRunners int) error {
-
-	if enablePluginCache {
-		if err := r.enablePluginCachePool(maxRunners); err != nil {
-			return err
-		}
-	}
-	// create plugin cache root dir if doesn't exists
-	err := os.MkdirAll(r.pluginCacheRootPath(), defaultDirMode)
-	if err != nil {
-		return fmt.Errorf("unable to create plugin cache root err:%w", err)
-	}
+	var err error
 
 	// remove tmp root if exits and re-create it
 	if err := os.RemoveAll(r.runTmpRootPath()); err != nil {
 		return fmt.Errorf("can't delete tmp root dir: %w", err)
 	}
+
 	if err := os.MkdirAll(r.runTmpRootPath(), defaultDirMode); err != nil {
 		return fmt.Errorf("unable to create tmp root dir err:%w", err)
 	}
-	return nil
-}
 
-func (r *Runner) pluginCacheRootPath() string {
-	return path.Join(r.DataRootPath, pluginCacheRoot)
+	if enablePluginCache {
+		r.pluginCacheEnabled = true
+		r.pluginCache, err = newPluginCache(
+			r.Log.With("logger", "pcp"),
+			r.DataRootPath,
+			r.runTmpRootPath())
+		if err != nil {
+			r.Log.Error("unable to init plugin cache pool, plugin caching is disabled", "err", err)
+			r.pluginCacheEnabled = false
+		}
+	}
+
+	return nil
 }
 
 func (r *Runner) runTmpRootPath() string {
 	return path.Join(r.DataRootPath, runTmpRoot)
-}
-
-// enablePluginCachePool will create plugin cache dirs and fill in
-// buffered chan `pluginCacheDirPool` which can be used concurrently by runners
-// if number concurrent runners is more then given `maxRunners` then those will be blocked
-// until plugin cache is available. hence its important that we create same number of
-// dirs as maximum number of concurrent runners/reconcilers
-func (r *Runner) enablePluginCachePool(maxRunners int) error {
-	// pluginCacheRootPath := path.Join(r.DataRootPath, pluginCacheRoot)
-	r.pluginCacheDirPool = make(chan string, maxRunners)
-
-	// create temp plugin cache folders which can be used by concurrent
-	// runs
-	for i := 0; i < maxRunners; i++ {
-		// setup plugin cache
-		pluginCacheDir := path.Join(r.pluginCacheRootPath(), fmt.Sprintf("plugin-cache-%d", i))
-
-		err := os.MkdirAll(pluginCacheDir, 0700)
-		if err != nil {
-			return fmt.Errorf("unable to create plugin cache dir err:%w", err)
-		}
-		r.pluginCacheDirPool <- pluginCacheDir
-	}
-	r.pluginCacheEnabled = true
-	return nil
-}
-
-func (r *Runner) CleanUp() {
-	pluginCacheRootPath := path.Join(r.DataRootPath, pluginCacheRoot)
-	sysutil.RemoveAll(pluginCacheRootPath)
 }
 
 // Start will start given run and return true if run is successful
@@ -132,13 +101,12 @@ func (r *Runner) Start(run *tfaplv1beta1.Run, cancelChan chan struct{}) bool {
 	maps.Copy(envs, r.GlobalENV)
 
 	if r.pluginCacheEnabled {
-		// borrow plugin cache folder from the pool and return it back once done
-		pluginCacheDir := <-r.pluginCacheDirPool
-		defer func() {
-			r.pluginCacheDirPool <- pluginCacheDir
-		}()
-
-		envs["TF_PLUGIN_CACHE_DIR"] = pluginCacheDir
+		// request plugin cache folder from the pool and clean up once done
+		pluginCacheDir := r.pluginCache.new()
+		if pluginCacheDir != "" {
+			envs["TF_PLUGIN_CACHE_DIR"] = pluginCacheDir
+			defer r.pluginCache.done(pluginCacheDir)
+		}
 	}
 
 	r.Log.Info("starting run", "module", run.Module, "type", run.Request.Type)
