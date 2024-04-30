@@ -3,9 +3,9 @@ package runner
 import (
 	"context"
 	"fmt"
+	"io/fs"
 	"log/slog"
 	"os"
-	"path"
 	"regexp"
 	"time"
 
@@ -27,7 +27,7 @@ var (
 	rePlanStatus  = regexp.MustCompile(`.*((Plan:|No changes.) .*)`)
 	reApplyStatus = regexp.MustCompile(`.*(Apply complete! .* destroyed)`)
 
-	pluginCacheRoot = path.Join(os.TempDir(), "plugin-cache-root")
+	defaultDirMode fs.FileMode = os.FileMode(0700) // 'rwx------'
 )
 
 //go:generate go run github.com/golang/mock/mockgen -package runner -destination runnner_mock.go github.com/utilitywarehouse/terraform-applier/runner RunnerInterface
@@ -52,40 +52,25 @@ type Runner struct {
 	RunStatus              *sysutil.RunStatus
 	GlobalENV              map[string]string
 	pluginCacheEnabled     bool
-	pluginCacheDirPool     chan string
+	pluginCache            *pluginCache
+	DataRootPath           string
 }
 
-// EnablePluginCachePool will create plugin cache dirs and fill in
-// buffered chan `pluginCacheDirPool` which can be used concurrently by runners
-// if number concurrent runners is more then given `maxRunners` then those will be blocked
-// until plugin cache is available. hence its important that we create same number of
-// dirs as maximum number of concurrent runners/reconcilers
-func (r *Runner) EnablePluginCachePool(maxRunners int) error {
-	r.pluginCacheDirPool = make(chan string, maxRunners)
+func (r *Runner) Init(enablePluginCache bool, maxRunners int) error {
+	var err error
 
-	err := os.Mkdir(pluginCacheRoot, 0700)
-	if err != nil {
-		return fmt.Errorf("unable to create plugin cache root err:%w", err)
-	}
-
-	// create temp plugin cache folders which can be used by concurrent
-	// runs
-	for i := 0; i < maxRunners; i++ {
-		// setup plugin cache
-		pluginCacheDir := path.Join(pluginCacheRoot, fmt.Sprintf("plugin-cache-%d", i))
-
-		err := os.Mkdir(pluginCacheDir, 0700)
+	if enablePluginCache {
+		r.pluginCacheEnabled = true
+		r.pluginCache, err = newPluginCache(
+			r.Log.With("logger", "pcp"),
+			r.DataRootPath)
 		if err != nil {
-			return fmt.Errorf("unable to create plugin cache dir err:%w", err)
+			r.Log.Error("unable to init plugin cache pool, plugin caching is disabled", "err", err)
+			r.pluginCacheEnabled = false
 		}
-		r.pluginCacheDirPool <- pluginCacheDir
 	}
-	r.pluginCacheEnabled = true
-	return nil
-}
 
-func (r *Runner) CleanUp() {
-	os.RemoveAll(pluginCacheRoot)
+	return nil
 }
 
 // Start will start given run and return true if run is successful
@@ -99,13 +84,12 @@ func (r *Runner) Start(run *tfaplv1beta1.Run, cancelChan chan struct{}) bool {
 	maps.Copy(envs, r.GlobalENV)
 
 	if r.pluginCacheEnabled {
-		// borrow plugin cache folder from the pool and return it back once done
-		pluginCacheDir := <-r.pluginCacheDirPool
-		defer func() {
-			r.pluginCacheDirPool <- pluginCacheDir
-		}()
-
-		envs["TF_PLUGIN_CACHE_DIR"] = pluginCacheDir
+		// request plugin cache folder from the pool and clean up once done
+		pluginCacheDir := r.pluginCache.new()
+		if pluginCacheDir != "" {
+			envs["TF_PLUGIN_CACHE_DIR"] = pluginCacheDir
+			defer r.pluginCache.done(pluginCacheDir)
+		}
 	}
 
 	r.Log.Info("starting run", "module", run.Module, "type", run.Request.Type)

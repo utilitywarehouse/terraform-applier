@@ -7,7 +7,7 @@ import (
 	"io"
 	"log/slog"
 	"os"
-	"os/exec"
+	"path"
 	"path/filepath"
 	"strings"
 	"time"
@@ -63,7 +63,6 @@ var (
 	scheme = runtime.NewScheme()
 
 	logLevel           string
-	reposRootPath      string
 	labelSelectorKey   string
 	labelSelectorValue string
 	electionID         string
@@ -71,6 +70,12 @@ var (
 	terraformVersion   string
 	watchNamespaces    []string
 	globalRunEnv       map[string]string
+
+	// since /tmp will be mounted on PV we need to do manual clean up
+	// on restart. appData will be excluded from this clean up
+	appData       = "tf-app-data"
+	dataRootPath  = path.Join(os.TempDir(), appData)
+	reposRootPath = path.Join(os.TempDir(), "src")
 
 	levelStrings = map[string]slog.Level{
 		"trace": slog.Level(-8),
@@ -81,14 +86,6 @@ var (
 	}
 
 	flags = []cli.Flag{
-		&cli.StringFlag{
-			Name:        "repos-root-path",
-			EnvVars:     []string{"REPOS_ROOT_PATH"},
-			Value:       "/src",
-			Destination: &reposRootPath,
-			Usage: "Absolute path to the directory containing all repositories of the modules. " +
-				"The immediate subdirectories of this directory should contain the module repo directories and directory name should match repoName referenced in  module.",
-		},
 		&cli.StringFlag{
 			Name:    "config",
 			EnvVars: []string{"TF_APPLIER_CONFIG"},
@@ -254,6 +251,12 @@ var (
 			EnvVars:  []string{"REDIS_URL"},
 			Required: true,
 			Usage:    "redis url to store run output and metadata",
+		},
+		&cli.BoolFlag{
+			Name:    "disable-plugin-cache",
+			EnvVars: []string{"DISABLE_PLUGIN_CACHE"},
+			Value:   false,
+			Usage:   "disable plugin cache created / reconciler",
 		},
 	}
 )
@@ -430,15 +433,19 @@ preferences: {}
 
 }
 
+// since /tmp will be mounted on PV we need to do manual clean up
+// on restart. appData will be excluded from this clean up
 func cleanupTmpDir() {
-	tmpDir := os.TempDir()
-
-	tmpDirCleanupCommand := fmt.Sprintf("rm -rf %s/* %s/*", tmpDir, reposRootPath)
-
-	cmd := exec.Command("sh", "-c", tmpDirCleanupCommand)
-	err := cmd.Run()
+	fileDescriptors, err := os.ReadDir(os.TempDir())
 	if err != nil {
-		fmt.Printf("Error: %v\n", err)
+		fmt.Printf("unable to cleanup %s Error: %v\n", os.TempDir(), err)
+		return
+	}
+
+	for _, fd := range fileDescriptors {
+		if fd.Name() != appData {
+			sysutil.RemoveAll(path.Join(os.TempDir(), fd.Name()))
+		}
 	}
 }
 
@@ -626,16 +633,17 @@ func run(c *cli.Context) {
 			SecretsEngPath: c.String("vault-aws-secret-engine-path"),
 			AuthPath:       c.String("vault-kube-auth-path"),
 		},
-		GlobalENV:  globalRunEnv,
-		RunStatus:  runStatus,
-		Redis:      sysutil.Redis{Client: rdb},
-		Delegate:   &runner.Delegate{},
-		ClusterClt: mgr.GetClient(),
-		Recorder:   mgr.GetEventRecorderFor("terraform-applier"),
+		GlobalENV:    globalRunEnv,
+		RunStatus:    runStatus,
+		Redis:        sysutil.Redis{Client: rdb},
+		Delegate:     &runner.Delegate{},
+		ClusterClt:   mgr.GetClient(),
+		Recorder:     mgr.GetEventRecorderFor("terraform-applier"),
+		DataRootPath: dataRootPath,
 	}
 
-	if err := runner.EnablePluginCachePool(c.Int("max-concurrent-runs")); err != nil {
-		logger.Error("unable to create plugin cache pool", "err", err)
+	if err := runner.Init(!c.Bool("disable-plugin-cache"), c.Int("max-concurrent-runs")); err != nil {
+		logger.Error("unable to init runner", "err", err)
 		os.Exit(1)
 	}
 

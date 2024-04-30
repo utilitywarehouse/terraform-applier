@@ -227,7 +227,11 @@ var _ = BeforeSuite(func() {
 		TerminationGracePeriod: 10 * time.Second,
 		RunStatus:              runStatus,
 		Redis:                  testRedis,
+		DataRootPath:           os.TempDir(),
 	}
+
+	err = testRunner.Init(false, 10)
+	Expect(err).NotTo(HaveOccurred())
 
 	pwd, err := os.Getwd()
 	Expect(err).NotTo(HaveOccurred())

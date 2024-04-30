@@ -13,6 +13,7 @@ import (
 	"github.com/hashicorp/terraform-exec/tfexec"
 	tfaplv1beta1 "github.com/utilitywarehouse/terraform-applier/api/v1beta1"
 	"github.com/utilitywarehouse/terraform-applier/metrics"
+	"github.com/utilitywarehouse/terraform-applier/sysutil"
 )
 
 const strongBoxEnv = "TF_APPLIER_STRONGBOX_KEYRING"
@@ -45,7 +46,8 @@ func (r *Runner) NewTFRunner(
 	envs map[string]string,
 	vars map[string]string,
 ) (te TFExecuter, err error) {
-	// Copy repo path to a temporary directory
+
+	// create module temp root to copy repo path to a temporary directory
 	tmpRoot, err := os.MkdirTemp("", module.Namespace+"-"+module.Name+"-*")
 	if err != nil {
 		return nil, fmt.Errorf("unable to create tmp dir %w", err)
@@ -55,7 +57,7 @@ func (r *Runner) NewTFRunner(
 		// calling function can only run cleanUp() if TFExecuter is successfully created
 		// hence cleanup temp repo dir if errored
 		if err != nil {
-			os.RemoveAll(tmpRoot)
+			sysutil.RemoveAll(tmpRoot)
 		}
 	}()
 
@@ -107,6 +109,15 @@ func (r *Runner) NewTFRunner(
 		}
 	}
 
+	// For those teams that don't preserve the dependency lock file in their
+	// version control systems between runs, Terraform allows an additional CLI
+	// Configuration setting which tells Terraform to always treat a package in
+	// the cache directory as valid even if there isn't already an entry in the
+	// dependency lock file to confirm it:
+	if !tfr.isLockFileExists() {
+		runEnv["TF_PLUGIN_CACHE_MAY_BREAK_DEPENDENCY_LOCK_FILE"] = "1"
+	}
+
 	tf.SetEnv(runEnv)
 
 	// Setup *.auto.tfvars.json file to auto load TF variables during plan and apply
@@ -124,8 +135,23 @@ func (r *Runner) NewTFRunner(
 	return tfr, nil
 }
 
+// isLockFileExists checks if ".terraform.lock.hcl" is present in the module's dir
+func (te *tfRunner) isLockFileExists() bool {
+	fileDescriptors, err := os.ReadDir(te.workingDir)
+	if err != nil {
+		return false
+	}
+
+	for _, fd := range fileDescriptors {
+		if fd.Name() == ".terraform.lock.hcl" {
+			return true
+		}
+	}
+	return false
+}
+
 func (te *tfRunner) cleanUp() {
-	os.RemoveAll(te.rootDir)
+	sysutil.RemoveAll(te.rootDir)
 }
 
 func (te *tfRunner) init(ctx context.Context, backendConf map[string]string) (string, error) {
