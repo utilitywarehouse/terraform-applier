@@ -28,7 +28,7 @@ var (
 	rePlanStatus  = regexp.MustCompile(`.*((Plan:|No changes.) .*)`)
 	reApplyStatus = regexp.MustCompile(`.*(Apply complete! .* destroyed)`)
 
-	runTmpRoot = "run-tmp-root"
+	runTmp = "temp"
 
 	defaultDirMode fs.FileMode = os.FileMode(0700) // 'rwx------'
 )
@@ -63,11 +63,11 @@ func (r *Runner) Init(enablePluginCache bool, maxRunners int) error {
 	var err error
 
 	// remove tmp root if exits and re-create it
-	if err := os.RemoveAll(r.runTmpRootPath()); err != nil {
+	if err := os.RemoveAll(r.runTmpPath()); err != nil {
 		return fmt.Errorf("can't delete tmp root dir: %w", err)
 	}
 
-	if err := os.MkdirAll(r.runTmpRootPath(), defaultDirMode); err != nil {
+	if err := os.MkdirAll(r.runTmpPath(), defaultDirMode); err != nil {
 		return fmt.Errorf("unable to create tmp root dir err:%w", err)
 	}
 
@@ -76,7 +76,7 @@ func (r *Runner) Init(enablePluginCache bool, maxRunners int) error {
 		r.pluginCache, err = newPluginCache(
 			r.Log.With("logger", "pcp"),
 			r.DataRootPath,
-			r.runTmpRootPath())
+			r.runTmpPath())
 		if err != nil {
 			r.Log.Error("unable to init plugin cache pool, plugin caching is disabled", "err", err)
 			r.pluginCacheEnabled = false
@@ -86,8 +86,8 @@ func (r *Runner) Init(enablePluginCache bool, maxRunners int) error {
 	return nil
 }
 
-func (r *Runner) runTmpRootPath() string {
-	return path.Join(r.DataRootPath, runTmpRoot)
+func (r *Runner) runTmpPath() string {
+	return path.Join(r.DataRootPath, runTmp)
 }
 
 // Start will start given run and return true if run is successful

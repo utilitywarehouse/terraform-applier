@@ -48,7 +48,7 @@ func (r *Runner) NewTFRunner(
 ) (te TFExecuter, err error) {
 
 	// create module temp root to copy repo path to a temporary directory
-	tmpRoot, err := os.MkdirTemp(r.runTmpRootPath(), module.Namespace+"-"+module.Name+"-*")
+	tmpRoot, err := os.MkdirTemp(r.runTmpPath(), module.Namespace+"-"+module.Name+"-*")
 	if err != nil {
 		return nil, fmt.Errorf("unable to create tmp dir %w", err)
 	}
