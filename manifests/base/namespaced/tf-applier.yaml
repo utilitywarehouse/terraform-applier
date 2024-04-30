@@ -59,7 +59,7 @@ spec:
             limits:
               cpu: 2000m
               memory: 2Gi
-              ephemeral-storage: 500Mi
+              ephemeral-storage: 256Mi
             requests:
               cpu: 0m
               memory: 128Mi
@@ -70,20 +70,11 @@ spec:
               drop:
                 - ALL
           volumeMounts:
-            - mountPath: /src
-              name: git-repo
             - mountPath: /tmp
               name: tmp
-            - mountPath: /data
-              name: data
-      volumes:
-        - name: git-repo
-          emptyDir: {}
-        - name: tmp
-          emptyDir: {}
   volumeClaimTemplates:
     - metadata:
-        name: data
+        name: tmp
       spec:
         accessModes:
           - ReadWriteOnce

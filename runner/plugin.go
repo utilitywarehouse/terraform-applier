@@ -24,10 +24,9 @@ type pluginCache struct {
 	*sync.RWMutex
 	log  *slog.Logger
 	main string
-	tmp  string
 }
 
-func newPluginCache(log *slog.Logger, root, tmp string) (*pluginCache, error) {
+func newPluginCache(log *slog.Logger, root string) (*pluginCache, error) {
 	main := path.Join(root, pluginCacheMain)
 
 	if err := os.MkdirAll(main, defaultDirMode); err != nil {
@@ -38,7 +37,6 @@ func newPluginCache(log *slog.Logger, root, tmp string) (*pluginCache, error) {
 		&sync.RWMutex{},
 		log,
 		main,
-		tmp,
 	}, nil
 }
 
@@ -46,7 +44,7 @@ func newPluginCache(log *slog.Logger, root, tmp string) (*pluginCache, error) {
 // of the main plugin cache dir
 func (pcp *pluginCache) new() string {
 
-	tmpPC, err := os.MkdirTemp(pcp.tmp, "plugin-cache-*")
+	tmpPC, err := os.MkdirTemp("", "plugin-cache-*")
 	if err != nil {
 		pcp.log.Error("unable to create plugin cache dir", "err", err)
 		return ""
