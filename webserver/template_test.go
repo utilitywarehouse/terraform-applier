@@ -127,6 +127,44 @@ func Test_ExecuteTemplate(t *testing.T) {
 						Duration:   60 * time.Second,
 						CommitHash: "abcccf2a0f758ba0d8e88a834a2acdba5885577c",
 						CommitMsg:  `initial commit (john)`,
+						InitOutput: `{
+  "terraform_version": "1.8.2",
+  "platform": "linux_amd64",
+  "provider_selections": {},
+  "terraform_outdated": false
+}
+
+Initializing the backend...
+
+Successfully configured the backend "local"! Terraform will automatically
+use this backend unless the backend configuration changes.
+
+Initializing provider plugins...
+- Finding latest version of hashicorp/null...
+- Using hashicorp/null v3.2.2 from the shared cache directory
+
+Terraform has created a lock file .terraform.lock.hcl to record the provider
+selections it made above. Include this file in your version control repository
+so that Terraform can guarantee to make the same selections by default when
+you run "terraform init" in the future.
+
+
+Warning: Incomplete lock file information for providers
+
+Due to your customized provider installation methods, Terraform was forced to
+calculate lock file checksums locally for the following providers:
+- hashicorp/null
+
+The current .terraform.lock.hcl file only includes checksums for linux_amd64,
+so Terraform running on another platform will fail to install these
+providers.
+
+To calculate additional checksums for another platform, run:
+terraform providers lock -platform=linux_amd64
+(where linux_amd64 is the platform to generate)
+
+Terraform has been successfully initialized!
+`,
 						Output: `
 Terraform used the selected providers to generate the following execution
 plan. Resource actions are indicated with the following symbols:
@@ -160,6 +198,56 @@ Plan: 7 to add, 0 to change, 0 to destroy.`,
 						CommitHash: "abcccf2a0f758ba0d8e88a834a2acdba5885577c",
 						CommitMsg:  `initial commit (john)`,
 						Applied:    true,
+						InitOutput: `
+{
+  "terraform_version": "1.8.2",
+  "platform": "linux_amd64",
+  "provider_selections": {},
+  "terraform_outdated": false
+}
+
+Initializing the backend...
+
+Successfully configured the backend "local"! Terraform will automatically
+use this backend unless the backend configuration changes.
+
+Initializing provider plugins...
+- Finding latest version of hashicorp/google-beta...
+- Finding latest version of okta/okta...
+- Finding latest version of hashicorp/aws...
+- Finding latest version of hashicorp/google...
+- Finding latest version of hashicorp/null...
+- Using hashicorp/google v5.26.0 from the shared cache directory
+- Using hashicorp/null v3.2.2 from the shared cache directory
+- Using hashicorp/google-beta v5.26.0 from the shared cache directory
+- Using okta/okta v4.8.1 from the shared cache directory
+- Using hashicorp/aws v5.47.0 from the shared cache directory
+
+Terraform has created a lock file .terraform.lock.hcl to record the provider
+selections it made above. Include this file in your version control repository
+so that Terraform can guarantee to make the same selections by default when
+you run "terraform init" in the future.
+
+
+Warning: Incomplete lock file information for providers
+
+Due to your customized provider installation methods, Terraform was forced to
+calculate lock file checksums locally for the following providers:
+- hashicorp/aws
+- hashicorp/google
+- hashicorp/google-beta
+- hashicorp/null
+- okta/okta
+
+The current .terraform.lock.hcl file only includes checksums for linux_amd64,
+so Terraform running on another platform will fail to install these
+providers.
+
+To calculate additional checksums for another platform, run:
+terraform providers lock -platform=linux_amd64
+(where linux_amd64 is the platform to generate)
+
+Terraform has been successfully initialized!`,
 						Output: `
 null_resource.echo: Creating...
 null_resource.env3: Creating...

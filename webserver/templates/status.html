@@ -98,7 +98,7 @@
                             <span class="fs-5 fw-semibold text-dark">Module Info</span>
                         </a>
                     </div>
-                    <div class="card-body">
+                    <div class="card-body p-2">
                         <div id="module-info-list" class="scrollarea">
                             {{range $k, $v := . }}
                             {{ range $i, $m := $v.Modules }}
@@ -130,8 +130,9 @@
 <!-- modules -->
 {{define "module"}}
 {{$m := .}}
-<div id="{{sanitizedUniqueName .Module.NamespacedName}}" class="d-none">
-    <div class='card {{if eq .Module.Status.CurrentState "Running"}}border-info{{end}}'>
+<div id="{{sanitizedUniqueName .Module.NamespacedName}}">
+    <div class='card {{if eq .Module.Status.CurrentState "Running"}}border-info{{end}}' class="d-none"
+        style="max-height: 90vh;">
         <div class="card-header bg-transparent">
             <div href="#{{ sanitizedUniqueName .Module.NamespacedName}}-info">
                 <div class="d-flex justify-content-between align-items-center mb-1">
@@ -211,10 +212,8 @@
                 </dl>
             </div>
         </div>
-        <div id="{{sanitizedUniqueName .Module.NamespacedName}}-info">
+        <div id="{{sanitizedUniqueName .Module.NamespacedName}}-info" class="overflow-auto">
             <div class="card-body">
-                <div>
-                </div>
                 <div>
                     <nav>
                         <div class="nav nav-tabs" role="tablist">
@@ -237,7 +236,7 @@
                         {{ range $i, $run := .Runs }}
                         <div class="tab-pane fade {{if eq $i 0}}active show{{end}}"
                             id="{{sanitizedUniqueName .Module}}-{{$i}}" role="tabpanel">
-                            <dl class="p-2">
+                            <dl class="p-2 mb-2">
                                 <div class="row">
                                     <div class="col-4">
                                         <dt>Status</dt>
@@ -264,10 +263,24 @@
                                     </div>
                                 </div>
                             </dl>
-                            <pre class="py-1">
+                            <div class="mh-100 overflow-auto">
+                                <!-- init output -->
+                                <a href="#{{sanitizedUniqueName .Module}}-{{$i}}-init" data-bs-toggle="collapse"
+                                    class="px-2" role="button">
+                                    Toggle Init Output
+                                </a>
+                                <div class="collapse out" id="{{sanitizedUniqueName .Module}}-{{$i}}-init">
+                                    <pre class="py-1">
+<!-- below <code> element lacking indenting whitespace because it is significant and creates left margin on first line -->
+<code class="language-hcl">{{$run.InitOutput}}</code>
+                                </pre>
+                                </div>
+                                <!-- run output -->
+                                <pre class="py-1">
 <!-- below <code> element lacking indenting whitespace because it is significant and creates left margin on first line -->
 <code class="language-hcl">{{$run.Output}}</code>
                             </pre>
+                            </div>
                         </div>
                         {{end}}
                     </div>
