@@ -296,7 +296,7 @@ func (r *Runner) runTF(
 		return false
 	}
 
-	_, err := te.init(ctx, backendConf)
+	initOut, err := te.init(ctx, backendConf)
 	if err != nil {
 		msg := fmt.Sprintf("unable to init module: err:%s", err)
 		// tf err contains new lines not suitable logging
@@ -304,6 +304,7 @@ func (r *Runner) runTF(
 		r.setFailedStatus(run, module, tfaplv1beta1.ReasonInitialiseFailed, msg, r.Clock.Now())
 		return false
 	}
+	run.InitOutput = initOut
 
 	log.Info("Initialised successfully")
 	r.Recorder.Event(module, corev1.EventTypeNormal, tfaplv1beta1.ReasonInitialised, "Initialised successfully")
