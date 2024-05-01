@@ -17,7 +17,6 @@ import (
 	"golang.org/x/exp/maps"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -290,30 +289,17 @@ func (r *Runner) runTF(
 	cancelChan <-chan struct{},
 ) bool {
 	log := r.Log.With("module", run.Module)
+	var err error
 
-	if err := r.SetProgressingStatus(run.Module, module, "Initialising"); err != nil {
-		log.Error("unable to set init status", "err", err)
-		return false
-	}
-
-	initOut, err := te.init(ctx, backendConf)
+	run.InitOutput, err = te.init(ctx, backendConf)
 	if err != nil {
-		msg := fmt.Sprintf("unable to init module: err:%s", err)
 		// tf err contains new lines not suitable logging
 		log.Error("unable to init module", "err", fmt.Sprintf("%q", err))
-		r.setFailedStatus(run, module, tfaplv1beta1.ReasonInitialiseFailed, msg, r.Clock.Now())
+		r.setFailedStatus(run, module, tfaplv1beta1.ReasonInitialiseFailed, "unable to init module", r.Clock.Now())
 		return false
 	}
-	run.InitOutput = initOut
-
 	log.Info("Initialised successfully")
 	r.Recorder.Event(module, corev1.EventTypeNormal, tfaplv1beta1.ReasonInitialised, "Initialised successfully")
-
-	// Start Planing
-	if err = r.SetProgressingStatus(run.Module, module, "Planning"); err != nil {
-		log.Error("unable to set planning status", "err", err)
-		return false
-	}
 
 	// if termination signal received its safe to return here
 	if isChannelClosed(cancelChan) {
@@ -326,10 +312,9 @@ func (r *Runner) runTF(
 	diffDetected, planOut, err := te.plan(ctx)
 	if err != nil {
 		run.Output = planOut
-		msg := fmt.Sprintf("unable to plan module: err:%s", err)
 		// tf err contains new lines not suitable logging
 		log.Error("unable to plan module", "err", fmt.Sprintf("%q", err))
-		r.setFailedStatus(run, module, tfaplv1beta1.ReasonPlanFailed, msg, r.Clock.Now())
+		r.setFailedStatus(run, module, tfaplv1beta1.ReasonPlanFailed, "unable to plan module", r.Clock.Now())
 		return false
 	}
 
@@ -344,15 +329,13 @@ func (r *Runner) runTF(
 	log.Info("planned", "status", planStatus)
 
 	// get saved plan to update status
-	savedPlan, err := te.showPlanFileRaw(ctx)
+	run.Output, err = te.showPlanFileRaw(ctx)
 	if err != nil {
-		msg := fmt.Sprintf("unable to get saved plan: err:%s", err)
 		// tf err contains new lines not suitable logging
 		log.Error("unable to get saved plan", "err", fmt.Sprintf("%q", err))
-		r.setFailedStatus(run, module, tfaplv1beta1.ReasonPlanFailed, msg, r.Clock.Now())
+		r.setFailedStatus(run, module, tfaplv1beta1.ReasonPlanFailed, "unable to get saved plan", r.Clock.Now())
 		return false
 	}
-	run.Output = savedPlan
 
 	// return if no drift detected
 	if !diffDetected {
@@ -380,23 +363,15 @@ func (r *Runner) runTF(
 		return false
 	}
 
-	// Start Applying
-	if err = r.SetProgressingStatus(run.Module, module, "Applying/"+planStatus); err != nil {
-		log.Error("unable to set applying status", "err", err)
-		return false
-	}
-
 	applyOut, err := te.apply(ctx)
+	run.Output += applyOut
 	if err != nil {
-		run.Output += applyOut
-		msg := fmt.Sprintf("unable to apply module: err:%s", err)
 		// tf err contains new lines not suitable logging
 		log.Error("unable to apply module", "err", fmt.Sprintf("%q", err))
-		r.setFailedStatus(run, module, tfaplv1beta1.ReasonApplyFailed, msg, r.Clock.Now())
+		r.setFailedStatus(run, module, tfaplv1beta1.ReasonApplyFailed, "unable to apply module", r.Clock.Now())
 		return false
 	}
 	run.Applied = true
-	run.Output += applyOut
 	module.Status.LastAppliedAt = &metav1.Time{Time: r.Clock.Now()}
 	module.Status.LastAppliedCommitHash = commitHash
 
@@ -414,12 +389,6 @@ func (r *Runner) runTF(
 	return true
 }
 
-func (r *Runner) SetProgressingStatus(objectKey types.NamespacedName, m *tfaplv1beta1.Module, msg string) error {
-	m.Status.CurrentState = string(tfaplv1beta1.StatusRunning)
-	m.Status.StateMessage = tfaplv1beta1.NormaliseStateMsg(msg)
-	return sysutil.PatchModuleStatus(context.Background(), r.ClusterClt, objectKey, m.Status)
-}
-
 func (r *Runner) SetRunStartedStatus(run *tfaplv1beta1.Run, m *tfaplv1beta1.Module, msg, commitHash, commitMsg, remoteURL string, now time.Time) error {
 
 	run.StartedAt = &metav1.Time{Time: now}
@@ -431,7 +400,6 @@ func (r *Runner) SetRunStartedStatus(run *tfaplv1beta1.Run, m *tfaplv1beta1.Modu
 	m.Status.LastDefaultRunStartedAt = &metav1.Time{Time: now}
 	m.Status.ObservedGeneration = m.Generation
 	m.Status.LastDefaultRunCommitHash = commitHash
-	m.Status.StateMessage = tfaplv1beta1.NormaliseStateMsg(msg)
 	m.Status.StateReason = tfaplv1beta1.RunReason(run.Request.Type)
 
 	r.Recorder.Eventf(m, corev1.EventTypeNormal, tfaplv1beta1.RunReason(run.Request.Type), "%s: type:%s, commit:%s", msg, run.Request.Type, commitHash)
@@ -445,7 +413,6 @@ func (r *Runner) SetRunFinishedStatus(run *tfaplv1beta1.Run, m *tfaplv1beta1.Mod
 	run.Duration = time.Since(run.StartedAt.Time)
 
 	m.Status.CurrentState = string(tfaplv1beta1.StatusReady)
-	m.Status.StateMessage = tfaplv1beta1.NormaliseStateMsg(msg)
 	m.Status.StateReason = reason
 
 	r.Recorder.Event(m, corev1.EventTypeNormal, reason, msg)
@@ -457,12 +424,13 @@ func (r *Runner) setFailedStatus(run *tfaplv1beta1.Run, module *tfaplv1beta1.Mod
 
 	run.Status = tfaplv1beta1.StatusErrored
 	run.Duration = time.Since(run.StartedAt.Time)
+	// msg in this case is an error message
+	run.Output = msg + "\n" + run.Output
 
 	module.Status.CurrentState = string(tfaplv1beta1.StatusErrored)
-	module.Status.StateMessage = tfaplv1beta1.NormaliseStateMsg(msg)
 	module.Status.StateReason = reason
 
-	r.Recorder.Event(module, corev1.EventTypeWarning, reason, fmt.Sprintf("%q", msg))
+	r.Recorder.Event(module, corev1.EventTypeWarning, reason, msg)
 
 	if err := sysutil.PatchModuleStatus(context.Background(), r.ClusterClt, run.Module, module.Status); err != nil {
 		r.Log.With("module", run).Error("unable to set failed status", "err", err)

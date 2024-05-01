@@ -144,7 +144,6 @@ var _ = Describe("Module controller with Runner", func() {
 			}, time.Second*30, interval).Should(Not(Equal("Running")))
 
 			Expect(fetchedModule.Status.CurrentState).Should(Equal("Ready"))
-			Expect(fetchedModule.Status.StateMessage).Should(ContainSubstring("Apply complete"))
 
 			// Make sure LastDriftInfo & LastApplyInfo is also set
 			Expect(lastRun.Output).Should(ContainSubstring("Plan:"))
@@ -232,7 +231,6 @@ var _ = Describe("Module controller with Runner", func() {
 			}, time.Second*30, interval).Should(Not(Equal("Running")))
 
 			Expect(fetchedModule.Status.CurrentState).Should(Equal("Ready"))
-			Expect(fetchedModule.Status.StateMessage).Should(ContainSubstring("PlanOnly"))
 			Expect(lastRun.Output).Should(ContainSubstring("Plan:"))
 
 			// Make sure LastApplyInfo is also set
@@ -363,7 +361,6 @@ var _ = Describe("Module controller with Runner", func() {
 			}, time.Second*30, interval).Should(Not(Equal("Running")))
 
 			Expect(fetchedModule.Status.CurrentState).Should(Equal("Ready"))
-			Expect(fetchedModule.Status.StateMessage).Should(ContainSubstring("Apply complete"))
 
 			Expect(lastRun.Output).Should(ContainSubstring("Plan:"))
 
@@ -468,7 +465,6 @@ var _ = Describe("Module controller with Runner", func() {
 			}, time.Second*30, interval).Should(Not(Equal("Running")))
 
 			Expect(fetchedModule.Status.CurrentState).Should(Equal("Ready"))
-			Expect(fetchedModule.Status.StateMessage).Should(ContainSubstring("Apply complete"))
 
 			// make sure all values are there in output
 			Expect(lastRun.Output).Should(ContainSubstring("AWS_KEY_ABCD1234"))

@@ -579,10 +579,6 @@ spec:
                 description: LastRunType is a short description of the kind of terraform
                   run that was attempted.
                 type: string
-              stateMessage:
-                description: StateMessage is a human readable message indicating details
-                  about current state.
-                type: string
               stateReason:
                 description: StateReason is potential reason associated with current
                   state.

@@ -179,10 +179,6 @@ type ModuleStatus struct {
 	// 'Errored' -> last run finished with Error and its waiting for next run/event
 	CurrentState string `json:"currentState,omitempty"`
 
-	// StateMessage is a human readable message indicating details about current state.
-	// +optional
-	StateMessage string `json:"stateMessage,omitempty"`
-
 	// StateReason is potential reason associated with current state.
 	// +optional
 	StateReason string `json:"stateReason,omitempty"`
