@@ -339,7 +339,7 @@ func (r *Runner) runTF(
 
 	// return if no drift detected
 	if !diffDetected {
-		if err = r.SetRunFinishedStatus(run, module, tfaplv1beta1.ReasonPlannedNoDriftDetected, planStatus, r.Clock.Now()); err != nil {
+		if err = r.SetRunFinishedStatus(run, module, tfaplv1beta1.ReasonNoDriftDetected, planStatus, r.Clock.Now()); err != nil {
 			log.Error("unable to set no drift status", "err", err)
 			return false
 		}
@@ -348,7 +348,7 @@ func (r *Runner) runTF(
 
 	// return if plan only mode
 	if run.PlanOnly {
-		if err = r.SetRunFinishedStatus(run, module, tfaplv1beta1.ReasonPlannedDriftDetected, "PlanOnly/"+planStatus, r.Clock.Now()); err != nil {
+		if err = r.SetRunFinishedStatus(run, module, tfaplv1beta1.ReasonDriftDetected, "PlanOnly/"+planStatus, r.Clock.Now()); err != nil {
 			log.Error("unable to set drift status", "err", err)
 			return false
 		}
@@ -400,20 +400,23 @@ func (r *Runner) SetRunStartedStatus(run *tfaplv1beta1.Run, m *tfaplv1beta1.Modu
 	m.Status.LastDefaultRunStartedAt = &metav1.Time{Time: now}
 	m.Status.ObservedGeneration = m.Generation
 	m.Status.LastDefaultRunCommitHash = commitHash
-	m.Status.StateReason = tfaplv1beta1.RunReason(run.Request.Type)
+	m.Status.StateReason = tfaplv1beta1.ReasonRunTriggered
 
-	r.Recorder.Eventf(m, corev1.EventTypeNormal, tfaplv1beta1.RunReason(run.Request.Type), "%s: type:%s, commit:%s", msg, run.Request.Type, commitHash)
+	r.Recorder.Eventf(m, corev1.EventTypeNormal, tfaplv1beta1.ReasonRunTriggered, "%s: type:%s, commit:%s", msg, run.Request.Type, commitHash)
 
 	return sysutil.PatchModuleStatus(context.Background(), r.ClusterClt, run.Module, m.Status)
 }
 
 func (r *Runner) SetRunFinishedStatus(run *tfaplv1beta1.Run, m *tfaplv1beta1.Module, reason, msg string, now time.Time) error {
 
-	run.Status = tfaplv1beta1.StatusSuccess
+	run.Status = tfaplv1beta1.StatusOk
 	run.Duration = time.Since(run.StartedAt.Time)
-
-	m.Status.CurrentState = string(tfaplv1beta1.StatusReady)
 	m.Status.StateReason = reason
+	m.Status.CurrentState = string(tfaplv1beta1.StatusOk)
+
+	if reason == tfaplv1beta1.ReasonDriftDetected {
+		m.Status.CurrentState = string(tfaplv1beta1.StatusDriftDetected)
+	}
 
 	r.Recorder.Event(m, corev1.EventTypeNormal, reason, msg)
 

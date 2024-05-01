@@ -75,13 +75,14 @@
                                     <h6><span class='badge rounded-pill text-bg-secondary'>plan only</span></h6>
                                     {{end}}
                                     <h6>
-                                        <span {{if or (eq .Module.Status.StateReason "PlannedDriftDetected" ) (eq
-                                            .Module.Status.StateReason "Applied" ) }}
-                                            class='badge rounded-pill bg-primary' {{else if eq
+                                        <span {{if eq .Module.Status.CurrentState "Running" }}
+                                            class='badge rounded-pill bg-info' {{else if eq
                                             .Module.Status.CurrentState "Errored" }}
-                                            class='badge rounded-pill bg-danger' {{else}}
-                                            class='badge rounded-pill bg-light text-dark' {{end}}>
-                                            {{$m.Module.Status.CurrentState}} ({{$m.Module.Status.StateReason}})
+                                            class='badge rounded-pill bg-danger' {{else if eq
+                                            .Module.Status.CurrentState "Drift_Detected" }}
+                                            class='badge rounded-pill bg-primary' {{else}}
+                                            class='badge rounded-pill bg-success' {{end}}>
+                                            {{$m.Module.Status.CurrentState}}
                                         </span>
                                     </h6>
                                 </div>
@@ -138,18 +139,22 @@
                 <div class="d-flex justify-content-between align-items-center mb-1">
                     <h3 class="fw-bold" style="color: #550091;">{{.Module.Name}}
                         {{ if .Module.IsPlanOnly}}
-                        <span class='badge rounded-pill text-bg-secondary'>plan only</span>
+                        <span class='badge text-bg-secondary'>plan only</span>
                         {{end}}
                     </h3>
                     <div>
+                        {{if index .Module.ObjectMeta.Annotations "terraform-applier.uw.systems/run-request"}}
+                        <button type="button" class="btn btn-info" disabled>Queued</button>
+                        {{else}}
                         <button data-namespace="{{ .Module.Namespace }}" data-name="{{ .Module.Name }}"
-                            data-plan-only="true" class="force-button force-module-button btn btn-info btn-s">
+                            data-plan-only="true" class="force-button force-module-button btn btn-info">
                             <strong>Force Plan</strong>
                         </button>
                         <button data-namespace="{{ .Module.Namespace }}" data-name="{{ .Module.Name }}"
-                            data-plan-only="false" class="force-button force-module-button btn btn-warning btn-s">
+                            data-plan-only="false" class="force-button force-module-button btn btn-warning">
                             <strong>Force Apply</strong>
                         </button>
+                        {{end}}
                     </div>
                 </div>
 
@@ -158,19 +163,25 @@
                         <div class="col-6">
                             <dt>Status</dt>
                             <dd class="fw-semibold">
-                                <span {{if or (eq .Module.Status.StateReason "PlannedDriftDetected" ) (eq
-                                    .Module.Status.StateReason "Applied" ) }} class='text-primary' {{else if eq
-                                    .Module.Status.CurrentState "Errored" }} class='text-danger' {{end}}>
-                                    {{.Module.Status.CurrentState}} ({{.Module.Status.StateReason}})
+                                <span {{if eq .Module.Status.CurrentState "Running" }} class='text-info' {{else if eq
+                                    .Module.Status.CurrentState "Errored" }} class='text-danger' {{else if eq
+                                    .Module.Status.CurrentState "Drift_Detected" }} class='text-primary' {{else}}
+                                    class='text-success' {{end}}>
+                                    {{.Module.Status.CurrentState}}
                                 </span>
                             </dd>
                         </div>
                         {{if .Module.Spec.Schedule}}
-                        <div class="col-6">
+                        <div class="col-2">
                             <dt>Schedule</dt>
                             <dd>{{ .Module.Spec.Schedule }}</dd>
                         </div>
                         {{end}}
+
+                        <div class="col-4">
+                            <dt>Status Reason</dt>
+                            <dd>{{.Module.Status.StateReason}}</dd>
+                        </div>
 
                         <div class="w-100 d-none d-md-block"></div>
 
@@ -193,12 +204,6 @@
                             </dd>
                         </div>
                         <div class="w-100 d-none d-md-block"></div>
-                        <div class="col-8">
-                            <dt>Pending request</dt>
-                            <dd>
-                                <pre><code>{{index .Module.ObjectMeta.Annotations "terraform-applier.uw.systems/run-request"}}</code></pre>
-                            </dd>
-                        </div>
                         <div class="col-4">
                             <dt>Last run type</dt>
                             <dd>{{ .Module.Status.LastRunType }}</dd>
@@ -233,18 +238,14 @@
                             id="{{sanitizedUniqueName .Module}}-{{$i}}" role="tabpanel">
                             <dl class="p-2 mb-2">
                                 <div class="row">
-                                    <div class="col-4">
-                                        <dt>Status</dt>
-                                        <dd>{{$run.Status}}</dd>
-                                    </div>
-                                    <div class="col-4">
-                                        <dt>Type</dt>
-                                        <dd>{{$run.Request.Type}}</dd>
-                                    </div>
-                                    <div class="col-4">
+                                    <div class="col-6">
                                         <dt>Started at</dt>
                                         <dd>{{ formattedTime $run.StartedAt }} (took {{ duration
                                             $run.Duration }})</dd>
+                                    </div>
+                                    <div class="col-6">
+                                        <dt>Type</dt>
+                                        <dd>{{$run.Request.Type}}</dd>
                                     </div>
                                     <div class="col-6">
                                         <dt>Commit hash</dt>

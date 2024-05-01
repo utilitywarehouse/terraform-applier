@@ -24,30 +24,23 @@ spec:
     - jsonPath: .status.currentState
       name: State
       type: string
-    - jsonPath: .status.runStartedAt
-      name: Started At
-      type: string
-    - jsonPath: .status.runDuration
-      name: Took
-      type: string
     - jsonPath: .status.stateReason
       name: Reason
       type: string
-    - jsonPath: .status.runCommitHash
+    - jsonPath: .status.lastDefaultRunStartedAt
+      name: Last Run Started At
+      type: string
+    - jsonPath: .status.lastAppliedAt
+      name: Last Applied At
+      type: string
+    - jsonPath: .status.lastDefaultRunCommitHash
       name: Commit
       priority: 10
-      type: string
-    - jsonPath: .spec.path
-      name: Path
-      priority: 20
       type: string
     - jsonPath: .metadata.creationTimestamp
       name: Age
       priority: 20
       type: date
-    - jsonPath: .status.stateMessage
-      name: Last Message
-      type: string
     name: v1beta1
     schema:
       openAPIV3Schema:
@@ -535,8 +528,9 @@ spec:
                   CurrentState denotes current overall status of module run
                   it will be either
                   'Running' -> Module is in running state
-                  'Ready' -> last run finished successfully and its waiting for next run/event
-                  'Errored' -> last run finished with Error and its waiting for next run/event
+                  'OK' -> last run finished successfully and no drift detected
+                  'Drift_Detected' -> last run finished successfully and drift detected
+                  'Errored' -> last run finished with Error
                 type: string
               lastAppliedAt:
                 description: Information when was the last time the module was successfully
