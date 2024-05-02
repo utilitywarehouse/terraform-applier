@@ -143,8 +143,7 @@ var _ = Describe("Module controller with Runner", func() {
 				return fetchedModule.Status.CurrentState
 			}, time.Second*30, interval).Should(Not(Equal("Running")))
 
-			Expect(fetchedModule.Status.CurrentState).Should(Equal("Ready"))
-			Expect(fetchedModule.Status.StateMessage).Should(ContainSubstring("Apply complete"))
+			Expect(fetchedModule.Status.CurrentState).Should(Equal(string(tfaplv1beta1.StatusOk)))
 
 			// Make sure LastDriftInfo & LastApplyInfo is also set
 			Expect(lastRun.Output).Should(ContainSubstring("Plan:"))
@@ -231,8 +230,7 @@ var _ = Describe("Module controller with Runner", func() {
 				return fetchedModule.Status.CurrentState
 			}, time.Second*30, interval).Should(Not(Equal("Running")))
 
-			Expect(fetchedModule.Status.CurrentState).Should(Equal("Ready"))
-			Expect(fetchedModule.Status.StateMessage).Should(ContainSubstring("PlanOnly"))
+			Expect(fetchedModule.Status.CurrentState).Should(Equal(string(tfaplv1beta1.StatusDriftDetected)))
 			Expect(lastRun.Output).Should(ContainSubstring("Plan:"))
 
 			// Make sure LastApplyInfo is also set
@@ -362,8 +360,7 @@ var _ = Describe("Module controller with Runner", func() {
 				return fetchedModule.Status.CurrentState
 			}, time.Second*30, interval).Should(Not(Equal("Running")))
 
-			Expect(fetchedModule.Status.CurrentState).Should(Equal("Ready"))
-			Expect(fetchedModule.Status.StateMessage).Should(ContainSubstring("Apply complete"))
+			Expect(fetchedModule.Status.CurrentState).Should(Equal(string(tfaplv1beta1.StatusOk)))
 
 			Expect(lastRun.Output).Should(ContainSubstring("Plan:"))
 
@@ -467,8 +464,7 @@ var _ = Describe("Module controller with Runner", func() {
 				return fetchedModule.Status.CurrentState
 			}, time.Second*30, interval).Should(Not(Equal("Running")))
 
-			Expect(fetchedModule.Status.CurrentState).Should(Equal("Ready"))
-			Expect(fetchedModule.Status.StateMessage).Should(ContainSubstring("Apply complete"))
+			Expect(fetchedModule.Status.CurrentState).Should(Equal(string(tfaplv1beta1.StatusOk)))
 
 			// make sure all values are there in output
 			Expect(lastRun.Output).Should(ContainSubstring("AWS_KEY_ABCD1234"))

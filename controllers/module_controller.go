@@ -315,7 +315,6 @@ func (r *ModuleReconciler) triggerRun(ctx context.Context, m *tfaplv1beta1.Modul
 func (r *ModuleReconciler) setFailedStatus(req ctrl.Request, module *tfaplv1beta1.Module, reason, msg string) {
 
 	module.Status.CurrentState = string(tfaplv1beta1.StatusErrored)
-	module.Status.StateMessage = tfaplv1beta1.NormaliseStateMsg(msg)
 	module.Status.StateReason = reason
 	module.Status.LastDefaultRunStartedAt = nil
 	module.Status.ObservedGeneration = module.Generation

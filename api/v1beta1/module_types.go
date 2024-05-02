@@ -18,7 +18,6 @@ package v1beta1
 
 import (
 	"encoding/json"
-	"strings"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -35,12 +34,7 @@ const (
 
 // The potential reasons for events and current state
 const (
-	ReasonRunTriggered          = "RunTriggered"
-	ReasonForcedPlanTriggered   = "ForcedPlanTriggered"
-	ReasonForcedApplyTriggered  = "ForcedApplyTriggered"
-	ReasonPollingRunTriggered   = "PollingRunTriggered"
-	ReasonScheduledRunTriggered = "ScheduledRunTriggered"
-	ReasonPRPlanTriggered       = "PullRequestPlanTriggered"
+	ReasonRunTriggered = "RunTriggered"
 
 	ReasonRunPreparationFailed = "RunPreparationFailed"
 	ReasonDelegationFailed     = "DelegationFailed"
@@ -48,20 +42,20 @@ const (
 	ReasonSpecsParsingFailure  = "SpecsParsingFailure"
 	ReasonGitFailure           = "GitFailure"
 	ReasonUnknown              = "Unknown"
+	ReasonInitialiseFailed     = "InitialiseFailed"
+	ReasonPlanFailed           = "PlanFailed"
+	ReasonApplyFailed          = "ApplyFailed"
 
-	ReasonInitialiseFailed = "InitialiseFailed"
-	ReasonPlanFailed       = "PlanFailed"
-	ReasonApplyFailed      = "ApplyFailed"
-
-	ReasonInitialised            = "Initialised"
-	ReasonPlannedDriftDetected   = "PlannedDriftDetected"
-	ReasonPlannedNoDriftDetected = "PlannedNoDriftDetected"
-	ReasonApplied                = "Applied"
-
-	stateMsgCharLimit = 1024
+	ReasonInitialised     = "Initialised"
+	ReasonDriftDetected   = "DriftDetected"
+	ReasonNoDriftDetected = "NoDriftDetected"
+	ReasonApplied         = "Applied"
 )
 
 const (
+	// following runs are called 'default runs' because it happens on revision
+	// specified by user in spec
+	//
 	// ScheduledRun indicates a scheduled, regular terraform run.
 	ScheduledRun = "ScheduledRun"
 	// PollingRun indicated a run triggered by changes in the git repository.
@@ -70,6 +64,8 @@ const (
 	ForcedPlan = "ForcedPlan"
 	// ForcedApply indicates a forced (triggered on the UI) terraform apply.
 	ForcedApply = "ForcedApply"
+
+	// non-default run happens on PR branch instead
 	// PRPlan indicates terraform plan trigged by PullRequest on modules repo path.
 	PRPlan = "PullRequestPlan"
 )
@@ -80,12 +76,12 @@ type state string
 const (
 	// 'Running' -> module is in running state
 	StatusRunning state = "Running"
-	// 'Ready' -> last run finished successfully and its waiting on next run/event
-	StatusReady state = "Ready"
-	// 'Errored' -> last run finished with Error and its waiting on next run/event
+	// 'OK' -> last run finished successfully and no drift detected
+	StatusOk state = "Ok"
+	// 'Drift_Detected' -> last run finished successfully and drift detected
+	StatusDriftDetected state = "Drift_Detected"
+	// 'Errored' -> last run finished with Error
 	StatusErrored state = "Errored"
-	// 'Success' ->  last run was a success
-	StatusSuccess state = "Success"
 )
 
 // ModuleSpec defines the desired state of Module
@@ -175,13 +171,10 @@ type ModuleStatus struct {
 	// CurrentState denotes current overall status of module run
 	// it will be either
 	// 'Running' -> Module is in running state
-	// 'Ready' -> last run finished successfully and its waiting for next run/event
-	// 'Errored' -> last run finished with Error and its waiting for next run/event
+	// 'OK' -> last run finished successfully and no drift detected
+	// 'Drift_Detected' -> last run finished successfully and drift detected
+	// 'Errored' -> last run finished with Error
 	CurrentState string `json:"currentState,omitempty"`
-
-	// StateMessage is a human readable message indicating details about current state.
-	// +optional
-	StateMessage string `json:"stateMessage,omitempty"`
 
 	// StateReason is potential reason associated with current state.
 	// +optional
@@ -227,13 +220,11 @@ type ModuleStatus struct {
 //+kubebuilder:printcolumn:name="Schedule",type="string",JSONPath=".spec.schedule",description=""
 //+kubebuilder:printcolumn:name="PlanOnly",type="string",JSONPath=".spec.planOnly",description=""
 //+kubebuilder:printcolumn:name="State",type="string",JSONPath=".status.currentState",description=""
-//+kubebuilder:printcolumn:name="Started At",type="string",JSONPath=`.status.runStartedAt`,description=""
-//+kubebuilder:printcolumn:name="Took",type="string",JSONPath=`.status.runDuration`,description=""
 //+kubebuilder:printcolumn:name="Reason",type="string",JSONPath=".status.stateReason",description=""
-//+kubebuilder:printcolumn:name="Commit",type="string",JSONPath=`.status.runCommitHash`,description="",priority=10
-//+kubebuilder:printcolumn:name="Path",type="string",JSONPath=`.spec.path`,description="",priority=20
+//+kubebuilder:printcolumn:name="Last Run Started At",type="string",JSONPath=`.status.lastDefaultRunStartedAt`,description=""
+//+kubebuilder:printcolumn:name="Last Applied At",type="string",JSONPath=`.status.lastAppliedAt`,description=""
+//+kubebuilder:printcolumn:name="Commit",type="string",JSONPath=`.status.lastDefaultRunCommitHash`,description="",priority=10
 //+kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp",description="",priority=20
-//+kubebuilder:printcolumn:name="Last Message",type="string",JSONPath=".status.stateMessage",description=""
 
 // Module is the Schema for the modules API
 type Module struct {
@@ -339,30 +330,4 @@ func (m *Module) PendingRunRequest() (*Request, bool) {
 		return nil, false
 	}
 	return &value, true
-}
-
-func RunReason(runType string) string {
-	switch runType {
-	case ScheduledRun:
-		return ReasonScheduledRunTriggered
-	case PollingRun:
-		return ReasonPollingRunTriggered
-	case ForcedPlan:
-		return ReasonForcedPlanTriggered
-	case ForcedApply:
-		return ReasonForcedApplyTriggered
-	case PRPlan:
-		return ReasonPRPlanTriggered
-	}
-	return ReasonRunTriggered
-}
-
-func NormaliseStateMsg(msg string) string {
-	msg = strings.TrimSpace(msg)
-
-	r := []rune(msg)
-	if len(r) > stateMsgCharLimit {
-		return strings.TrimSpace(string(r[:stateMsgCharLimit])) + "..."
-	}
-	return msg
 }
