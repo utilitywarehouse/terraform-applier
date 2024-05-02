@@ -436,16 +436,14 @@ preferences: {}
 // since /tmp will be mounted on PV we need to do manual clean up
 // on restart. appData will be excluded from this clean up
 func cleanupTmpDir() {
-	fileDescriptors, err := os.ReadDir(os.TempDir())
+	err := sysutil.RemoveDirContentsIf(
+		os.TempDir(),
+		func(path string, fi os.FileInfo) (bool, error) {
+			return fi.Name() != appData, nil
+		})
 	if err != nil {
 		fmt.Printf("unable to cleanup %s Error: %v\n", os.TempDir(), err)
 		return
-	}
-
-	for _, fd := range fileDescriptors {
-		if fd.Name() != appData {
-			sysutil.RemoveAll(path.Join(os.TempDir(), fd.Name()))
-		}
 	}
 }
 

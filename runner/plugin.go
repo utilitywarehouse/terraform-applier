@@ -6,11 +6,13 @@ import (
 	"os"
 	"path"
 	"sync"
+	"time"
 
 	"github.com/utilitywarehouse/terraform-applier/sysutil"
 )
 
 var pluginCacheMain = "plugin-cache-main"
+var stalePluginTimeout = 7 * 24 * time.Hour
 
 // The plugin cache directory is not guaranteed to be concurrency safe.
 // https://github.com/hashicorp/terraform/issues/31964
@@ -29,8 +31,23 @@ type pluginCache struct {
 func newPluginCache(log *slog.Logger, root string) (*pluginCache, error) {
 	main := path.Join(root, pluginCacheMain)
 
+	// crate main plugin cache dir if not exit
 	if err := os.MkdirAll(main, defaultDirMode); err != nil {
 		return nil, fmt.Errorf("unable to create main cache dir err:%w", err)
+	}
+
+	// clean up plugin cache dir in case its an old one
+	err := sysutil.RemoveDirContentsRecursiveIf(main,
+		func(path string, fi os.FileInfo) (bool, error) {
+			// delete all plugin/dir older then stalePluginTimeout
+			if time.Since(fi.ModTime()) > stalePluginTimeout {
+				log.Info("clearing stale plugin path", "path", path)
+				return true, nil
+			}
+			return false, nil
+		})
+	if err != nil {
+		log.Error("unable to clean up main plugin cache dir", "err", err)
 	}
 
 	return &pluginCache{
