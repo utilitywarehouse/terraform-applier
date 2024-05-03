@@ -90,7 +90,7 @@ func (r *Runner) Start(run *tfaplv1beta1.Run, cancelChan chan struct{}) bool {
 		if pluginCacheDir != "" {
 			envs["TF_PLUGIN_CACHE_DIR"] = pluginCacheDir
 			defer r.pluginCache.done(pluginCacheDir)
-			r.Log.Info("plugin cache folder generated", "module", run.Module)
+			r.Log.Info("plugin cache folder is ready", "module", run.Module)
 		}
 	}
 
