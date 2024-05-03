@@ -82,16 +82,17 @@ func (r *Runner) Start(run *tfaplv1beta1.Run, cancelChan chan struct{}) bool {
 	envs := make(map[string]string)
 	maps.Copy(envs, r.GlobalENV)
 
+	r.Log.Info("starting run", "module", run.Module, "type", run.Request.Type)
+
 	if r.pluginCacheEnabled {
 		// request plugin cache folder from the pool and clean up once done
 		pluginCacheDir := r.pluginCache.new()
 		if pluginCacheDir != "" {
 			envs["TF_PLUGIN_CACHE_DIR"] = pluginCacheDir
 			defer r.pluginCache.done(pluginCacheDir)
+			r.Log.Info("plugin cache folder is ready", "module", run.Module)
 		}
 	}
-
-	r.Log.Info("starting run", "module", run.Module, "type", run.Request.Type)
 
 	start := time.Now()
 
