@@ -5,3 +5,4 @@ bin
 # test state files
 *.tfstate
 webserver/index.html
+plugin-cache-main

@@ -7,7 +7,6 @@ import (
 	"os/exec"
 	"path"
 	"path/filepath"
-	"sync"
 )
 
 // RemoveAll will remove given dir and sub dir recursively using exec 'rm -rf'
@@ -76,40 +75,18 @@ func CopyDir(src string, dst string, withReplace bool) error {
 		return err
 	}
 
-	wg := &sync.WaitGroup{}
-	errors := make(chan error)
-
 	for _, fd := range fileDescriptors {
 		srcPath := path.Join(src, fd.Name())
 		dstPath := path.Join(dst, fd.Name())
 
 		if fd.IsDir() {
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				if err = CopyDir(srcPath, dstPath, withReplace); err != nil {
-					errors <- err
-				}
-			}()
+			if err := CopyDir(srcPath, dstPath, withReplace); err != nil {
+				return err
+			}
 		} else {
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				if err = CopyFile(srcPath, dstPath, withReplace); err != nil {
-					errors <- err
-				}
-			}()
-		}
-	}
-
-	go func() {
-		wg.Wait()
-		close(errors)
-	}()
-
-	for err := range errors {
-		if err != nil {
-			return err
+			if err := CopyFile(srcPath, dstPath, withReplace); err != nil {
+				return err
+			}
 		}
 	}
 
