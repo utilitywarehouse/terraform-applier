@@ -84,6 +84,8 @@ func (r *Runner) Start(run *tfaplv1beta1.Run, cancelChan chan struct{}) bool {
 
 	r.Log.Info("starting run", "module", run.Module, "type", run.Request.Type)
 
+	start := time.Now()
+
 	if r.pluginCacheEnabled {
 		// request plugin cache folder from the pool and clean up once done
 		pluginCacheDir := r.pluginCache.new()
@@ -93,8 +95,6 @@ func (r *Runner) Start(run *tfaplv1beta1.Run, cancelChan chan struct{}) bool {
 			r.Log.Info("plugin cache folder is ready", "module", run.Module)
 		}
 	}
-
-	start := time.Now()
 
 	success := r.process(run, cancelChan, envs)
 
