@@ -574,6 +574,7 @@ func run(c *cli.Context) {
 		electionID = generateElectionID("4ee367ac", labelSelectorKey, labelSelectorValue, watchNamespaces)
 	}
 
+	gracefulShutdownTimeout := time.Duration(c.Int("termination-grace-period")) * time.Second
 	options := ctrl.Options{
 		Scheme:                 scheme,
 		Metrics:                metricsserver.Options{BindAddress: c.String("metrics-bind-address")},
@@ -583,6 +584,7 @@ func run(c *cli.Context) {
 		Controller: config.Controller{
 			MaxConcurrentReconciles: c.Int("max-concurrent-runs"),
 		},
+		GracefulShutdownTimeout: &gracefulShutdownTimeout,
 	}
 
 	var labelSelector labels.Selector
@@ -626,7 +628,7 @@ func run(c *cli.Context) {
 		Log:                    logger.With("logger", "runner"),
 		Metrics:                metrics,
 		TerraformExecPath:      execPath,
-		TerminationGracePeriod: time.Duration(c.Int("termination-grace-period")) * time.Second,
+		TerminationGracePeriod: gracefulShutdownTimeout,
 		AWSSecretsEngineConfig: &vault.AWSSecretsEngineConfig{
 			SecretsEngPath: c.String("vault-aws-secret-engine-path"),
 			AuthPath:       c.String("vault-kube-auth-path"),

@@ -1,6 +1,7 @@
 package sysutil
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -58,7 +59,7 @@ func CopyFile(src, dst string, withReplace bool) error {
 }
 
 // CopyDir copies a dir recursively
-func CopyDir(src string, dst string, withReplace bool) error {
+func CopyDir(ctx context.Context, src string, dst string, withReplace bool) error {
 	var err error
 	var fileDescriptors []os.DirEntry
 	var srcInfo os.FileInfo
@@ -80,12 +81,17 @@ func CopyDir(src string, dst string, withReplace bool) error {
 		dstPath := path.Join(dst, fd.Name())
 
 		if fd.IsDir() {
-			if err := CopyDir(srcPath, dstPath, withReplace); err != nil {
+			if err := CopyDir(ctx, srcPath, dstPath, withReplace); err != nil {
 				return err
 			}
 		} else {
-			if err := CopyFile(srcPath, dstPath, withReplace); err != nil {
-				return err
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			default:
+				if err := CopyFile(srcPath, dstPath, withReplace); err != nil {
+					return err
+				}
 			}
 		}
 	}

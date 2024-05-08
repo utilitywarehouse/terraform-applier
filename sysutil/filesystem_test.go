@@ -1,6 +1,7 @@
 package sysutil
 
 import (
+	"context"
 	"os"
 	"path"
 	"path/filepath"
@@ -47,7 +48,7 @@ func TestCopyDirWithReplace(t *testing.T) {
 	}
 
 	// Copy the directory.
-	err := CopyDir(srcDir, dstDir, true)
+	err := CopyDir(context.TODO(), srcDir, dstDir, true)
 	if err != nil {
 		t.Fatalf("error copying directory: %v", err)
 	}
@@ -122,7 +123,7 @@ func TestCopyDirWithoutReplace(t *testing.T) {
 	}
 
 	// Copy the directory.
-	err := CopyDir(srcDir, dstDir, false)
+	err := CopyDir(context.TODO(), srcDir, dstDir, false)
 	if err != nil {
 		t.Fatalf("error copying directory: %v", err)
 	}
