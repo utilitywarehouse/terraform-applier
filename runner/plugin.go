@@ -1,6 +1,7 @@
 package runner
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"os"
@@ -58,7 +59,7 @@ func newPluginCache(log *slog.Logger, root string) (*pluginCache, error) {
 }
 
 // new returns path of the plugin cache dir which is the clone
-// of the main plugin cache dir
+// of the main plugin cache dir. function will timeout in 120 sec
 func (pcp *pluginCache) new() string {
 
 	tmpPC, err := os.MkdirTemp("", "plugin-cache-*")
@@ -67,11 +68,15 @@ func (pcp *pluginCache) new() string {
 		return ""
 	}
 
+	ctx, cancel := context.WithTimeout(context.TODO(), 120*time.Second)
+	defer cancel()
+
 	pcp.RLock()
 	defer pcp.RUnlock()
 
-	if err := sysutil.CopyDir(pcp.main, tmpPC, true); err != nil {
+	if err := sysutil.CopyDir(ctx, pcp.main, tmpPC, true); err != nil {
 		pcp.log.Error("unable to create copy providers to plugin cache dir", "err", err)
+		sysutil.RemoveAll(tmpPC)
 		return ""
 	}
 
@@ -83,10 +88,13 @@ func (pcp *pluginCache) new() string {
 func (pcp *pluginCache) done(tmpPC string) {
 	defer sysutil.RemoveAll(tmpPC)
 
+	ctx, cancel := context.WithTimeout(context.TODO(), 60*time.Second)
+	defer cancel()
+
 	pcp.Lock()
 	defer pcp.Unlock()
 
-	if err := sysutil.CopyDir(tmpPC, pcp.main, false); err != nil {
+	if err := sysutil.CopyDir(ctx, tmpPC, pcp.main, false); err != nil {
 		pcp.log.Error("unable to create copy tmp to main dir", "err", err)
 	}
 }

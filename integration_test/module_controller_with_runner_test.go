@@ -57,7 +57,7 @@ var _ = Describe("Module controller with Runner", func() {
 			var dst string
 			testRepos.EXPECT().Clone(gomock.Any(), "https://host.xy/dummy/repo.git", gomock.AssignableToTypeOf(dst), "HEAD", "", true).
 				DoAndReturn(func(ctx context.Context, remote, dst, branch, pathspec string, rmGitDir bool) (string, error) {
-					return "commit124", sysutil.CopyDir(filepath.Join("src", "modules"), dst, true)
+					return "commit124", sysutil.CopyDir(context.TODO(), filepath.Join("src", "modules"), dst, true)
 				}).AnyTimes()
 
 			testMetrics.EXPECT().UpdateModuleRunDuration(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
