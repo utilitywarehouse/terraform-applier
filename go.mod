@@ -9,7 +9,7 @@ require (
 	github.com/gorilla/securecookie v1.1.2
 	github.com/hashicorp/go-version v1.6.0
 	github.com/hashicorp/hc-install v0.6.4
-	github.com/hashicorp/terraform-exec v0.20.0
+	github.com/hashicorp/terraform-exec v0.21.0
 	github.com/hashicorp/vault/api v1.13.0
 	github.com/onsi/ginkgo/v2 v2.17.2
 	github.com/onsi/gomega v1.33.1
@@ -70,7 +70,7 @@ require (
 	github.com/hashicorp/go-secure-stdlib/strutil v0.1.2 // indirect
 	github.com/hashicorp/go-sockaddr v1.0.6 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
-	github.com/hashicorp/terraform-json v0.21.0 // indirect
+	github.com/hashicorp/terraform-json v0.22.1 // indirect
 	github.com/imdario/mergo v0.3.16 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
