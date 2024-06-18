@@ -32,6 +32,7 @@ type Run struct {
 	Applied      bool          `json:"applied,omitempty"`
 	InitOutput   string        `json:"initOutput,omitempty"`
 	Output       string        `json:"output,omitempty"`
+	Summary      string        `json:"summary,omitempty"`
 }
 
 func NewRun(module *Module, req *Request) Run {
@@ -59,7 +60,7 @@ type Request struct {
 type PullRequest struct {
 	Number     int    `json:"num,omitempty"`
 	HeadBranch string `json:"headBranch,omitempty"`
-	CommentID  string `json:"commentID,omitempty"`
+	CommentID  int    `json:"commentID,omitempty"`
 }
 
 func (req *Request) Validate() error {
@@ -84,8 +85,7 @@ func (req *Request) Validate() error {
 // IsPlanOnly will return is req is plan-only
 func (req *Request) IsPlanOnly(module *Module) bool {
 	// for scheduled and polling run respect module spec
-	if req.Type == ScheduledRun ||
-		req.Type == PollingRun {
+	if req.Type == ScheduledRun || req.Type == PollingRun {
 		return module.IsPlanOnly()
 	}
 
@@ -102,6 +102,11 @@ func (req *Request) IsPlanOnly(module *Module) bool {
 
 	// its always safe to default to plan-only
 	return true
+}
+
+// IsPlanOnly will return is req is plan-only
+func (req *Request) SkipStatusUpdate() bool {
+	return req.Type == PRPlan
 }
 
 // RepoRef returns the revision of the repository for the module source code

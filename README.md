@@ -144,9 +144,10 @@ it will not do `apply` even if drift is detected.
 Controller will force shutdown on current stage run if it takes more time then `TERMINATION_GRACE_PERIOD` set on controller.
 
 ### Git Sync
-Terraform-applier uses [git-mirror](https://github.com/utilitywarehouse/git-mirror) package to sync git repositories. 
+
+Terraform-applier uses [git-mirror](https://github.com/utilitywarehouse/git-mirror) package to sync git repositories.
 This package supports mirroring multiple repositories and all available references.
-Because of this terraform-applier can also support different revisions on same repo. it can be set in module CRD by `repoRef` field. 
+Because of this terraform-applier can also support different revisions on same repo. it can be set in module CRD by `repoRef` field.
 Use following config to add repositories. supported urls formats are
 'git@host.xz:org/repo.git','ssh://git@host.xz/org/repo.git' or 'https://host.xz/org/repo.git'
 
@@ -154,8 +155,8 @@ Use following config to add repositories. supported urls formats are
 git_mirror:
   defaults:
     interval: 1m # defaults to 30s
-    git_gc:  always # defaults to always
-    auth: 
+    git_gc: always # defaults to always
+    auth:
       ssh_key_path: /etc/git-secret/ssh # defaults to --git-ssh-key-file flag
       ssh_known_hosts_path: /etc/git-secret/known_hosts # defaults to --git-ssh-known-hosts
   repositories:
@@ -163,9 +164,39 @@ git_mirror:
     - remote: git@github.com:utilitywarehouse/other-repo.git
 ```
 
+### Git PR Planner
+
+Terraform-applier can run terraform plan for open Pull Requests and post plan run outputs as PR comments.
+To enable that, terraform-applier does the following:
+
+1. Receives a webhook from Github notifying about a change in open Pull Requests e.g. new PR created, new commit pushed, new comment posted, etc.
+2. Requests more information from Github about the PR: list of commits, comments, files updated, etc.
+3. If plan run needs to be executed due to new commit or user request via comments (`@terraform-applier plan <module name>`, the request gets verified and forwarded to the Terraform Runner
+4. The run output gets posted to the PR comments as soon as run is finished and stored in Redis
+
+Apart from listening to webhooks terraform-applier also runs polling jobs at a set interval (every 10 minutes by default). These jobs help making sure no webhooks were missed and there are no outstanding requests.
+
+PR Planner feature is enabled by default, but can be disabled either for a specific module by setting `planOnPR` to `false` in the module spec, or by setting `DISABLE_PR_PLANNER` env var to `false` to be disabled entirely across all modules.
+
+PR Planner config:
+
+- `--disable-pr-planner (DISABLE_PR_PLANNER)` - (default: `false`) Disable PR planner feature across all modules
+- `--pr-planner-interval (PR_PLANNER_INTERVAL)` - (default: `300`) The inverval at which terraform-applier polls Github for any open PRs.
+- `--pr-planner-webhook-port (PR_PLANNER_WEBHOOK_PORT)` - (default: `":8083"`) Port to listen to for incoming Github webhooks
+- `--github-token (GITHUB_TOKEN)` - (default: `""`) Github API personal access token that allows requesting information about open Pull Requests and post comments to these PRs.  
+  Example permissions: `Read` access to metadata and contents, `Read and Write` access to issues, and pull requests.
+- `--github-webhook-secret (GITHUB_WEBHOOK_SECRET)` - (default: `""`) User-defined secret that will be used to sign and authorise the incoming webhooks.  
+  Example Github webhook settings:
+  - Payload URL: `https://teerraform-applier.foo.bar/github-events`
+  - Content Type: `application/json`
+  - Secret: `<GITHUB_WEBHOOK_SECRET>`
+  - Enable SSL verification: `true`
+  - Events: `Issue comments`, `Pull requests`
+  - Active: `true`
+
 ### Controller config
 
-- `--repos-root-path (REPOS_ROOT_PATH)` - (default: `/src`) Absolute path to the directory containing all repositories of the modules. 
+- `--repos-root-path (REPOS_ROOT_PATH)` - (default: `/src`) Absolute path to the directory containing all repositories of the modules.
   This dir will be cleared on start.
 - `--config (TF_APPLIER_CONFIG)` - (default: `/config/config.yaml`) Path to the tf applier config file containing repository config.
 - `--min-interval-between-runs (MIN_INTERVAL_BETWEEN_RUNS)` - (default: `60`) The minimum interval in seconds, user can set between 2 consecutive runs. This value defines the frequency of runs.
