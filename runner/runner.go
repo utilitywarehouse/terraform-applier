@@ -183,13 +183,13 @@ func (r *Runner) process(run *tfaplv1beta1.Run, cancelChan <-chan struct{}, envs
 		}
 	}()
 
-	commitHash, err := r.Repos.Hash(ctx, module.Spec.RepoURL, module.Spec.RepoRef, module.Spec.Path)
+	commitHash, err := r.Repos.Hash(ctx, module.Spec.RepoURL, run.RepoRef, module.Spec.Path)
 	if err != nil {
 		log.Error("unable to get commit hash", "err", err)
 		return false
 	}
 
-	commitLog, err := r.Repos.LogMsg(ctx, module.Spec.RepoURL, module.Spec.RepoRef, module.Spec.Path)
+	commitLog, err := r.Repos.LogMsg(ctx, module.Spec.RepoURL, run.RepoRef, module.Spec.Path)
 	if err != nil {
 		log.Error("unable to get commit log subject", "err", err)
 		return false
@@ -265,7 +265,7 @@ func (r *Runner) process(run *tfaplv1beta1.Run, cancelChan <-chan struct{}, envs
 		}
 	}
 
-	te, err := r.NewTFRunner(ctx, module, envs, vars)
+	te, err := r.NewTFRunner(ctx, module, run, envs, vars)
 	if err != nil {
 		msg := fmt.Sprintf("unable to create terraform executer: err:%s", err)
 		log.Error(msg)

@@ -26,6 +26,7 @@ import (
 	"github.com/utilitywarehouse/git-mirror/pkg/mirror"
 	"github.com/utilitywarehouse/terraform-applier/git"
 	"github.com/utilitywarehouse/terraform-applier/metrics"
+	"github.com/utilitywarehouse/terraform-applier/prplanner"
 	"github.com/utilitywarehouse/terraform-applier/runner"
 	"github.com/utilitywarehouse/terraform-applier/sysutil"
 	"github.com/utilitywarehouse/terraform-applier/vault"
@@ -704,9 +705,20 @@ func run(c *cli.Context) {
 		}
 	}()
 
+	username := "DTLP" // TODO: Sort out the credentials
+	token := os.Getenv("GITHUB_TOKEN")
+	prPlanner := &prplanner.Server{
+		ClusterClt:    mgr.GetClient(),
+		KubeClient:    kubeClient,
+		Repos:         repos,
+		RedisClient:   sysutil.Redis{Client: rdb},
+		GraphqlClient: prplanner.NewGraphqlClient(username, token),
+		Log:           logger.With("logger", "prPlanner"),
+	}
+	go prPlanner.Start(ctx)
+
 	logger.Info("starting manager")
 	if err := mgr.Start(ctx); err != nil {
 		logger.Error("problem running manager", "err", err)
 	}
-
 }

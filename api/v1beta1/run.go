@@ -57,9 +57,10 @@ type Request struct {
 }
 
 type PullRequest struct {
-	Number     int    `json:"num,omitempty"`
-	HeadBranch string `json:"headBranch,omitempty"`
-	CommentID  string `json:"commentID,omitempty"`
+	Number        int    `json:"num,omitempty"`
+	HeadBranch    string `json:"headBranch,omitempty"`
+	CommentID     int    `json:"commentID,omitempty"`
+	GitCommitHash string `json:"GitCommitHash,omitempty"`
 }
 
 func (req *Request) Validate() error {

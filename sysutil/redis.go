@@ -23,6 +23,7 @@ type RedisInterface interface {
 	DefaultApply(ctx context.Context, module types.NamespacedName) (*tfaplv1beta1.Run, error)
 	PRLastRun(ctx context.Context, module types.NamespacedName, pr int) (*tfaplv1beta1.Run, error)
 	Runs(ctx context.Context, module types.NamespacedName) ([]*tfaplv1beta1.Run, error)
+	GetCommitHash(ctx context.Context, key string) (string, error)
 
 	SetDefaultLastRun(ctx context.Context, run *tfaplv1beta1.Run) error
 	SetDefaultApply(ctx context.Context, run *tfaplv1beta1.Run) error
@@ -45,7 +46,7 @@ func defaultLastApplyKey(module types.NamespacedName) string {
 	return fmt.Sprintf("%sdefault:lastApply", keyPrefix(module))
 }
 
-func defaultPRLastRunsKey(module types.NamespacedName, pr int) string {
+func DefaultPRLastRunsKey(module types.NamespacedName, pr int) string {
 	return fmt.Sprintf("%sPR:%d:lastRun", keyPrefix(module), pr)
 }
 
@@ -61,7 +62,7 @@ func (r Redis) DefaultApply(ctx context.Context, module types.NamespacedName) (*
 
 // PRLastRun will return last run result for the given PR branch
 func (r Redis) PRLastRun(ctx context.Context, module types.NamespacedName, pr int) (*tfaplv1beta1.Run, error) {
-	return r.getKV(ctx, defaultPRLastRunsKey(module, pr))
+	return r.getKV(ctx, DefaultPRLastRunsKey(module, pr))
 }
 
 // Runs will return all the runs stored for the given module
@@ -93,9 +94,9 @@ func (r Redis) SetDefaultApply(ctx context.Context, run *tfaplv1beta1.Run) error
 	return r.setKV(ctx, defaultLastApplyKey(run.Module), run, 0)
 }
 
-// SetDefaultApply puts given run in to cache with expiration
+// SetPRLastRun puts given run in to cache with expiration
 func (r Redis) SetPRLastRun(ctx context.Context, run *tfaplv1beta1.Run) error {
-	return r.setKV(ctx, defaultPRLastRunsKey(run.Module, run.Request.PR.Number), run, PRKeyExpirationDur)
+	return r.setKV(ctx, DefaultPRLastRunsKey(run.Module, run.Request.PR.Number), run, PRKeyExpirationDur)
 }
 
 func (r Redis) setKV(ctx context.Context, key string, run *tfaplv1beta1.Run, exp time.Duration) error {
@@ -105,6 +106,15 @@ func (r Redis) setKV(ctx context.Context, key string, run *tfaplv1beta1.Run, exp
 	}
 
 	return r.Client.Set(ctx, key, str, exp).Err()
+}
+
+func (r Redis) GetCommitHash(ctx context.Context, key string) (string, error) {
+	module, err := r.getKV(ctx, key)
+	if err != nil {
+		return "", fmt.Errorf("unable to get key value pair err:%w", err)
+	}
+
+	return module.CommitHash, nil
 }
 
 func (r Redis) getKV(ctx context.Context, key string) (*tfaplv1beta1.Run, error) {
