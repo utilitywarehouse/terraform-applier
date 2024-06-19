@@ -17,7 +17,7 @@ func (ps *Server) serveOutputRequests(ctx context.Context, repo gitHubRepo, pr p
 	outputs := ps.getPendinPRUpdates(ctx, pr, module)
 
 	for _, output := range outputs {
-		ps.postPlanOutput(output)
+		ps.postPlanOutput(output, repo)
 	}
 }
 
@@ -35,14 +35,14 @@ func (ps *Server) getPendinPRUpdates(ctx context.Context, pr pr, module tfaplv1b
 func (ps *Server) checkPRCommentsForOutputRequests(ctx context.Context, outputs *[]output, pr pr, comment prComment, module tfaplv1beta1.Module) {
 
 	if strings.Contains(comment.Body, "Received terraform plan request") {
-		prCommentModule, prCommentReqID, err := ps.findModuleNameInComment(comment.Body)
+		prCommentModule, _, err := ps.findModuleNameInComment(comment.Body)
 		if err != nil {
 			ps.Log.Error("error getting module name and req ID from PR comment", err)
 			return
 		}
 
 		if module.Name == prCommentModule {
-			planOutput, err := ps.getPlanOutputFromRedis(ctx, pr, prCommentReqID, module)
+			planOutput, err := ps.getPlanOutputFromRedis(ctx, pr, "", module)
 			if err != nil {
 				ps.Log.Error("can't check plan output in Redis:", err)
 				return
@@ -90,8 +90,8 @@ func (ps *Server) findModuleNameInComment(commentBody string) (string, string, e
 	return "", "", fmt.Errorf("module data not found")
 }
 
-func (ps *Server) postPlanOutput(output output) {
-	_, err := ps.postToGitHub(output.module.Spec.RepoURL, "PATCH", output.commentID, output.prNumber, output.body)
+func (ps *Server) postPlanOutput(output output, repo gitHubRepo) {
+	_, err := ps.postToGitHub(repo, "PATCH", output.commentID, output.prNumber, output.body)
 	if err != nil {
 		ps.Log.Error("error posting PR comment:", err)
 	}
@@ -113,18 +113,17 @@ func (ps *Server) getPlanOutputFromRedis(ctx context.Context, pr pr, prCommentRe
 
 	return "", nil
 }
-func (ps *Server) postToGitHub(repoURL, method string, commentID, prNumber int, commentBody prComment) (int, error) {
+
+func (ps *Server) postToGitHub(repo gitHubRepo, method string, commentID, prNumber int, commentBody prComment) (int, error) {
 	// TODO: Update credentials
 	// Temporarily using my own github user and token
 	username := "DTLP"
 	token := os.Getenv("GITHUB_TOKEN")
 
-	repoName := repoNameFromURL(repoURL)
-
 	// Post a comment
-	url := fmt.Sprintf("https://api.github.com/repos/%s/issues/%d/comments", repoName, prNumber)
+	url := fmt.Sprintf("https://api.github.com/repos/%s/%s/issues/%d/comments", repo.owner, repo.name, prNumber)
 	if method == "PATCH" {
-		url = fmt.Sprintf("https://api.github.com/repos/%s/issues/comments/%d", repoName, commentID)
+		url = fmt.Sprintf("https://api.github.com/repos/%s/%/issues/comments/%d", repo.owner, repo.name, commentID)
 	}
 
 	// Marshal the comment object to JSON
@@ -168,11 +167,11 @@ func (ps *Server) postToGitHub(repoURL, method string, commentID, prNumber int, 
 	return commentResponse.ID, nil
 }
 
-func repoNameFromURL(url string) string {
-	trimmedURL := strings.TrimSuffix(url, ".git")
-	parts := strings.Split(trimmedURL, ":")
-	if len(parts) < 2 {
-		return ""
-	}
-	return parts[1]
-}
+// func repoNameFromURL(url string) string {
+// 	trimmedURL := strings.TrimSuffix(url, ".git")
+// 	parts := strings.Split(trimmedURL, ":")
+// 	if len(parts) < 2 {
+// 		return ""
+// 	}
+// 	return parts[1]
+// }

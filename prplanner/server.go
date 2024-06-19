@@ -135,7 +135,7 @@ func (ps *Server) Start(ctx context.Context) {
 					}
 
 					// 2. compare remote and local repos last commit hashes
-					upToDate, err := ps.isLocalRepoUpToDate(pr)
+					upToDate, err := ps.isLocalRepoUpToDate(ctx, repo, pr)
 					if err != nil {
 						ps.Log.Error("error fetching local repo last commit hash", err)
 					}
@@ -164,9 +164,10 @@ func (ps *Server) actionOnPRModules(ctx context.Context, repo gitHubRepo, pr pr,
 	}
 }
 
-func (ps *Server) isLocalRepoUpToDate(pr pr) (bool, error) {
+func (ps *Server) isLocalRepoUpToDate(ctx context.Context, repo gitHubRepo, pr pr) (bool, error) {
+	repoURL := "git@github.com:" + repo.owner + "/" + repo.name + ".git"
 	prLastCommitHash := pr.Commits.Nodes[0].Commit.Oid
-	localRepoCommitHash, err := ps.Repos.Hash(ctx, module.Spec.RepoURL, pr.HeadRefName, module.Spec.Path)
+	localRepoCommitHash, err := ps.Repos.Hash(ctx, repoURL, pr.HeadRefName, ".")
 	if err != nil {
 		return false, nil
 	}
