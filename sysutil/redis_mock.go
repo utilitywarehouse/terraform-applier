@@ -66,19 +66,34 @@ func (mr *MockRedisInterfaceMockRecorder) DefaultLastRun(arg0, arg1 interface{})
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DefaultLastRun", reflect.TypeOf((*MockRedisInterface)(nil).DefaultLastRun), arg0, arg1)
 }
 
-// PRLastRun mocks base method.
-func (m *MockRedisInterface) PRLastRun(arg0 context.Context, arg1 types.NamespacedName, arg2 int) (*v1beta1.Run, error) {
+// GetCommitHash mocks base method.
+func (m *MockRedisInterface) GetCommitHash(arg0 context.Context, arg1 string) (string, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "PRLastRun", arg0, arg1, arg2)
+	ret := m.ctrl.Call(m, "GetCommitHash", arg0, arg1)
+	ret0, _ := ret[0].(string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetCommitHash indicates an expected call of GetCommitHash.
+func (mr *MockRedisInterfaceMockRecorder) GetCommitHash(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCommitHash", reflect.TypeOf((*MockRedisInterface)(nil).GetCommitHash), arg0, arg1)
+}
+
+// PRRun mocks base method.
+func (m *MockRedisInterface) PRRun(arg0 context.Context, arg1 types.NamespacedName, arg2 int, arg3 string) (*v1beta1.Run, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "PRRun", arg0, arg1, arg2, arg3)
 	ret0, _ := ret[0].(*v1beta1.Run)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// PRLastRun indicates an expected call of PRLastRun.
-func (mr *MockRedisInterfaceMockRecorder) PRLastRun(arg0, arg1, arg2 interface{}) *gomock.Call {
+// PRRun indicates an expected call of PRRun.
+func (mr *MockRedisInterfaceMockRecorder) PRRun(arg0, arg1, arg2, arg3 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PRLastRun", reflect.TypeOf((*MockRedisInterface)(nil).PRLastRun), arg0, arg1, arg2)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PRRun", reflect.TypeOf((*MockRedisInterface)(nil).PRRun), arg0, arg1, arg2, arg3)
 }
 
 // Runs mocks base method.
@@ -124,16 +139,16 @@ func (mr *MockRedisInterfaceMockRecorder) SetDefaultLastRun(arg0, arg1 interface
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetDefaultLastRun", reflect.TypeOf((*MockRedisInterface)(nil).SetDefaultLastRun), arg0, arg1)
 }
 
-// SetPRLastRun mocks base method.
-func (m *MockRedisInterface) SetPRLastRun(arg0 context.Context, arg1 *v1beta1.Run) error {
+// SetPRRun mocks base method.
+func (m *MockRedisInterface) SetPRRun(arg0 context.Context, arg1 *v1beta1.Run) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SetPRLastRun", arg0, arg1)
+	ret := m.ctrl.Call(m, "SetPRRun", arg0, arg1)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
-// SetPRLastRun indicates an expected call of SetPRLastRun.
-func (mr *MockRedisInterfaceMockRecorder) SetPRLastRun(arg0, arg1 interface{}) *gomock.Call {
+// SetPRRun indicates an expected call of SetPRRun.
+func (mr *MockRedisInterfaceMockRecorder) SetPRRun(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetPRLastRun", reflect.TypeOf((*MockRedisInterface)(nil).SetPRLastRun), arg0, arg1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetPRRun", reflect.TypeOf((*MockRedisInterface)(nil).SetPRRun), arg0, arg1)
 }

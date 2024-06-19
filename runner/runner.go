@@ -458,7 +458,7 @@ func (r *Runner) updateRedis(ctx context.Context, run *tfaplv1beta1.Run) error {
 
 	// if its PR run only update relevant PR key
 	if run.Request.Type == tfaplv1beta1.PRPlan {
-		return r.Redis.SetPRLastRun(ctx, run)
+		return r.Redis.SetPRRun(ctx, run)
 	}
 
 	// set default last run
