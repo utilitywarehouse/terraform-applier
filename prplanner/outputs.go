@@ -13,28 +13,6 @@ import (
 	tfaplv1beta1 "github.com/utilitywarehouse/terraform-applier/api/v1beta1"
 )
 
-func (ps *Server) getPendingPlans(ctx context.Context, planRequests *map[string]*tfaplv1beta1.Request, pr pr, repo gitHubRepo, prModules []tfaplv1beta1.Module) {
-	if ps.isNewPR(pr.Comments.Nodes) {
-		for _, module := range prModules {
-			annotated, err := ps.isModuleAnnotated(ctx, module.NamespacedName())
-			if err != nil {
-				ps.Log.Error("error retreiving module annotation", err)
-			}
-
-			if annotated {
-				continue // Skip annotated modules
-			}
-
-			ps.addNewRequest(ctx, planRequests, module, pr, repo)
-			ps.Log.Debug("new pr found. creating new plan request", "namespace", module.ObjectMeta.Namespace, "module", module.Name)
-		}
-		return
-	}
-
-	ps.checkLastPRCommit(ctx, planRequests, pr, repo, prModules)
-	ps.analysePRCommentsForRun(ctx, planRequests, pr, repo, prModules)
-}
-
 func (ps *Server) getPendinPRUpdates(ctx context.Context, outputs []output, pr pr, prModules []tfaplv1beta1.Module) []output {
 	// Go through PR comments in reverse order
 	for _, module := range prModules {

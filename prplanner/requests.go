@@ -14,6 +14,69 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
+func (ps *Server) getPendingPlans(ctx context.Context, planRequests *map[string]*tfaplv1beta1.Request, pr pr, repo gitHubRepo, prModules []tfaplv1beta1.Module) {
+	// 1. Check if module is annotated
+	annotated, err := ps.isModuleAnnotated(ctx, module.NamespacedName())
+	if err != nil {
+		ps.Log.Error("error checking module annotation", err)
+	}
+
+	if annotated {
+		break // no need to proceed if there's already a plan request for the module
+	}
+
+	planRequests := make(map[string]*tfaplv1beta1.Request)
+	// 2. loop through commits from latest to oldest
+	ps.checkPRCommits(ctx, &planRequests)
+
+	// 3. loop through comments
+	var outputs []output
+	ps.checkPRComments(ctx, outputs, pr, prModules)
+
+}
+
+func (ps *Server) checkPRCommits() {
+	// 0. check comments if output posted for the commit hash
+	// if no comment posted:
+	//
+	// 1. check commit hashes in redis
+	// if missing:
+	//
+	// 2. verify module needs to be planned based on files changed
+	// if matching:
+	//
+	// 3. request run
+}
+
+func (ps *Server) checkPRComments() {
+	// 1. check if user requested run
+	// if yes:
+	//
+	// 2. request run
+}
+
+// func (ps *Server) getPendingPlans(ctx context.Context, planRequests *map[string]*tfaplv1beta1.Request, pr pr, repo gitHubRepo, prModules []tfaplv1beta1.Module) {
+// 	if ps.isNewPR(pr.Comments.Nodes) {
+// 		for _, module := range prModules {
+// 			annotated, err := ps.isModuleAnnotated(ctx, module.NamespacedName())
+// 			if err != nil {
+// 				ps.Log.Error("error retreiving module annotation", err)
+// 			}
+//
+// 			if annotated {
+// 				continue // Skip annotated modules
+// 			}
+//
+// 			ps.addNewRequest(ctx, planRequests, module, pr, repo)
+// 			ps.Log.Debug("new pr found. creating new plan request", "namespace", module.ObjectMeta.Namespace, "module", module.Name)
+// 		}
+// 		return
+// 	}
+//
+// 	ps.checkLastPRCommit(ctx, planRequests, pr, repo, prModules)
+// 	ps.analysePRCommentsForRun(ctx, planRequests, pr, repo, prModules)
+// }
+
 func (ps *Server) pathBelongsToModule(pathList []string, module tfaplv1beta1.Module) bool {
 	for _, path := range pathList {
 		if strings.Contains(path, module.Spec.Path) {

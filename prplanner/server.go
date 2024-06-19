@@ -128,22 +128,67 @@ func (ps *Server) Start(ctx context.Context) {
 				// Loop through all open PRs
 				for _, pr := range response.Data.Repository.PullRequests.Nodes {
 
+					// 1. Verify if pr belongs to module based on files changed
 					prModules, err := ps.getPRModuleList(pr.Files.Nodes, kubeModuleList)
 					if err != nil {
 						ps.Log.Error("error getting a list of modules in PR", err)
 					}
 
-					planRequests := make(map[string]*tfaplv1beta1.Request)
-					ps.getPendingPlans(ctx, &planRequests, pr, repo, prModules)
-					ps.requestPlan(ctx, &planRequests, pr, repo)
+					// 2. compare remote and local repos last commit hashes
+					upToDate, err := ps.isLocalRepoUpToDate(pr)
+					if err != nil {
+						ps.Log.Error("error fetching local repo last commit hash", err)
+					}
 
-					var outputs []output
-					outputs = ps.getPendinPRUpdates(ctx, outputs, pr, prModules)
-					ps.postPlanOutput(outputs)
+					if !upToDate {
+						break // skip as local repo isn't yet in sync with the remote
+					}
+
+					// 3. loop through pr modules
+					for _, module := range prModules {
+						ps.actionOnPRModule(ctx, module)
+					}
+
+					// planRequests := make(map[string]*tfaplv1beta1.Request)
+					// ps.getPendingPlans(ctx, &planRequests, pr, repo, prModules)
+					// ps.requestPlan(ctx, &planRequests, pr, repo)
+					//
+					// var outputs []output
+					// outputs = ps.getPendinPRUpdates(ctx, outputs, pr, prModules)
+					// ps.postPlanOutput(outputs)
 				}
 			}
 		}
 	}
+}
+
+func (ps *Server) actionOnPRModule(ctx context.Context, module tfaplv1beta1.Module) {
+
+	fmt.Println("module:", module.Name)
+
+	// 1. look for pending plan requests
+	planRequests := make(map[string]*tfaplv1beta1.Request)
+	ps.getPendingPlans(ctx, &planRequests, pr, repo, prModules)
+	ps.requestPlan(ctx, &planRequests, pr, repo)
+
+	// 2. look for pending outputs
+	var outputs []output
+	outputs = ps.getPendinPRUpdates(ctx, outputs, pr, prModules)
+	ps.postPlanOutput(outputs)
+}
+
+func (ps *Server) isLocalRepoUpToDate(pr pr) (bool, error) {
+	prLastCommitHash := pr.Commits.Nodes[0].Commit.Oid
+	localRepoCommitHash, err := ps.Repos.Hash(ctx, module.Spec.RepoURL, pr.HeadRefName, module.Spec.Path)
+	if err != nil {
+		return false, nil
+	}
+
+	if prLastCommitHash != localRepoCommitHash {
+		return false, nil
+	}
+
+	return true, nil
 }
 
 func (ps *Server) getKubeModuleList(ctx context.Context) ([]tfaplv1beta1.Module, error) {
