@@ -145,36 +145,23 @@ func (ps *Server) Start(ctx context.Context) {
 					}
 
 					// 3. loop through pr modules
-					for _, module := range prModules {
-						ps.actionOnPRModule(ctx, module)
-					}
-
-					// planRequests := make(map[string]*tfaplv1beta1.Request)
-					// ps.getPendingPlans(ctx, &planRequests, pr, repo, prModules)
-					// ps.requestPlan(ctx, &planRequests, pr, repo)
-					//
-					// var outputs []output
-					// outputs = ps.getPendinPRUpdates(ctx, outputs, pr, prModules)
-					// ps.postPlanOutput(outputs)
+					ps.actionOnPRModules(ctx, repo, pr, prModules)
 				}
 			}
 		}
 	}
 }
 
-func (ps *Server) actionOnPRModule(ctx context.Context, module tfaplv1beta1.Module) {
+func (ps *Server) actionOnPRModules(ctx context.Context, repo gitHubRepo, pr pr, prModules []tfaplv1beta1.Module) {
 
-	fmt.Println("module:", module.Name)
+	for _, module := range prModules {
+		fmt.Println("module:", module.Name)
 
-	// 1. look for pending plan requests
-	planRequests := make(map[string]*tfaplv1beta1.Request)
-	ps.getPendingPlans(ctx, &planRequests, pr, repo, prModules)
-	ps.requestPlan(ctx, &planRequests, pr, repo)
-
-	// 2. look for pending outputs
-	var outputs []output
-	outputs = ps.getPendinPRUpdates(ctx, outputs, pr, prModules)
-	ps.postPlanOutput(outputs)
+		// 1. look for pending plan requests
+		ps.servePlanRequests(ctx, repo, pr, module)
+		// 2. look for pending outputs
+		ps.serveOutputRequests(ctx, repo, pr, module)
+	}
 }
 
 func (ps *Server) isLocalRepoUpToDate(pr pr) (bool, error) {
@@ -240,7 +227,7 @@ func (ps *Server) getOpenPullRequests(ctx context.Context, repoOwner, repoName s
 				nodes {
 					number
 					headRefName
-					commits(last: 1) {
+					commits(last: 20) {
 						nodes {
 							commit {
 								oid

@@ -13,52 +13,61 @@ import (
 	tfaplv1beta1 "github.com/utilitywarehouse/terraform-applier/api/v1beta1"
 )
 
-func (ps *Server) getPendinPRUpdates(ctx context.Context, outputs []output, pr pr, prModules []tfaplv1beta1.Module) []output {
+func (ps *Server) serveOutputRequests(ctx context.Context, repo gitHubRepo, pr pr, module tfaplv1beta1.Module) {
+	outputs := ps.getPendinPRUpdates(ctx, pr, module)
+
+	for _, output := range outputs {
+		ps.postPlanOutput(output)
+	}
+}
+
+func (ps *Server) getPendinPRUpdates(ctx context.Context, pr pr, module tfaplv1beta1.Module) []output {
+	var outputs []output
 	// Go through PR comments in reverse order
-	for _, module := range prModules {
-
-		for i := len(pr.Comments.Nodes) - 1; i >= 0; i-- {
-			comment := pr.Comments.Nodes[i]
-
-			if strings.Contains(comment.Body, "Received terraform plan request") {
-				prCommentModule, prCommentReqID, err := ps.findModuleNameInComment(comment.Body)
-				if err != nil {
-					ps.Log.Error("error getting module name and req ID from PR comment", err)
-					return nil
-				}
-
-				if module.Name == prCommentModule {
-					planOutput, err := ps.getPlanOutputFromRedis(ctx, module, prCommentReqID, pr)
-					if err != nil {
-						ps.Log.Error("can't check plan output in Redis:", err)
-						break
-					}
-
-					if planOutput == "" {
-						break // plan output is not ready yet
-					}
-
-					commentBody := prComment{
-						Body: fmt.Sprintf(
-							"Terraform plan output for module `%s`\n```terraform\n%s\n```",
-							module.Name,
-							planOutput,
-						),
-					}
-					newOutput := output{
-						module:    module,
-						commentID: comment.DatabaseID,
-						prNumber:  pr.Number,
-						body:      commentBody,
-					}
-					outputs = append(outputs, newOutput)
-					break
-				}
-			}
-		}
+	for i := len(pr.Comments.Nodes) - 1; i >= 0; i-- {
+		comment := pr.Comments.Nodes[i]
+		ps.checkPRCommentsForOutputRequests(ctx, &outputs, pr, comment, module)
 	}
 
 	return outputs
+}
+
+func (ps *Server) checkPRCommentsForOutputRequests(ctx context.Context, outputs *[]output, pr pr, comment prComment, module tfaplv1beta1.Module) {
+
+	if strings.Contains(comment.Body, "Received terraform plan request") {
+		prCommentModule, prCommentReqID, err := ps.findModuleNameInComment(comment.Body)
+		if err != nil {
+			ps.Log.Error("error getting module name and req ID from PR comment", err)
+			return
+		}
+
+		if module.Name == prCommentModule {
+			planOutput, err := ps.getPlanOutputFromRedis(ctx, pr, prCommentReqID, module)
+			if err != nil {
+				ps.Log.Error("can't check plan output in Redis:", err)
+				return
+			}
+
+			if planOutput == "" {
+				return // plan output is not ready yet
+			}
+
+			commentBody := prComment{
+				Body: fmt.Sprintf(
+					"Terraform plan output for module `%s`\n```terraform\n%s\n```",
+					module.Name,
+					planOutput,
+				),
+			}
+			newOutput := output{
+				module:    module,
+				commentID: comment.DatabaseID,
+				prNumber:  pr.Number,
+				body:      commentBody,
+			}
+			*outputs = append(*outputs, newOutput)
+		}
+	}
 }
 
 func (ps *Server) findModuleNameInComment(commentBody string) (string, string, error) {
@@ -81,16 +90,14 @@ func (ps *Server) findModuleNameInComment(commentBody string) (string, string, e
 	return "", "", fmt.Errorf("module data not found")
 }
 
-func (ps *Server) postPlanOutput(outputs []output) {
-	for _, output := range outputs {
-		_, err := ps.postToGitHub(output.module.Spec.RepoURL, "PATCH", output.commentID, output.prNumber, output.body)
-		if err != nil {
-			ps.Log.Error("error posting PR comment:", err)
-		}
+func (ps *Server) postPlanOutput(output output) {
+	_, err := ps.postToGitHub(output.module.Spec.RepoURL, "PATCH", output.commentID, output.prNumber, output.body)
+	if err != nil {
+		ps.Log.Error("error posting PR comment:", err)
 	}
 }
 
-func (ps *Server) getPlanOutputFromRedis(ctx context.Context, module tfaplv1beta1.Module, prCommentReqID string, pr pr) (string, error) {
+func (ps *Server) getPlanOutputFromRedis(ctx context.Context, pr pr, prCommentReqID string, module tfaplv1beta1.Module) (string, error) {
 	lastRun, err := ps.RedisClient.PRLastRun(ctx, module.NamespacedName(), pr.Number)
 	if err != nil {
 		return "", err

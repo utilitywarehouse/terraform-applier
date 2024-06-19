@@ -14,7 +14,13 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
-func (ps *Server) getPendingPlans(ctx context.Context, planRequests *map[string]*tfaplv1beta1.Request, pr pr, repo gitHubRepo, prModules []tfaplv1beta1.Module) {
+func (ps *Server) servePlanRequests(ctx context.Context, repo gitHubRepo, pr pr, module tfaplv1beta1.Module) {
+	planRequests := make(map[string]*tfaplv1beta1.Request)
+	ps.getPendingPlans(ctx, &planRequests, repo, pr, module)
+	ps.requestPlan(ctx, &planRequests, pr, repo)
+}
+
+func (ps *Server) getPendingPlans(ctx context.Context, planRequests *map[string]*tfaplv1beta1.Request, repo gitHubRepo, pr pr, module tfaplv1beta1.Module) {
 	// 1. Check if module is annotated
 	annotated, err := ps.isModuleAnnotated(ctx, module.NamespacedName())
 	if err != nil {
@@ -22,37 +28,96 @@ func (ps *Server) getPendingPlans(ctx context.Context, planRequests *map[string]
 	}
 
 	if annotated {
-		break // no need to proceed if there's already a plan request for the module
+		return // no need to proceed if there's already a plan request for the module
 	}
 
-	planRequests := make(map[string]*tfaplv1beta1.Request)
 	// 2. loop through commits from latest to oldest
-	ps.checkPRCommits(ctx, &planRequests)
+	ps.checkPRCommits(ctx, planRequests, repo, pr, module)
 
 	// 3. loop through comments
-	var outputs []output
-	ps.checkPRComments(ctx, outputs, pr, prModules)
+	ps.checkPRCommentsForPlanRequests(ctx, planRequests, pr, repo, module)
 
 }
 
-func (ps *Server) checkPRCommits() {
-	// 0. check comments if output posted for the commit hash
-	// if no comment posted:
-	//
-	// 1. check commit hashes in redis
-	// if missing:
-	//
-	// 2. verify module needs to be planned based on files changed
-	// if matching:
-	//
-	// 3. request run
+func (ps *Server) checkPRCommits(ctx context.Context, planRequests *map[string]*tfaplv1beta1.Request, repo gitHubRepo, pr pr, module tfaplv1beta1.Module) {
+	for i := len(pr.Commits.Nodes) - 1; i >= 0; i-- {
+		commit := pr.Commits.Nodes[i].Commit
+
+		// 0. check comments if output posted for the commit hash
+		outputPosted := ps.commentPostedForCommit(pr, commit.Oid)
+		if outputPosted {
+			return
+		}
+
+		// 1. check commit hashes in redis
+		runOutput := ps.getPlanOutputFromRedis(ctx, commit, module) // TODO: Change the format of objects stored in Redis first :lastRun -> :<commit hash>
+		if runOutput != "" {
+			return
+		}
+
+		// 2. verify module needs to be planned based on files changed
+		commitBelongsToModule, err := ps.doesCommitBelongToModule(repo, commit.Oid, module)
+		if err != nil {
+			ps.Log.Error("", err)
+		}
+		if !commitBelongsToModule {
+			return
+		}
+
+		// 3. request run
+		ps.addNewRequest(ctx, planRequests, module, pr, repo)
+	}
 }
 
-func (ps *Server) checkPRComments() {
-	// 1. check if user requested run
-	// if yes:
-	//
-	// 2. request run
+func (ps *Server) commentPostedForCommit(pr pr, commitID string) bool {
+	for i := len(pr.Comments.Nodes) - 1; i >= 0; i-- {
+		comment := pr.Comments.Nodes[i]
+
+		if strings.Contains(comment.Body, commitID) {
+			return true
+		}
+	}
+
+	return false
+}
+
+func (ps *Server) doesCommitBelongToModule(repo gitHubRepo, commitHash string, module tfaplv1beta1.Module) (bool, error) {
+
+	filesChangedInCommit, err := ps.getCommitFilesChanged(repo.name, commitHash)
+	if err != nil {
+		return false, fmt.Errorf("error getting commit info: %w", err)
+	}
+
+	moduleUpdated := ps.pathBelongsToModule(filesChangedInCommit, module)
+	if !moduleUpdated {
+		return false, nil
+	}
+
+	return true, nil
+}
+
+func (ps *Server) checkPRCommentsForPlanRequests(ctx context.Context, planRequests *map[string]*tfaplv1beta1.Request, pr pr, repo gitHubRepo, module tfaplv1beta1.Module) {
+	// TODO: Allow users manually request plan runs for PRs with a large number of modules,
+	// but only ONE module at a time
+
+	// Go through PR comments in reverse order
+	for i := len(pr.Comments.Nodes) - 1; i >= 0; i-- {
+		comment := pr.Comments.Nodes[i]
+
+		// Check if user requested terraform plan run
+		if strings.Contains(comment.Body, "@terraform-applier plan") {
+			// Give users ability to request plan for all modules or just one
+			// terraform-applier plan [`<module name>`]
+			prCommentModule, _, _ := ps.findModuleNameInComment(comment.Body)
+
+			if prCommentModule != "" && module.Name != prCommentModule {
+				break
+			}
+
+			ps.addNewRequest(ctx, planRequests, module, pr, repo)
+			ps.Log.Debug("new plan request received. creating new plan request", "namespace", module.ObjectMeta.Namespace, "module", module.Name)
+		}
+	}
 }
 
 // func (ps *Server) getPendingPlans(ctx context.Context, planRequests *map[string]*tfaplv1beta1.Request, pr pr, repo gitHubRepo, prModules []tfaplv1beta1.Module) {
