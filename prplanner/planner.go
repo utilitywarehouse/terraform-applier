@@ -2,7 +2,6 @@ package prplanner
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"time"
 
@@ -72,22 +71,20 @@ func (ps *Planner) Start(ctx context.Context) {
 
 				// Loop through all open PRs
 				for _, pr := range prs {
-					fmt.Println("§§§ pr:", pr.Number)
-
-					// 1. compare PR and local repos last commit hashes
-					if !ps.isLocalRepoUpToDate(ctx, repoConf.Remote, pr) {
-						// skip as local repo isn't yet in sync with the remote
-						continue
-					}
-
-					// 2. Verify if pr belongs to module based on files changed
+					// 1. Verify if pr belongs to module based on files changed
 					prModules, err := ps.getPRModuleList(pr.Files.Nodes, kubeModuleList)
 					if err != nil {
 						ps.Log.Error("error getting a list of modules in PR", err)
 					}
 
 					if len(prModules) == 0 {
-						// this is non-module PR
+						// no modules are affected by this PR
+						continue
+					}
+
+					// 2. compare PR and local repos last commit hashes
+					if !ps.isLocalRepoUpToDate(ctx, repoConf.Remote, pr) {
+						// skip as local repo isn't yet in sync with the remote
 						continue
 					}
 
