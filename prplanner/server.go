@@ -14,6 +14,7 @@ import (
 
 	"github.com/go-resty/resty/v2"
 
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -78,7 +79,7 @@ type prFiles []struct {
 }
 
 type output struct {
-	module    tfaplv1beta1.Module
+	module    types.NamespacedName
 	body      prComment
 	commentID int
 	prNumber  int
@@ -128,22 +129,56 @@ func (ps *Server) Start(ctx context.Context) {
 				// Loop through all open PRs
 				for _, pr := range response.Data.Repository.PullRequests.Nodes {
 
+					// 1. Verify if pr belongs to module based on files changed
 					prModules, err := ps.getPRModuleList(pr.Files.Nodes, kubeModuleList)
 					if err != nil {
 						ps.Log.Error("error getting a list of modules in PR", err)
 					}
 
-					planRequests := make(map[string]*tfaplv1beta1.Request)
-					ps.getPendingPlans(ctx, &planRequests, pr, repo, prModules)
-					ps.requestPlan(ctx, &planRequests, pr, repo)
+					// 2. compare remote and local repos last commit hashes
+					upToDate, err := ps.isLocalRepoUpToDate(ctx, repo, pr)
+					if err != nil {
+						ps.Log.Error("error fetching local repo last commit hash", err)
+					}
 
-					var outputs []output
-					outputs = ps.getPendinPRUpdates(ctx, outputs, pr, prModules)
-					ps.postPlanOutput(outputs)
+					if !upToDate {
+						break // skip as local repo isn't yet in sync with the remote
+					}
+
+					// 3. loop through pr modules
+					ps.actionOnPRModules(ctx, repo, pr, prModules)
 				}
 			}
 		}
 	}
+}
+
+func (ps *Server) actionOnPRModules(ctx context.Context, repo gitHubRepo, pr pr, prModules []tfaplv1beta1.Module) {
+
+	for _, module := range prModules {
+		fmt.Println("module:", module.Name)
+
+		// 1. look for pending plan requests
+		ps.servePlanRequests(ctx, repo, pr, module)
+	}
+
+	// 2. look for pending outputs
+	ps.serveOutputRequests(ctx, repo, pr)
+}
+
+func (ps *Server) isLocalRepoUpToDate(ctx context.Context, repo gitHubRepo, pr pr) (bool, error) {
+	repoURL := "git@github.com:" + repo.owner + "/" + repo.name + ".git"
+	prLastCommitHash := pr.Commits.Nodes[0].Commit.Oid
+	localRepoCommitHash, err := ps.Repos.Hash(ctx, repoURL, pr.HeadRefName, ".")
+	if err != nil {
+		return false, nil
+	}
+
+	if prLastCommitHash != localRepoCommitHash {
+		return false, nil
+	}
+
+	return true, nil
 }
 
 func (ps *Server) getKubeModuleList(ctx context.Context) ([]tfaplv1beta1.Module, error) {
@@ -195,7 +230,7 @@ func (ps *Server) getOpenPullRequests(ctx context.Context, repoOwner, repoName s
 				nodes {
 					number
 					headRefName
-					commits(last: 1) {
+					commits(last: 20) {
 						nodes {
 							commit {
 								oid

@@ -21,13 +21,13 @@ var (
 type RedisInterface interface {
 	DefaultLastRun(ctx context.Context, module types.NamespacedName) (*tfaplv1beta1.Run, error)
 	DefaultApply(ctx context.Context, module types.NamespacedName) (*tfaplv1beta1.Run, error)
-	PRLastRun(ctx context.Context, module types.NamespacedName, pr int) (*tfaplv1beta1.Run, error)
+	PRRun(ctx context.Context, module types.NamespacedName, pr int, hash string) (*tfaplv1beta1.Run, error)
 	Runs(ctx context.Context, module types.NamespacedName) ([]*tfaplv1beta1.Run, error)
 	GetCommitHash(ctx context.Context, key string) (string, error)
 
 	SetDefaultLastRun(ctx context.Context, run *tfaplv1beta1.Run) error
 	SetDefaultApply(ctx context.Context, run *tfaplv1beta1.Run) error
-	SetPRLastRun(ctx context.Context, run *tfaplv1beta1.Run) error
+	SetPRRun(ctx context.Context, run *tfaplv1beta1.Run) error
 }
 
 type Redis struct {
@@ -46,8 +46,8 @@ func defaultLastApplyKey(module types.NamespacedName) string {
 	return fmt.Sprintf("%sdefault:lastApply", keyPrefix(module))
 }
 
-func DefaultPRLastRunsKey(module types.NamespacedName, pr int) string {
-	return fmt.Sprintf("%sPR:%d:lastRun", keyPrefix(module), pr)
+func DefaultPRLastRunsKey(module types.NamespacedName, pr int, hash string) string {
+	return fmt.Sprintf("%sPR:%d:%s", keyPrefix(module), pr, hash)
 }
 
 // DefaultLastRun will return last run result for the default branch
@@ -61,8 +61,8 @@ func (r Redis) DefaultApply(ctx context.Context, module types.NamespacedName) (*
 }
 
 // PRLastRun will return last run result for the given PR branch
-func (r Redis) PRLastRun(ctx context.Context, module types.NamespacedName, pr int) (*tfaplv1beta1.Run, error) {
-	return r.getKV(ctx, DefaultPRLastRunsKey(module, pr))
+func (r Redis) PRRun(ctx context.Context, module types.NamespacedName, pr int, hash string) (*tfaplv1beta1.Run, error) {
+	return r.getKV(ctx, DefaultPRLastRunsKey(module, pr, hash))
 }
 
 // Runs will return all the runs stored for the given module
@@ -94,9 +94,9 @@ func (r Redis) SetDefaultApply(ctx context.Context, run *tfaplv1beta1.Run) error
 	return r.setKV(ctx, defaultLastApplyKey(run.Module), run, 0)
 }
 
-// SetPRLastRun puts given run in to cache with expiration
-func (r Redis) SetPRLastRun(ctx context.Context, run *tfaplv1beta1.Run) error {
-	return r.setKV(ctx, DefaultPRLastRunsKey(run.Module, run.Request.PR.Number), run, PRKeyExpirationDur)
+// SetPRRun puts given run in to cache with expiration
+func (r Redis) SetPRRun(ctx context.Context, run *tfaplv1beta1.Run) error {
+	return r.setKV(ctx, DefaultPRLastRunsKey(run.Module, run.Request.PR.Number, run.CommitHash), run, PRKeyExpirationDur)
 }
 
 func (r Redis) setKV(ctx context.Context, key string, run *tfaplv1beta1.Run, exp time.Duration) error {

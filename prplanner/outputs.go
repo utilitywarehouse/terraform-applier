@@ -10,136 +10,127 @@ import (
 	"regexp"
 	"strings"
 
-	tfaplv1beta1 "github.com/utilitywarehouse/terraform-applier/api/v1beta1"
+	"k8s.io/apimachinery/pkg/types"
 )
 
-func (ps *Server) getPendingPlans(ctx context.Context, planRequests *map[string]*tfaplv1beta1.Request, pr pr, repo gitHubRepo, prModules []tfaplv1beta1.Module) {
-	if ps.isNewPR(pr.Comments.Nodes) {
-		for _, module := range prModules {
-			annotated, err := ps.isModuleAnnotated(ctx, module.NamespacedName())
-			if err != nil {
-				ps.Log.Error("error retreiving module annotation", err)
-			}
+func (ps *Server) serveOutputRequests(ctx context.Context, repo gitHubRepo, pr pr) {
+	outputs := ps.getPendinPRUpdates(ctx, pr)
 
-			if annotated {
-				continue // Skip annotated modules
-			}
-
-			ps.addNewRequest(ctx, planRequests, module, pr, repo)
-			ps.Log.Debug("new pr found. creating new plan request", "namespace", module.ObjectMeta.Namespace, "module", module.Name)
-		}
-		return
+	for _, output := range outputs {
+		ps.postPlanOutput(output, repo)
 	}
-
-	ps.checkLastPRCommit(ctx, planRequests, pr, repo, prModules)
-	ps.analysePRCommentsForRun(ctx, planRequests, pr, repo, prModules)
 }
 
-func (ps *Server) getPendinPRUpdates(ctx context.Context, outputs []output, pr pr, prModules []tfaplv1beta1.Module) []output {
+func (ps *Server) getPendinPRUpdates(ctx context.Context, pr pr) []output {
+	var outputs []output
 	// Go through PR comments in reverse order
-	for _, module := range prModules {
-
-		for i := len(pr.Comments.Nodes) - 1; i >= 0; i-- {
-			comment := pr.Comments.Nodes[i]
-
-			if strings.Contains(comment.Body, "Received terraform plan request") {
-				prCommentModule, prCommentReqID, err := ps.findModuleNameInComment(comment.Body)
-				if err != nil {
-					ps.Log.Error("error getting module name and req ID from PR comment", err)
-					return nil
-				}
-
-				if module.Name == prCommentModule {
-					planOutput, err := ps.getPlanOutputFromRedis(ctx, module, prCommentReqID, pr)
-					if err != nil {
-						ps.Log.Error("can't check plan output in Redis:", err)
-						break
-					}
-
-					if planOutput == "" {
-						break // plan output is not ready yet
-					}
-
-					commentBody := prComment{
-						Body: fmt.Sprintf(
-							"Terraform plan output for module `%s`\n```terraform\n%s\n```",
-							module.Name,
-							planOutput,
-						),
-					}
-					newOutput := output{
-						module:    module,
-						commentID: comment.DatabaseID,
-						prNumber:  pr.Number,
-						body:      commentBody,
-					}
-					outputs = append(outputs, newOutput)
-					break
-				}
-			}
-		}
+	for i := len(pr.Comments.Nodes) - 1; i >= 0; i-- {
+		comment := pr.Comments.Nodes[i]
+		ps.checkPRCommentsForOutputRequests(ctx, &outputs, pr, comment)
 	}
 
 	return outputs
 }
 
-func (ps *Server) findModuleNameInComment(commentBody string) (string, string, error) {
+func (ps *Server) checkPRCommentsForOutputRequests(ctx context.Context, outputs *[]output, pr pr, comment prComment) {
+
+	if strings.Contains(comment.Body, "Received terraform plan request") {
+		prCommentModule, err := ps.findModuleNameInComment(comment.Body)
+		if err != nil {
+			ps.Log.Error("error getting module name and req ID from PR comment", err)
+			return
+		}
+
+		// if module.Name == prCommentModule {
+		planOutput, err := ps.getPlanOutputFromRedis(ctx, pr, "", prCommentModule)
+		if err != nil {
+			ps.Log.Error("can't check plan output in Redis:", err)
+			return
+		}
+
+		if planOutput == "" {
+			return // plan output is not ready yet
+		}
+
+		commentBody := prComment{
+			Body: fmt.Sprintf(
+				"Terraform plan output for module `%s`\n```terraform\n%s\n```",
+				prCommentModule,
+				planOutput,
+			),
+		}
+		newOutput := output{
+			module:    prCommentModule,
+			commentID: comment.DatabaseID,
+			prNumber:  pr.Number,
+			body:      commentBody,
+		}
+		*outputs = append(*outputs, newOutput)
+		// }
+	}
+}
+
+// TODO: move re1 outside of func
+func (ps *Server) findModuleNameInComment(commentBody string) (types.NamespacedName, error) {
 	// Search for module name and req ID
 	re1 := regexp.MustCompile(`Module: ` + "`" + `(.+?)` + "`" + ` Request ID: ` + "`" + `(.+?)` + "`")
-	matches1 := re1.FindStringSubmatch(commentBody)
 
-	if len(matches1) == 3 {
-		return matches1[1], matches1[2], nil
+	matches := re1.FindStringSubmatch(commentBody)
+
+	if len(matches) == 3 {
+		namespacedName := strings.Split(matches[1], "/")
+		return types.NamespacedName{Namespace: namespacedName[0], Name: namespacedName[1]}, nil
+
 	}
 
+	return types.NamespacedName{}, nil
+}
+
+func (ps *Server) findModuleNameInRunRequestComment(commentBody string) (string, error) {
+	// TODO: Match "@terraform-applier plan "
 	// Search for module name only
 	re2 := regexp.MustCompile("`([^`]*)`")
-	matches2 := re2.FindStringSubmatch(commentBody)
+	matches := re2.FindStringSubmatch(commentBody)
 
-	if len(matches2) > 1 {
-		return matches2[1], "", nil
+	if len(matches) > 1 {
+		return matches[1], nil
 	}
 
-	return "", "", fmt.Errorf("module data not found")
+	return "", fmt.Errorf("module data not found")
 }
 
-func (ps *Server) postPlanOutput(outputs []output) {
-	for _, output := range outputs {
-		_, err := ps.postToGitHub(output.module.Spec.RepoURL, "PATCH", output.commentID, output.prNumber, output.body)
-		if err != nil {
-			ps.Log.Error("error posting PR comment:", err)
-		}
+func (ps *Server) postPlanOutput(output output, repo gitHubRepo) {
+	_, err := ps.postToGitHub(repo, "PATCH", output.commentID, output.prNumber, output.body)
+	if err != nil {
+		ps.Log.Error("error posting PR comment:", err)
 	}
 }
 
-func (ps *Server) getPlanOutputFromRedis(ctx context.Context, module tfaplv1beta1.Module, prCommentReqID string, pr pr) (string, error) {
-	lastRun, err := ps.RedisClient.PRLastRun(ctx, module.NamespacedName(), pr.Number)
+func (ps *Server) getPlanOutputFromRedis(ctx context.Context, pr pr, prCommentReqID string, module types.NamespacedName) (string, error) {
+	moduleRuns, err := ps.RedisClient.Runs(ctx, module)
 	if err != nil {
 		return "", err
 	}
 
-	if lastRun == nil {
-		return "", nil
-	}
-
-	if prCommentReqID == lastRun.Request.ID {
-		return lastRun.Output, nil
+	for _, run := range moduleRuns {
+		if run.Request.ID == prCommentReqID {
+			return run.Output, nil
+		}
 	}
 
 	return "", nil
 }
-func (ps *Server) postToGitHub(repoURL, method string, commentID, prNumber int, commentBody prComment) (int, error) {
+
+func (ps *Server) postToGitHub(repo gitHubRepo, method string, commentID, prNumber int, commentBody prComment) (int, error) {
 	// TODO: Update credentials
 	// Temporarily using my own github user and token
 	username := "DTLP"
 	token := os.Getenv("GITHUB_TOKEN")
 
-	repoName := repoNameFromURL(repoURL)
-
 	// Post a comment
-	url := fmt.Sprintf("https://api.github.com/repos/%s/issues/%d/comments", repoName, prNumber)
+	url := fmt.Sprintf("https://api.github.com/repos/%s/%s/issues/%d/comments", repo.owner, repo.name, prNumber)
 	if method == "PATCH" {
-		url = fmt.Sprintf("https://api.github.com/repos/%s/issues/comments/%d", repoName, commentID)
+		url = fmt.Sprintf("https://api.github.com/repos/%s/%/issues/comments/%d", repo.owner, repo.name, commentID)
 	}
 
 	// Marshal the comment object to JSON
@@ -183,11 +174,11 @@ func (ps *Server) postToGitHub(repoURL, method string, commentID, prNumber int, 
 	return commentResponse.ID, nil
 }
 
-func repoNameFromURL(url string) string {
-	trimmedURL := strings.TrimSuffix(url, ".git")
-	parts := strings.Split(trimmedURL, ":")
-	if len(parts) < 2 {
-		return ""
-	}
-	return parts[1]
-}
+// func repoNameFromURL(url string) string {
+// 	trimmedURL := strings.TrimSuffix(url, ".git")
+// 	parts := strings.Split(trimmedURL, ":")
+// 	if len(parts) < 2 {
+// 		return ""
+// 	}
+// 	return parts[1]
+// }
