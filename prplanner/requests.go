@@ -10,9 +10,6 @@ import (
 	tfaplv1beta1 "github.com/utilitywarehouse/terraform-applier/api/v1beta1"
 	"github.com/utilitywarehouse/terraform-applier/sysutil"
 
-	"github.com/go-git/go-git/v5"
-	"github.com/go-git/go-git/v5/plumbing"
-
 	"k8s.io/apimachinery/pkg/types"
 )
 
@@ -88,7 +85,7 @@ func (ps *Planner) checkPRCommits(ctx context.Context, repo *mirror.GitURL, pr p
 		commit := pr.Commits.Nodes[i].Commit
 
 		// 1. check if module path is updated in this commit
-		updated, err := ps.doesCommitBelongToModule(repo, commit.Oid, module)
+		updated, err := ps.isModuleUpdated(ctx, commit.Oid, module)
 		if err != nil {
 			return false, err
 		}
@@ -149,19 +146,13 @@ func (ps *Planner) commentPostedForCommit(pr pr, commitID string, module types.N
 	return false
 }
 
-func (ps *Planner) doesCommitBelongToModule(repo *mirror.GitURL, commitHash string, module tfaplv1beta1.Module) (bool, error) {
-
-	filesChangedInCommit, err := ps.getCommitFilesChanged(repo.Repo, commitHash)
+func (ps *Planner) isModuleUpdated(ctx context.Context, commitHash string, module tfaplv1beta1.Module) (bool, error) {
+	filesChangedInCommit, err := ps.Repos.ChangedFiles(ctx, module.Spec.RepoURL, commitHash)
 	if err != nil {
 		return false, fmt.Errorf("error getting commit info: %w", err)
 	}
 
-	moduleUpdated := ps.pathBelongsToModule(filesChangedInCommit, module)
-	if !moduleUpdated {
-		return false, nil
-	}
-
-	return true, nil
+	return pathBelongsToModule(filesChangedInCommit, module), nil
 }
 
 func (ps *Planner) checkPRCommentsForPlanRequests(ctx context.Context, pr pr, repo *mirror.GitURL, module tfaplv1beta1.Module) (bool, error) {
@@ -214,15 +205,6 @@ func (ps *Planner) checkPRCommentsForPlanRequests(ctx context.Context, pr pr, re
 // 	ps.checkLastPRCommit(ctx, planRequests, pr, repo, prModules)
 // 	ps.analysePRCommentsForRun(ctx, planRequests, pr, repo, prModules)
 // }
-
-func (ps *Planner) pathBelongsToModule(pathList []string, module tfaplv1beta1.Module) bool {
-	for _, path := range pathList {
-		if strings.Contains(path, module.Spec.Path) {
-			return true
-		}
-	}
-	return false
-}
 
 // func (ps *Server) isNewPR(prComments []prComment) bool {
 // 	// A PR is considered new when there are no comments posted by terraform-applier
@@ -312,32 +294,6 @@ func (ps *Planner) addNewRequest(ctx context.Context, module tfaplv1beta1.Module
 // 		}
 // 	}
 // }
-
-func (ps *Planner) getCommitFilesChanged(repoName, commitHash string) ([]string, error) {
-	// TODO: Replace go-git package with git command
-	repoPath := "/tmp/src/" + repoName + ".git" // TODO: Replace with REPOS_ROOT_PATH var
-	githubRepo, err := git.PlainOpen(repoPath)
-	if err != nil {
-		return nil, fmt.Errorf("%w", err)
-	}
-
-	commit, err := githubRepo.CommitObject(plumbing.NewHash(commitHash))
-	if err != nil {
-		return nil, fmt.Errorf("commit hash provided not found")
-	}
-
-	files, err := commit.Stats()
-	if err != nil {
-		return nil, fmt.Errorf("error getting commmit stats")
-	}
-
-	var filesChanged []string
-	for _, file := range files {
-		filesChanged = append(filesChanged, file.Name)
-	}
-
-	return filesChanged, nil
-}
 
 // func (ps *Server) analysePRCommentsForRun(ctx context.Context, planRequests *map[string]*tfaplv1beta1.Request, pr pr, repo *mirror.GitURL, prModules []tfaplv1beta1.Module) {
 // 	for _, module := range prModules {

@@ -3,6 +3,7 @@ package prplanner
 import (
 	"context"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/utilitywarehouse/git-mirror/pkg/mirror"
@@ -118,10 +119,19 @@ func (ps *Planner) getPRModuleList(prFiles prFiles, kubeModules *tfaplv1beta1.Mo
 	var modulesUpdated []types.NamespacedName
 
 	for _, kubeModule := range kubeModules.Items {
-		if ps.pathBelongsToModule(pathList, kubeModule) {
+		if pathBelongsToModule(pathList, kubeModule) {
 			modulesUpdated = append(modulesUpdated, kubeModule.NamespacedName())
 		}
 	}
 
 	return modulesUpdated, nil
+}
+
+func pathBelongsToModule(pathList []string, module tfaplv1beta1.Module) bool {
+	for _, path := range pathList {
+		if strings.HasPrefix(path, module.Spec.Path) {
+			return true
+		}
+	}
+	return false
 }
