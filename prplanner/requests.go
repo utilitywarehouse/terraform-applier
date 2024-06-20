@@ -13,6 +13,11 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
+var (
+	terraformPlanOutRegex    = regexp.MustCompile("Terraform plan output for module `(.+?)`. Commit ID: `(.+?)`")
+	requestAcknowledgedRegex = regexp.MustCompile("Received terraform plan request. Module: `(.+?)`")
+)
+
 // 3. loop through pr modules:
 //   1. check if modules is annotated
 //   if not:
@@ -95,6 +100,11 @@ func (p *Planner) checkPRCommits(ctx context.Context, repo *mirror.GitURL, pr pr
 			return false, nil
 		}
 
+		requestAcknowledged := p.planRequestAcknowledgedForCommit(pr, module.NamespacedName())
+		if requestAcknowledged {
+			return false, nil
+		}
+
 		// 3. check if run is already completed for this commit
 		_, err = p.RedisClient.PRRun(ctx, module.NamespacedName(), pr.Number, commit.Oid)
 		if err != nil && err.Error() != "unable to get value err:redis: nil" {
@@ -113,16 +123,12 @@ func (p *Planner) planOutputPostedForCommit(pr pr, commitID string, module types
 	for i := len(pr.Comments.Nodes) - 1; i >= 0; i-- {
 		comment := pr.Comments.Nodes[i]
 
-		fmt.Println("§§§ planOutputPostedForCommit()")
-		fmt.Println("§§§ module:", module)
-		fmt.Println("§§§ commit:", commitID)
-
-		searchPattern := fmt.Sprintf("Terraform plan output for module `(%s)`. Commit ID: `(%s)`", module, commitID)
-		re := regexp.MustCompile(searchPattern)
-		matches := re.FindStringSubmatch(comment.Body)
-		fmt.Println("§§§ matches:", matches)
-		fmt.Println("§§§ len(matches):", len(matches))
-		if len(matches) == 3 {
+		matches := terraformPlanOutRegex.FindStringSubmatch(comment.Body)
+		if len(matches) != 3 {
+			return false
+		}
+		// TODO: S1025: should use String() instead of fmt.Sprintf
+		if matches[1] == fmt.Sprintf("%s", module) && matches[2] == commitID {
 			return true
 		}
 	}
@@ -134,10 +140,12 @@ func (p *Planner) planRequestAcknowledgedForCommit(pr pr, module types.Namespace
 	for i := len(pr.Comments.Nodes) - 1; i >= 0; i-- {
 		comment := pr.Comments.Nodes[i]
 
-		searchPattern := fmt.Sprintf("Received terraform plan request. Module: `(%s)`", module)
-		re := regexp.MustCompile(searchPattern)
-		matches := re.FindStringSubmatch(comment.Body)
-		if len(matches) == 2 {
+		matches := requestAcknowledgedRegex.FindStringSubmatch(comment.Body)
+		if len(matches) != 2 {
+			return false
+		}
+		// TODO: S1025: should use String() instead of fmt.Sprintf
+		if matches[1] == fmt.Sprintf("%s", module) {
 			return true
 		}
 	}
