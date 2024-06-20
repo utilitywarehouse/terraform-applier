@@ -75,42 +75,40 @@ func (ps *Planner) Start(ctx context.Context) {
 					fmt.Println("§§§ pr:", pr.Number)
 
 					// 1. compare PR and local repos last commit hashes
-					upToDate, err := ps.isLocalRepoUpToDate(ctx, repoConf.Remote, pr)
+					if !ps.isLocalRepoUpToDate(ctx, repoConf.Remote, pr) {
+						// skip as local repo isn't yet in sync with the remote
+						continue
+					}
+
+					// 2. Verify if pr belongs to module based on files changed
+					prModules, err := ps.getPRModuleList(pr.Files.Nodes, kubeModuleList)
 					if err != nil {
-						ps.Log.Error("error fetching local repo last commit hash", err)
-						return
+						ps.Log.Error("error getting a list of modules in PR", err)
 					}
 
-					if !upToDate {
-						break // skip as local repo isn't yet in sync with the remote
+					if len(prModules) == 0 {
+						// this is non-module PR
+						continue
 					}
 
-					fmt.Println("§§§ local repo is up-to-date")
+					// 1. ensure plan requests
+					ps.ensurePlanRequests(ctx, repo, pr, prModules)
 
-					// 3. loop through pr modules
-					ps.processPR(ctx, repo, pr, kubeModuleList)
+					// 2. look for pending output updates
+					ps.uploadRequestOutput(ctx, repo, pr)
 				}
 			}
 		}
 	}
 }
 
-func (ps *Planner) processPR(ctx context.Context, repo *mirror.GitURL, pr pr, kubeModuleList *tfaplv1beta1.ModuleList) {
-	// 2. Verify if pr belongs to module based on files changed
-	prModules, err := ps.getPRModuleList(pr.Files.Nodes, kubeModuleList)
-	if err != nil {
-		ps.Log.Error("error getting a list of modules in PR", err)
+func (ps *Planner) isLocalRepoUpToDate(ctx context.Context, repo string, pr pr) bool {
+	if len(pr.Comments.Nodes) == 0 {
+		return false
 	}
-	fmt.Println("§§§ got a list of pr modules")
-
-	ps.ensurePlanRequests(ctx, repo, pr, prModules)
-
-	// 2. look for pending outputs
-	ps.uploadRequestOutput(ctx, repo, pr)
-}
-
-func (ps *Planner) isLocalRepoUpToDate(ctx context.Context, repo string, pr pr) (bool, error) {
-	return true, nil
+	latestCommit := pr.Commits.Nodes[len(pr.Comments.Nodes)-1].Commit.Oid
+	err := ps.Repos.ObjectExists(ctx, repo, latestCommit)
+	return err == nil
 }
 
 func (ps *Planner) getPRModuleList(prFiles prFiles, kubeModules *tfaplv1beta1.ModuleList) ([]types.NamespacedName, error) {
