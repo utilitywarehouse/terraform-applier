@@ -12,37 +12,36 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
-func (ps *Planner) uploadRequestOutput(ctx context.Context, repo *mirror.GitURL, pr pr) {
-	outputs := ps.getPendinPRUpdates(ctx, pr)
+func (p *Planner) uploadRequestOutput(ctx context.Context, repo *mirror.GitURL, pr pr) {
+	outputs := p.getPendinPRUpdates(ctx, pr)
 
 	for _, output := range outputs {
-		ps.postPlanOutput(output, repo)
+		p.postPlanOutput(output, repo)
 	}
 }
 
-func (ps *Planner) getPendinPRUpdates(ctx context.Context, pr pr) []output {
+func (p *Planner) getPendinPRUpdates(ctx context.Context, pr pr) []output {
 	var outputs []output
 	// Go through PR comments in reverse order
 	for i := len(pr.Comments.Nodes) - 1; i >= 0; i-- {
 		comment := pr.Comments.Nodes[i]
-		ps.checkPRCommentForOutputRequests(ctx, &outputs, pr, comment)
+		p.checkPRCommentForOutputRequests(ctx, &outputs, pr, comment)
 	}
 
 	return outputs
 }
 
-func (ps *Planner) checkPRCommentForOutputRequests(ctx context.Context, outputs *[]output, pr pr, comment prComment) {
-
-	fmt.Println("§§§ checkPRCommentsForOutputRequests")
+func (p *Planner) checkPRCommentForOutputRequests(ctx context.Context, outputs *[]output, pr pr, comment prComment) {
+	fmt.Println("checkPRCommentsForOutputRequests")
 	// TODO: Find "Received terraform plan request" comment using regex
 	// requestAckRegex := regexp.MustCompile(`Module: ` + "`" + `(.+?)` + "`" + ` Request ID: ` + "`" + `(.+?)` + "`")
 	//
 	//
 	//
 	//
-	outputRequest := ps.findOutputRequestDataInComment(comment.Body)
-	fmt.Println("§§§ outputRequest:", outputRequest)
-	fmt.Println("§§§ len outputRequest:", outputRequest)
+	outputRequest := p.findOutputRequestDataInComment(comment.Body)
+	fmt.Println("outputRequest:", outputRequest)
+	fmt.Println("len outputRequest:", outputRequest)
 	// if strings.Contains(comment.Body, "Received terraform plan request") {
 	// 	prCommentModule, err := ps.findModuleNameInComment(comment.Body)
 	// 	if err != nil {
@@ -81,14 +80,12 @@ func (ps *Planner) checkPRCommentForOutputRequests(ctx context.Context, outputs 
 	// }
 }
 
-func (ps *Planner) findOutputRequestDataInComment(commentBody string) []string {
+func (p *Planner) findOutputRequestDataInComment(commentBody string) []string {
 	// TODO: Dirty prototype
 	// Improve flow and formatting if this works
 	searchPattern := fmt.Sprintf("Received terraform plan request. Module: `(.+?)` Request ID: `(.+?)` Commit ID: `(.+?)`")
 	re := regexp.MustCompile(searchPattern)
 	matches := re.FindStringSubmatch(commentBody)
-	fmt.Printf("§§§ matches: %+v\n", matches)
-	fmt.Println("§§§ len matches:", len(matches))
 	// searchString := regexp.MustCompile(`Module: ` + "`" + `(.+?)` + "`" + ` Request ID: ` + "`" + `(.+?)` + "`")
 	// if strings.Contains(comment.Body, commitID) {
 	if len(matches) == 4 {
@@ -99,7 +96,7 @@ func (ps *Planner) findOutputRequestDataInComment(commentBody string) []string {
 }
 
 // TODO: regex should be compiled outside of func
-func (ps *Planner) findModuleNameInComment(commentBody string) (types.NamespacedName, error) {
+func (p *Planner) findModuleNameInComment(commentBody string) (types.NamespacedName, error) {
 	// Search for module name and req ID
 	re1 := regexp.MustCompile(`Module: ` + "`" + `(.+?)` + "`" + ` Request ID: ` + "`" + `(.+?)` + "`")
 
@@ -114,7 +111,7 @@ func (ps *Planner) findModuleNameInComment(commentBody string) (types.Namespaced
 	return types.NamespacedName{}, nil
 }
 
-func (ps *Planner) findModuleNameInRunRequestComment(commentBody string) (string, error) {
+func (p *Planner) findModuleNameInRunRequestComment(commentBody string) (string, error) {
 	// TODO: Match "@terraform-applier plan "
 	// Search for module name only
 	re2 := regexp.MustCompile("`([^`]*)`")
@@ -127,15 +124,15 @@ func (ps *Planner) findModuleNameInRunRequestComment(commentBody string) (string
 	return "", fmt.Errorf("module data not found")
 }
 
-func (ps *Planner) postPlanOutput(output output, repo *mirror.GitURL) {
-	_, err := ps.postToGitHub(repo, "PATCH", output.commentID, output.prNumber, output.body)
+func (p *Planner) postPlanOutput(output output, repo *mirror.GitURL) {
+	_, err := p.postToGitHub(repo, "PATCH", output.commentID, output.prNumber, output.body)
 	if err != nil {
-		ps.Log.Error("error posting PR comment:", err)
+		p.Log.Error("error posting PR comment:", err)
 	}
 }
 
-func (ps *Planner) getRunFromRedis(ctx context.Context, pr pr, prCommentReqID string, module types.NamespacedName) (*tfaplv1beta1.Run, error) {
-	moduleRuns, err := ps.RedisClient.Runs(ctx, module)
+func (p *Planner) getRunFromRedis(ctx context.Context, pr pr, prCommentReqID string, module types.NamespacedName) (*tfaplv1beta1.Run, error) {
+	moduleRuns, err := p.RedisClient.Runs(ctx, module)
 	if err != nil {
 		return &tfaplv1beta1.Run{}, err
 	}

@@ -7,15 +7,18 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/utilitywarehouse/git-mirror/pkg/mirror"
 )
 
 func (ps *Planner) getOpenPullRequests(ctx context.Context, repo *mirror.GitURL) ([]pr, error) {
 	url := "https://api.github.com/graphql"
+	repoName := strings.TrimSuffix(repo.Repo, ".git")
+
 	query := `
 	query {
-		repository(owner: "` + repo.Path + `", name: "` + repo.Repo + `") {
+		repository(owner: "` + repo.Path + `", name: "` + repoName + `") {
 			pullRequests(states: OPEN, last: 100) {
 				nodes {
 					number
@@ -50,7 +53,6 @@ func (ps *Planner) getOpenPullRequests(ctx context.Context, repo *mirror.GitURL)
 		SetBody(q).
 		SetResult(&gitPRResponse{}).
 		Post(url)
-
 	if err != nil {
 		return nil, err
 	}
@@ -69,10 +71,12 @@ func (ps *Planner) postToGitHub(repo *mirror.GitURL, method string, commentID, p
 	username := "DTLP"
 	token := os.Getenv("GITHUB_TOKEN")
 
+	repoName := strings.TrimSuffix(repo.Repo, ".git")
+
 	// Post a comment
-	url := fmt.Sprintf("https://api.github.com/repos/%s/%s/issues/%d/comments", repo.Path, repo.Repo, prNumber)
+	url := fmt.Sprintf("https://api.github.com/repos/%s/%s/issues/%d/comments", repo.Path, repoName, prNumber)
 	if method == "PATCH" {
-		url = fmt.Sprintf("https://api.github.com/repos/%s/%/issues/comments/%d", repo.Path, repo.Repo, commentID)
+		url = fmt.Sprintf("https://api.github.com/repos/%s/%s/issues/comments/%d", repo.Path, repoName, commentID)
 	}
 
 	// Marshal the comment object to JSON
