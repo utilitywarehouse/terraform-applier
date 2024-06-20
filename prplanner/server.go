@@ -129,11 +129,13 @@ func (ps *Server) Start(ctx context.Context) {
 				// Loop through all open PRs
 				for _, pr := range response.Data.Repository.PullRequests.Nodes {
 
+					fmt.Println("§§§ pr:", pr.Number)
 					// 1. Verify if pr belongs to module based on files changed
 					prModules, err := ps.getPRModuleList(pr.Files.Nodes, kubeModuleList)
 					if err != nil {
 						ps.Log.Error("error getting a list of modules in PR", err)
 					}
+					fmt.Println("§§§ got a list of pr modules")
 
 					// 2. compare remote and local repos last commit hashes
 					upToDate, err := ps.isLocalRepoUpToDate(ctx, repo, pr)
@@ -144,6 +146,7 @@ func (ps *Server) Start(ctx context.Context) {
 					if !upToDate {
 						break // skip as local repo isn't yet in sync with the remote
 					}
+					fmt.Println("§§§ local repo is up-to-date")
 
 					// 3. loop through pr modules
 					ps.actionOnPRModules(ctx, repo, pr, prModules)
@@ -154,9 +157,9 @@ func (ps *Server) Start(ctx context.Context) {
 }
 
 func (ps *Server) actionOnPRModules(ctx context.Context, repo gitHubRepo, pr pr, prModules []tfaplv1beta1.Module) {
-
+	fmt.Println("§§§ action on pr modules")
 	for _, module := range prModules {
-		fmt.Println("module:", module.Name)
+		fmt.Println("§§§ module:", module.NamespacedName())
 
 		// 1. look for pending plan requests
 		ps.servePlanRequests(ctx, repo, pr, module)
@@ -168,7 +171,7 @@ func (ps *Server) actionOnPRModules(ctx context.Context, repo gitHubRepo, pr pr,
 
 func (ps *Server) isLocalRepoUpToDate(ctx context.Context, repo gitHubRepo, pr pr) (bool, error) {
 	repoURL := "git@github.com:" + repo.owner + "/" + repo.name + ".git"
-	prLastCommitHash := pr.Commits.Nodes[0].Commit.Oid
+	prLastCommitHash := pr.Commits.Nodes[len(pr.Commits.Nodes)-1].Commit.Oid
 	localRepoCommitHash, err := ps.Repos.Hash(ctx, repoURL, pr.HeadRefName, ".")
 	if err != nil {
 		return false, nil

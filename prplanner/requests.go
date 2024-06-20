@@ -3,6 +3,7 @@ package prplanner
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"strings"
 
 	tfaplv1beta1 "github.com/utilitywarehouse/terraform-applier/api/v1beta1"
@@ -15,18 +16,22 @@ import (
 )
 
 func (ps *Server) servePlanRequests(ctx context.Context, repo gitHubRepo, pr pr, module tfaplv1beta1.Module) {
+	fmt.Println("§§§ servePlanRequests")
 	planRequests := make(map[string]*tfaplv1beta1.Request)
 	ps.getPendingPlans(ctx, &planRequests, repo, pr, module)
 	ps.requestPlan(ctx, &planRequests, pr, repo)
 }
 
 func (ps *Server) getPendingPlans(ctx context.Context, planRequests *map[string]*tfaplv1beta1.Request, repo gitHubRepo, pr pr, module tfaplv1beta1.Module) {
+
+	fmt.Println("§§§ getPendingPlans")
 	// 1. Check if module is annotated
 	annotated, err := ps.isModuleAnnotated(ctx, module.NamespacedName())
 	if err != nil {
 		ps.Log.Error("error checking module annotation", err)
 	}
 
+	fmt.Println("§§§ getPendingPlans 1")
 	if annotated {
 		return // no need to proceed if there's already a plan request for the module
 	}
@@ -34,6 +39,7 @@ func (ps *Server) getPendingPlans(ctx context.Context, planRequests *map[string]
 	// 2. loop through commits from latest to oldest
 	ps.checkPRCommits(ctx, planRequests, repo, pr, module)
 
+	fmt.Println("§§§ getPendingPlans 2")
 	// 3. loop through comments
 	ps.checkPRCommentsForPlanRequests(ctx, planRequests, pr, repo, module)
 
@@ -43,18 +49,21 @@ func (ps *Server) checkPRCommits(ctx context.Context, planRequests *map[string]*
 	for i := len(pr.Commits.Nodes) - 1; i >= 0; i-- {
 		commit := pr.Commits.Nodes[i].Commit
 
+		fmt.Println("§§§ checkPRCommits")
 		// 0. check comments if output posted for the commit hash
-		outputPosted := ps.commentPostedForCommit(pr, commit.Oid)
+		outputPosted := ps.commentPostedForCommit(pr, commit.Oid, module.NamespacedName())
 		if outputPosted {
 			return
 		}
 
+		fmt.Println("§§§ checkPRCommits 0")
 		// 1. check commit hashes in redis
 		_, err := ps.RedisClient.PRRun(ctx, module.NamespacedName(), pr.Number, commit.Oid)
-		if err == nil {
+		if err != nil {
 			break
 		}
 
+		fmt.Println("§§§ checkPRCommits 1")
 		// 2. verify module needs to be planned based on files changed
 		commitBelongsToModule, err := ps.doesCommitBelongToModule(repo, commit.Oid, module)
 		if err != nil {
@@ -64,16 +73,37 @@ func (ps *Server) checkPRCommits(ctx context.Context, planRequests *map[string]*
 			return
 		}
 
+		fmt.Println("§§§ checkPRCommits 2")
 		// 3. request run
-		ps.addNewRequest(ctx, planRequests, module, pr, repo)
+		ps.addNewRequest(ctx, planRequests, module, pr, repo, commit.Oid)
 	}
 }
 
-func (ps *Server) commentPostedForCommit(pr pr, commitID string) bool {
+func (ps *Server) commentPostedForCommit(pr pr, commitID string, module types.NamespacedName) bool {
+	// TODO: Dirty prototype
+	// Improve flow and formatting if this works
 	for i := len(pr.Comments.Nodes) - 1; i >= 0; i-- {
 		comment := pr.Comments.Nodes[i]
 
-		if strings.Contains(comment.Body, commitID) {
+		searchPattern := fmt.Sprintf("Terraform plan output for module `(%s)`. Commit ID: `(%s)`", module, commitID)
+		re := regexp.MustCompile(searchPattern)
+		matches := re.FindStringSubmatch(comment.Body)
+		fmt.Printf("§§§ matches: %+v\n", matches)
+		fmt.Println("§§§ len matches:", len(matches))
+		// searchString := regexp.MustCompile(`Module: ` + "`" + `(.+?)` + "`" + ` Request ID: ` + "`" + `(.+?)` + "`")
+		// if strings.Contains(comment.Body, commitID) {
+		if len(matches) == 3 {
+			return true
+		}
+
+		searchPattern = fmt.Sprintf("Received terraform plan request. Module: `(%s)`", module)
+		re = regexp.MustCompile(searchPattern)
+		matches = re.FindStringSubmatch(comment.Body)
+		fmt.Printf("§§§ matches: %+v\n", matches)
+		fmt.Println("§§§ len matches:", len(matches))
+		// searchString := regexp.MustCompile(`Module: ` + "`" + `(.+?)` + "`" + ` Request ID: ` + "`" + `(.+?)` + "`")
+		// if strings.Contains(comment.Body, commitID) {
+		if len(matches) == 2 {
 			return true
 		}
 	}
@@ -115,7 +145,7 @@ func (ps *Server) checkPRCommentsForPlanRequests(ctx context.Context, planReques
 				break
 			}
 
-			ps.addNewRequest(ctx, planRequests, module, pr, repo)
+			ps.addNewRequest(ctx, planRequests, module, pr, repo, pr.Commits.Nodes[len(pr.Commits.Nodes)-1].Commit.Oid)
 			ps.Log.Debug("new plan request received. creating new plan request", "namespace", module.ObjectMeta.Namespace, "module", module.Name)
 		}
 	}
@@ -163,7 +193,8 @@ func (ps *Server) pathBelongsToModule(pathList []string, module tfaplv1beta1.Mod
 // 	return true
 // }
 
-func (ps *Server) addNewRequest(ctx context.Context, requests *map[string]*tfaplv1beta1.Request, module tfaplv1beta1.Module, pr pr, repo gitHubRepo) {
+func (ps *Server) addNewRequest(ctx context.Context, requests *map[string]*tfaplv1beta1.Request, module tfaplv1beta1.Module, pr pr, repo gitHubRepo, commitID string) {
+	// TODO: Post module namespacedName instead of just name
 	if _, exists := (*requests)[module.Name]; exists {
 		return // module is already in the requests list
 	}
@@ -171,7 +202,7 @@ func (ps *Server) addNewRequest(ctx context.Context, requests *map[string]*tfapl
 	newReq := module.NewRunRequest(tfaplv1beta1.PRPlan)
 
 	commentBody := prComment{
-		Body: fmt.Sprintf("Received terraform plan request. Module: `%s` Request ID: `%s`", module.Name, newReq.ID),
+		Body: fmt.Sprintf("Received terraform plan request. Module: `%s` Request ID: `%s` Commit iD: `%s`", module.NamespacedName(), newReq.ID, commitID),
 	}
 	commentID, err := ps.postToGitHub(repo, "POST", 0, pr.Number, commentBody)
 	if err != nil {
@@ -189,7 +220,8 @@ func (ps *Server) addNewRequest(ctx context.Context, requests *map[string]*tfapl
 		Number:        pr.Number,
 		HeadBranch:    pr.HeadRefName,
 		CommentID:     commentID,
-		GitCommitHash: pr.Commits.Nodes[0].Commit.Oid,
+		GitCommitHash: commitID,
+		// GitCommitHash: pr.Commits.Nodes[0].Commit.Oid,
 	}
 
 	moduleKey := module.ObjectMeta.Namespace + "/" + module.Name
