@@ -1,21 +1,18 @@
 package prplanner
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
-	"net/http"
-	"os"
 	"regexp"
 	"strings"
 
+	"github.com/utilitywarehouse/git-mirror/pkg/mirror"
 	tfaplv1beta1 "github.com/utilitywarehouse/terraform-applier/api/v1beta1"
 
 	"k8s.io/apimachinery/pkg/types"
 )
 
-func (ps *Server) serveOutputRequests(ctx context.Context, repo gitHubRepo, pr pr) {
+func (ps *Planner) uploadRequestOutput(ctx context.Context, repo *mirror.GitURL, pr pr) {
 	outputs := ps.getPendinPRUpdates(ctx, pr)
 
 	for _, output := range outputs {
@@ -23,7 +20,7 @@ func (ps *Server) serveOutputRequests(ctx context.Context, repo gitHubRepo, pr p
 	}
 }
 
-func (ps *Server) getPendinPRUpdates(ctx context.Context, pr pr) []output {
+func (ps *Planner) getPendinPRUpdates(ctx context.Context, pr pr) []output {
 	var outputs []output
 	// Go through PR comments in reverse order
 	for i := len(pr.Comments.Nodes) - 1; i >= 0; i-- {
@@ -34,7 +31,7 @@ func (ps *Server) getPendinPRUpdates(ctx context.Context, pr pr) []output {
 	return outputs
 }
 
-func (ps *Server) checkPRCommentForOutputRequests(ctx context.Context, outputs *[]output, pr pr, comment prComment) {
+func (ps *Planner) checkPRCommentForOutputRequests(ctx context.Context, outputs *[]output, pr pr, comment prComment) {
 
 	fmt.Println("§§§ checkPRCommentsForOutputRequests")
 	// TODO: Find "Received terraform plan request" comment using regex
@@ -84,7 +81,7 @@ func (ps *Server) checkPRCommentForOutputRequests(ctx context.Context, outputs *
 	// }
 }
 
-func (ps *Server) findOutputRequestDataInComment(commentBody string) []string {
+func (ps *Planner) findOutputRequestDataInComment(commentBody string) []string {
 	// TODO: Dirty prototype
 	// Improve flow and formatting if this works
 	searchPattern := fmt.Sprintf("Received terraform plan request. Module: `(.+?)` Request ID: `(.+?)` Commit ID: `(.+?)`")
@@ -102,7 +99,7 @@ func (ps *Server) findOutputRequestDataInComment(commentBody string) []string {
 }
 
 // TODO: regex should be compiled outside of func
-func (ps *Server) findModuleNameInComment(commentBody string) (types.NamespacedName, error) {
+func (ps *Planner) findModuleNameInComment(commentBody string) (types.NamespacedName, error) {
 	// Search for module name and req ID
 	re1 := regexp.MustCompile(`Module: ` + "`" + `(.+?)` + "`" + ` Request ID: ` + "`" + `(.+?)` + "`")
 
@@ -117,7 +114,7 @@ func (ps *Server) findModuleNameInComment(commentBody string) (types.NamespacedN
 	return types.NamespacedName{}, nil
 }
 
-func (ps *Server) findModuleNameInRunRequestComment(commentBody string) (string, error) {
+func (ps *Planner) findModuleNameInRunRequestComment(commentBody string) (string, error) {
 	// TODO: Match "@terraform-applier plan "
 	// Search for module name only
 	re2 := regexp.MustCompile("`([^`]*)`")
@@ -130,14 +127,14 @@ func (ps *Server) findModuleNameInRunRequestComment(commentBody string) (string,
 	return "", fmt.Errorf("module data not found")
 }
 
-func (ps *Server) postPlanOutput(output output, repo gitHubRepo) {
+func (ps *Planner) postPlanOutput(output output, repo *mirror.GitURL) {
 	_, err := ps.postToGitHub(repo, "PATCH", output.commentID, output.prNumber, output.body)
 	if err != nil {
 		ps.Log.Error("error posting PR comment:", err)
 	}
 }
 
-func (ps *Server) getRunFromRedis(ctx context.Context, pr pr, prCommentReqID string, module types.NamespacedName) (*tfaplv1beta1.Run, error) {
+func (ps *Planner) getRunFromRedis(ctx context.Context, pr pr, prCommentReqID string, module types.NamespacedName) (*tfaplv1beta1.Run, error) {
 	moduleRuns, err := ps.RedisClient.Runs(ctx, module)
 	if err != nil {
 		return &tfaplv1beta1.Run{}, err
@@ -150,59 +147,6 @@ func (ps *Server) getRunFromRedis(ctx context.Context, pr pr, prCommentReqID str
 	}
 
 	return &tfaplv1beta1.Run{}, nil
-}
-
-func (ps *Server) postToGitHub(repo gitHubRepo, method string, commentID, prNumber int, commentBody prComment) (int, error) {
-	// TODO: Update credentials
-	// Temporarily using my own github user and token
-	username := "DTLP"
-	token := os.Getenv("GITHUB_TOKEN")
-
-	// Post a comment
-	url := fmt.Sprintf("https://api.github.com/repos/%s/%s/issues/%d/comments", repo.owner, repo.name, prNumber)
-	if method == "PATCH" {
-		url = fmt.Sprintf("https://api.github.com/repos/%s/%/issues/comments/%d", repo.owner, repo.name, commentID)
-	}
-
-	// Marshal the comment object to JSON
-	commentJSON, err := json.Marshal(commentBody)
-	if err != nil {
-		return 0, fmt.Errorf("error marshalling comment to JSON: %w", err)
-	}
-
-	// Create a new HTTP request
-	req, err := http.NewRequest(method, url, bytes.NewBuffer(commentJSON))
-	if err != nil {
-		return 0, fmt.Errorf("error creating HTTP request: %w", err)
-	}
-
-	// Set headers
-	req.Header.Set("Content-Type", "application/json")
-	req.SetBasicAuth(username, token)
-
-	// Send the HTTP request
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		return 0, fmt.Errorf("error sending HTTP request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	var commentResponse struct {
-		ID int `json:"id"`
-	}
-
-	err = json.NewDecoder(resp.Body).Decode(&commentResponse)
-	if err != nil {
-		return 0, err
-	}
-
-	// Check the response status
-	if resp.StatusCode != 200 && resp.StatusCode != 201 {
-		return 0, fmt.Errorf("error creating PR comment: %s", resp.Status)
-	}
-
-	return commentResponse.ID, nil
 }
 
 // func repoNameFromURL(url string) string {

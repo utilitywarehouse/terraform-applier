@@ -707,14 +707,17 @@ func run(c *cli.Context) {
 
 	username := "DTLP" // TODO: Sort out the credentials
 	token := os.Getenv("GITHUB_TOKEN")
-	prPlanner := &prplanner.Server{
-		ClusterClt:    mgr.GetClient(),
-		KubeClient:    kubeClient,
-		Repos:         repos,
-		RedisClient:   sysutil.Redis{Client: rdb},
-		GraphqlClient: prplanner.NewGraphqlClient(username, token),
-		Log:           logger.With("logger", "prPlanner"),
+
+	prPlanner := &prplanner.Planner{
+		GitMirror:   conf.GitMirror,
+		Interval:    10 * time.Second,
+		ClusterClt:  mgr.GetClient(),
+		Repos:       repos,
+		RedisClient: sysutil.Redis{Client: rdb},
+		Log:         logger.With("logger", "prPlanner"),
 	}
+	prPlanner.Init(username, token)
+
 	go prPlanner.Start(ctx)
 
 	logger.Info("starting manager")

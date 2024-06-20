@@ -6,6 +6,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/utilitywarehouse/git-mirror/pkg/mirror"
 	tfaplv1beta1 "github.com/utilitywarehouse/terraform-applier/api/v1beta1"
 	"github.com/utilitywarehouse/terraform-applier/sysutil"
 
@@ -15,71 +16,108 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
-func (ps *Server) servePlanRequests(ctx context.Context, repo gitHubRepo, pr pr, module tfaplv1beta1.Module) {
-	fmt.Println("§§§ servePlanRequests")
-	planRequests := make(map[string]*tfaplv1beta1.Request)
-	ps.getPendingPlans(ctx, &planRequests, repo, pr, module)
-	ps.requestPlan(ctx, &planRequests, pr, repo)
+// 3. loop through pr modules:
+//   1. check if modules is annotated
+//   if not:
+//   no need for this??? 1. verify if pr is new by looking at comments
+
+//   2. loop through commits from latest to oldest:
+//     0. verify modules needs to be planned based on files changed
+//     if matching:
+
+//     1. check comments if output posted for the commit hash
+//     if no comment posted:
+
+//     2. check commit hashes in redis
+//     if missing:
+
+//     3. request run
+
+//   3. loop through comments
+//     1. check if user requested run
+//     if yes:
+
+// 2. request run
+func (ps *Planner) ensurePlanRequests(ctx context.Context, repo *mirror.GitURL, pr pr, prModules []types.NamespacedName) {
+	for _, moduleName := range prModules {
+		fmt.Println("§§§ module:", moduleName)
+
+		var module tfaplv1beta1.Module
+		err := ps.ClusterClt.Get(ctx, moduleName, &module)
+		if err != nil {
+			ps.Log.Error("unable to get module", "module", moduleName, "error", err)
+			continue
+		}
+
+		// 1. Check if module is annotated
+		// no need to proceed if there's already a plan request for the module
+		_, ok := module.PendingRunRequest()
+		if ok {
+			continue
+		}
+
+		err = ps.ensurePlanRequest(ctx, repo, pr, module)
+		if err != nil {
+			ps.Log.Error("unable to get module", "module", moduleName, "error", err)
+			continue
+		}
+	}
 }
 
-func (ps *Server) getPendingPlans(ctx context.Context, planRequests *map[string]*tfaplv1beta1.Request, repo gitHubRepo, pr pr, module tfaplv1beta1.Module) {
-
+func (ps *Planner) ensurePlanRequest(ctx context.Context, repo *mirror.GitURL, pr pr, module tfaplv1beta1.Module) error {
 	fmt.Println("§§§ getPendingPlans")
-	// 1. Check if module is annotated
-	annotated, err := ps.isModuleAnnotated(ctx, module.NamespacedName())
-	if err != nil {
-		ps.Log.Error("error checking module annotation", err)
-	}
-
-	fmt.Println("§§§ getPendingPlans 1")
-	if annotated {
-		return // no need to proceed if there's already a plan request for the module
-	}
 
 	// 2. loop through commits from latest to oldest
-	ps.checkPRCommits(ctx, planRequests, repo, pr, module)
+	ok, err := ps.checkPRCommits(ctx, repo, pr, module)
+	if err != nil {
+		return err
+	}
+	if ok {
+		return nil
+	}
 
-	fmt.Println("§§§ getPendingPlans 2")
 	// 3. loop through comments
-	ps.checkPRCommentsForPlanRequests(ctx, planRequests, pr, repo, module)
-
+	fmt.Println("§§§ getPendingPlans 2")
+	_, err = ps.checkPRCommentsForPlanRequests(ctx, pr, repo, module)
+	return err
 }
 
-func (ps *Server) checkPRCommits(ctx context.Context, planRequests *map[string]*tfaplv1beta1.Request, repo gitHubRepo, pr pr, module tfaplv1beta1.Module) {
+func (ps *Planner) checkPRCommits(ctx context.Context, repo *mirror.GitURL, pr pr, module tfaplv1beta1.Module) (bool, error) {
+	// loop through commits to check if module path is updated
 	for i := len(pr.Commits.Nodes) - 1; i >= 0; i-- {
 		commit := pr.Commits.Nodes[i].Commit
 
+		// 1. check if module path is updated in this commit
+		updated, err := ps.doesCommitBelongToModule(repo, commit.Oid, module)
+		if err != nil {
+			return false, err
+		}
+		if !updated {
+			continue
+		}
+
 		fmt.Println("§§§ checkPRCommits")
-		// 0. check comments if output posted for the commit hash
+		// 2. check if we have already processed (uploaded output) this commit
 		outputPosted := ps.commentPostedForCommit(pr, commit.Oid, module.NamespacedName())
 		if outputPosted {
-			return
+			return false, nil
 		}
 
 		fmt.Println("§§§ checkPRCommits 0")
-		// 1. check commit hashes in redis
-		_, err := ps.RedisClient.PRRun(ctx, module.NamespacedName(), pr.Number, commit.Oid)
+		// 3. check if run is already completed for this commit
+		_, err = ps.RedisClient.PRRun(ctx, module.NamespacedName(), pr.Number, commit.Oid)
 		if err != nil {
-			break
+			return false, nil
 		}
 
-		fmt.Println("§§§ checkPRCommits 1")
-		// 2. verify module needs to be planned based on files changed
-		commitBelongsToModule, err := ps.doesCommitBelongToModule(repo, commit.Oid, module)
-		if err != nil {
-			ps.Log.Error("", err)
-		}
-		if !commitBelongsToModule {
-			return
-		}
-
-		fmt.Println("§§§ checkPRCommits 2")
 		// 3. request run
-		ps.addNewRequest(ctx, planRequests, module, pr, repo, commit.Oid)
+		return true, ps.addNewRequest(ctx, module, pr, repo, commit.Oid)
 	}
+
+	return false, nil
 }
 
-func (ps *Server) commentPostedForCommit(pr pr, commitID string, module types.NamespacedName) bool {
+func (ps *Planner) commentPostedForCommit(pr pr, commitID string, module types.NamespacedName) bool {
 	// TODO: Dirty prototype
 	// Improve flow and formatting if this works
 	for i := len(pr.Comments.Nodes) - 1; i >= 0; i-- {
@@ -111,9 +149,9 @@ func (ps *Server) commentPostedForCommit(pr pr, commitID string, module types.Na
 	return false
 }
 
-func (ps *Server) doesCommitBelongToModule(repo gitHubRepo, commitHash string, module tfaplv1beta1.Module) (bool, error) {
+func (ps *Planner) doesCommitBelongToModule(repo *mirror.GitURL, commitHash string, module tfaplv1beta1.Module) (bool, error) {
 
-	filesChangedInCommit, err := ps.getCommitFilesChanged(repo.name, commitHash)
+	filesChangedInCommit, err := ps.getCommitFilesChanged(repo.Repo, commitHash)
 	if err != nil {
 		return false, fmt.Errorf("error getting commit info: %w", err)
 	}
@@ -126,7 +164,7 @@ func (ps *Server) doesCommitBelongToModule(repo gitHubRepo, commitHash string, m
 	return true, nil
 }
 
-func (ps *Server) checkPRCommentsForPlanRequests(ctx context.Context, planRequests *map[string]*tfaplv1beta1.Request, pr pr, repo gitHubRepo, module tfaplv1beta1.Module) {
+func (ps *Planner) checkPRCommentsForPlanRequests(ctx context.Context, pr pr, repo *mirror.GitURL, module tfaplv1beta1.Module) (bool, error) {
 	// TODO: Allow users manually request plan runs for PRs with a large number of modules,
 	// but only ONE module at a time
 
@@ -134,24 +172,28 @@ func (ps *Server) checkPRCommentsForPlanRequests(ctx context.Context, planReques
 	for i := len(pr.Comments.Nodes) - 1; i >= 0; i-- {
 		comment := pr.Comments.Nodes[i]
 
+		// TODO: 1st check if plan output for THIS module is uploaded/requested
+		// if find return
+
 		// Check if user requested terraform plan run
 		if strings.Contains(comment.Body, "@terraform-applier plan") {
-
 			// Give users ability to request plan for all modules or just one
 			// terraform-applier plan [`<module name>`]
 			prCommentModule, _ := ps.findModuleNameInComment(comment.Body)
 
 			if prCommentModule.Name != "" && module.Name != prCommentModule.Name {
-				break
+				continue
 			}
 
-			ps.addNewRequest(ctx, planRequests, module, pr, repo, pr.Commits.Nodes[len(pr.Commits.Nodes)-1].Commit.Oid)
 			ps.Log.Debug("new plan request received. creating new plan request", "namespace", module.ObjectMeta.Namespace, "module", module.Name)
+			return true, ps.addNewRequest(ctx, module, pr, repo, pr.Commits.Nodes[len(pr.Commits.Nodes)-1].Commit.Oid)
 		}
 	}
+
+	return false, nil
 }
 
-// func (ps *Server) getPendingPlans(ctx context.Context, planRequests *map[string]*tfaplv1beta1.Request, pr pr, repo gitHubRepo, prModules []tfaplv1beta1.Module) {
+// func (ps *Server) getPendingPlans(ctx context.Context, planRequests *map[string]*tfaplv1beta1.Request, pr pr, repo *mirror.GitURL, prModules []tfaplv1beta1.Module) {
 // 	if ps.isNewPR(pr.Comments.Nodes) {
 // 		for _, module := range prModules {
 // 			annotated, err := ps.isModuleAnnotated(ctx, module.NamespacedName())
@@ -173,7 +215,7 @@ func (ps *Server) checkPRCommentsForPlanRequests(ctx context.Context, planReques
 // 	ps.analysePRCommentsForRun(ctx, planRequests, pr, repo, prModules)
 // }
 
-func (ps *Server) pathBelongsToModule(pathList []string, module tfaplv1beta1.Module) bool {
+func (ps *Planner) pathBelongsToModule(pathList []string, module tfaplv1beta1.Module) bool {
 	for _, path := range pathList {
 		if strings.Contains(path, module.Spec.Path) {
 			return true
@@ -193,43 +235,39 @@ func (ps *Server) pathBelongsToModule(pathList []string, module tfaplv1beta1.Mod
 // 	return true
 // }
 
-func (ps *Server) addNewRequest(ctx context.Context, requests *map[string]*tfaplv1beta1.Request, module tfaplv1beta1.Module, pr pr, repo gitHubRepo, commitID string) {
-	// TODO: Post module namespacedName instead of just name
-	if _, exists := (*requests)[module.Name]; exists {
-		return // module is already in the requests list
-	}
+func (ps *Planner) addNewRequest(ctx context.Context, module tfaplv1beta1.Module, pr pr, repo *mirror.GitURL, commitID string) error {
 
-	newReq := module.NewRunRequest(tfaplv1beta1.PRPlan)
+	req := module.NewRunRequest(tfaplv1beta1.PRPlan)
 
 	commentBody := prComment{
-		Body: fmt.Sprintf("Received terraform plan request. Module: `%s` Request ID: `%s` Commit iD: `%s`", module.NamespacedName(), newReq.ID, commitID),
+		// TODO: put all comments message together as template/var
+		Body: fmt.Sprintf("Received terraform plan request. Module: `%s` Request ID: `%s` Commit iD: `%s`", module.NamespacedName(), req.ID, commitID),
 	}
+
 	commentID, err := ps.postToGitHub(repo, "POST", 0, pr.Number, commentBody)
 	if err != nil {
-		ps.Log.Error("error posting PR comment:", err)
+		return fmt.Errorf("unable to post pending request comment:", err)
 	}
 
-	ps.Log.Debug("posted request id to github", "namespace", module.ObjectMeta.Namespace, "module", module.Name, "requestID", newReq.ID, "repo", repo.name, "pr", pr.Number)
-
-	err = ps.ClusterClt.Get(ctx, module.NamespacedName(), &module)
-	if err != nil {
-		ps.Log.Error("cannot find module", err)
-	}
-
-	newReq.PR = &tfaplv1beta1.PullRequest{
+	req.PR = &tfaplv1beta1.PullRequest{
 		Number:        pr.Number,
 		HeadBranch:    pr.HeadRefName,
 		CommentID:     commentID,
 		GitCommitHash: commitID,
-		// GitCommitHash: pr.Commits.Nodes[0].Commit.Oid,
 	}
 
-	moduleKey := module.ObjectMeta.Namespace + "/" + module.Name
-	(*requests)[moduleKey] = newReq
+	// TODO: Test what happens if we upload but we annotation fails
 
+	err = sysutil.EnsureRequest(ctx, ps.ClusterClt, module.NamespacedName(), req)
+	if err != nil {
+		ps.Log.Error("failed to request plan job", err)
+	}
+
+	ps.Log.Info("requested terraform plan for the PR", "module", module.NamespacedName(), "requestID", req.ID, "pr", pr.Number)
+	return nil
 }
 
-// func (ps *Server) checkLastPRCommit(ctx context.Context, planRequests *map[string]*tfaplv1beta1.Request, pr pr, repo gitHubRepo, prModules []tfaplv1beta1.Module) {
+// func (ps *Server) checkLastPRCommit(ctx context.Context, planRequests *map[string]*tfaplv1beta1.Request, pr pr, repo *mirror.GitURL, prModules []tfaplv1beta1.Module) {
 // 	for _, module := range prModules {
 // 		// TODO: Change order of checks?
 // 		// What's the point in doing all of that if module might be annotated at the end?
@@ -275,36 +313,7 @@ func (ps *Server) addNewRequest(ctx context.Context, requests *map[string]*tfapl
 // 	}
 // }
 
-func (ps *Server) isModuleAnnotated(ctx context.Context, key types.NamespacedName) (bool, error) {
-	module, err := sysutil.GetModule(ctx, ps.ClusterClt, key)
-	if err != nil {
-		return false, err
-	}
-
-	for _, value := range module.ObjectMeta.Annotations {
-		if strings.Contains(value, "terraform-applier.uw.systems/run-request") {
-			return true, nil
-		}
-	}
-
-	return false, nil
-}
-
-// func (ps *Server) isModuleUpdated(repo gitHubRepo, commitHash string, module tfaplv1beta1.Module) (bool, error) {
-// 	filesChangedInCommit, err := ps.getCommitFilesChanged(repo.name, commitHash)
-// 	if err != nil {
-// 		return false, fmt.Errorf("error getting commit info: %w", err)
-// 	}
-//
-// 	moduleUpdated := ps.pathBelongsToModule(filesChangedInCommit, module)
-// 	if !moduleUpdated {
-// 		return false, nil
-// 	}
-//
-// 	return true, nil
-// }
-
-func (ps *Server) getCommitFilesChanged(repoName, commitHash string) ([]string, error) {
+func (ps *Planner) getCommitFilesChanged(repoName, commitHash string) ([]string, error) {
 	// TODO: Replace go-git package with git command
 	repoPath := "/tmp/src/" + repoName + ".git" // TODO: Replace with REPOS_ROOT_PATH var
 	githubRepo, err := git.PlainOpen(repoPath)
@@ -330,7 +339,7 @@ func (ps *Server) getCommitFilesChanged(repoName, commitHash string) ([]string, 
 	return filesChanged, nil
 }
 
-// func (ps *Server) analysePRCommentsForRun(ctx context.Context, planRequests *map[string]*tfaplv1beta1.Request, pr pr, repo gitHubRepo, prModules []tfaplv1beta1.Module) {
+// func (ps *Server) analysePRCommentsForRun(ctx context.Context, planRequests *map[string]*tfaplv1beta1.Request, pr pr, repo *mirror.GitURL, prModules []tfaplv1beta1.Module) {
 // 	for _, module := range prModules {
 //
 // 		// Go through PR comments in reverse order
@@ -365,23 +374,3 @@ func (ps *Server) getCommitFilesChanged(repoName, commitHash string) ([]string, 
 // 		}
 // 	}
 // }
-
-func (ps *Server) requestPlan(ctx context.Context, planRequests *map[string]*tfaplv1beta1.Request, pr pr, repo gitHubRepo) {
-	for module, req := range *planRequests {
-
-		parts := strings.Split(module, "/")
-		moduleNamespace := parts[0]
-		moduleName := parts[1]
-		namespacedName := types.NamespacedName{
-			Namespace: moduleNamespace,
-			Name:      moduleName,
-		}
-
-		err := sysutil.EnsureRequest(ctx, ps.ClusterClt, namespacedName, req)
-		if err != nil {
-			ps.Log.Error("failed to request plan job", err)
-		}
-
-		ps.Log.Debug("requested terraform plan", "namespace", moduleNamespace, "module", moduleName)
-	}
-}
