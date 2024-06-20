@@ -14,6 +14,7 @@ import (
 
 	"github.com/go-resty/resty/v2"
 
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -78,7 +79,7 @@ type prFiles []struct {
 }
 
 type output struct {
-	module    tfaplv1beta1.Module
+	module    types.NamespacedName
 	body      prComment
 	commentID int
 	prNumber  int
@@ -159,9 +160,10 @@ func (ps *Server) actionOnPRModules(ctx context.Context, repo gitHubRepo, pr pr,
 
 		// 1. look for pending plan requests
 		ps.servePlanRequests(ctx, repo, pr, module)
-		// 2. look for pending outputs
-		ps.serveOutputRequests(ctx, repo, pr, module)
 	}
+
+	// 2. look for pending outputs
+	ps.serveOutputRequests(ctx, repo, pr)
 }
 
 func (ps *Server) isLocalRepoUpToDate(ctx context.Context, repo gitHubRepo, pr pr) (bool, error) {

@@ -50,10 +50,9 @@ func (ps *Server) checkPRCommits(ctx context.Context, planRequests *map[string]*
 		}
 
 		// 1. check commit hashes in redis
-		runOutput := ps.getPlanOutputFromRedis(ctx, pr, commit.Oid, module)
-		// TODO: Change the format of objects stored in Redis first :lastRun -> :<commit hash>
-		if runOutput != "" {
-			return
+		_, err := ps.RedisClient.PRRun(ctx, module.NamespacedName(), pr.Number, commit.Oid)
+		if err == nil {
+			break
 		}
 
 		// 2. verify module needs to be planned based on files changed
@@ -107,11 +106,12 @@ func (ps *Server) checkPRCommentsForPlanRequests(ctx context.Context, planReques
 
 		// Check if user requested terraform plan run
 		if strings.Contains(comment.Body, "@terraform-applier plan") {
+
 			// Give users ability to request plan for all modules or just one
 			// terraform-applier plan [`<module name>`]
-			prCommentModule, _, _ := ps.findModuleNameInComment(comment.Body)
+			prCommentModule, _ := ps.findModuleNameInComment(comment.Body)
 
-			if prCommentModule != "" && module.Name != prCommentModule {
+			if prCommentModule.Name != "" && module.Name != prCommentModule.Name {
 				break
 			}
 
@@ -173,7 +173,7 @@ func (ps *Server) addNewRequest(ctx context.Context, requests *map[string]*tfapl
 	commentBody := prComment{
 		Body: fmt.Sprintf("Received terraform plan request. Module: `%s` Request ID: `%s`", module.Name, newReq.ID),
 	}
-	commentID, err := ps.postToGitHub(module.Spec.RepoURL, "POST", 0, pr.Number, commentBody)
+	commentID, err := ps.postToGitHub(repo, "POST", 0, pr.Number, commentBody)
 	if err != nil {
 		ps.Log.Error("error posting PR comment:", err)
 	}
