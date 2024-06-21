@@ -3,6 +3,7 @@ package prplanner
 import (
 	"context"
 	"log/slog"
+	"net/http"
 	"strings"
 	"time"
 
@@ -12,8 +13,6 @@ import (
 	"github.com/utilitywarehouse/terraform-applier/sysutil"
 	"k8s.io/apimachinery/pkg/types"
 
-	"github.com/go-resty/resty/v2"
-
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -22,21 +21,19 @@ type Planner struct {
 	ClusterClt  client.Client
 	Repos       git.Repositories
 	RedisClient sysutil.RedisInterface
-	github      *graphqlClient
+	github      *gitHubClient
 	Interval    time.Duration
 	Log         *slog.Logger
 }
 
-func (p *Planner) Init(username, token string) {
-	c := &graphqlClient{
-		url:  "https://api.github.com/graphql",
-		http: resty.New(),
+func (p *Planner) Init(token string) {
+	p.github = &gitHubClient{
+		rootURL: "https://api.github.com",
+		http: &http.Client{
+			Timeout: 3 * time.Minute,
+		},
+		token: token,
 	}
-	c.http.SetTimeout(5 * time.Minute)
-	c.http.SetHeader("Accept", "application/vnd.github.v3+json")
-	c.http.SetBasicAuth(username, token)
-
-	p.github = c
 }
 
 func (p *Planner) Start(ctx context.Context) {
@@ -64,7 +61,7 @@ func (p *Planner) Start(ctx context.Context) {
 				}
 
 				// Make a GraphQL query to fetch all open Pull Requests from Github
-				prs, err := p.getOpenPullRequests(ctx, repo)
+				prs, err := p.github.openPRs(ctx, repo)
 				if err != nil {
 					p.Log.Error("error making GraphQL request:", err)
 					return
@@ -100,7 +97,7 @@ func (p *Planner) Start(ctx context.Context) {
 	}
 }
 
-func (p *Planner) isLocalRepoUpToDate(ctx context.Context, repo string, pr pr) bool {
+func (p *Planner) isLocalRepoUpToDate(ctx context.Context, repo string, pr *pr) bool {
 	if len(pr.Commits.Nodes) == 0 {
 		return false
 	}
