@@ -269,7 +269,7 @@ var (
 			Name:    "pr-planner-interval",
 			EnvVars: []string{"PR_PLANNER_INTERVAL"},
 			Value:   30,
-			Usage:   "disable plan on PR feature",
+			Usage:   "PR poll interval in seconds",
 		},
 		&cli.StringFlag{
 			Name:    "github-token",
