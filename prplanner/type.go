@@ -5,6 +5,36 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
+const queryRepoPRs = `
+query {
+	repository(owner: $owner, name: $repoName) {
+		pullRequests(states: OPEN, last: 100) {
+			nodes {
+				number
+				headRefName
+				commits(last: 20) {
+					nodes {
+						commit {
+							oid
+						}
+					}
+				}
+				comments(last:20) {
+					nodes {
+						databaseId
+						body
+					}
+				}
+				files(last: 100) {
+					nodes {
+						path
+					}
+				}
+			}
+		}
+	}
+}`
+
 type gitHubRepo struct {
 	name  string
 	owner string
@@ -13,8 +43,8 @@ type gitHubRepo struct {
 type gitPRRequest struct {
 	Query     string `json:"query,omitempty"`
 	Variables struct {
-		Slug  string `json:"slug"`
-		After string `json:"after,omitempty"`
+		Owner    string `json:"owner"`
+		RepoName string `json:"repoName"`
 	} `json:"variables,omitempty"`
 }
 
@@ -22,7 +52,7 @@ type gitPRResponse struct {
 	Data struct {
 		Repository struct {
 			PullRequests struct {
-				Nodes []pr `json:"nodes"`
+				Nodes []*pr `json:"nodes"`
 			} `json:"pullRequests"`
 		} `json:"repository"`
 	} `json:"data"`

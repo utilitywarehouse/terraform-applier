@@ -12,7 +12,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
-func (p *Planner) uploadRequestOutput(ctx context.Context, repo *mirror.GitURL, pr pr) {
+func (p *Planner) uploadRequestOutput(ctx context.Context, repo *mirror.GitURL, pr *pr) {
 	outputs := p.getPendinPRUpdates(ctx, pr)
 
 	for _, output := range outputs {
@@ -20,7 +20,7 @@ func (p *Planner) uploadRequestOutput(ctx context.Context, repo *mirror.GitURL, 
 	}
 }
 
-func (p *Planner) getPendinPRUpdates(ctx context.Context, pr pr) []output {
+func (p *Planner) getPendinPRUpdates(ctx context.Context, pr *pr) []output {
 	var outputs []output
 	// Go through PR comments in reverse order
 	for i := len(pr.Comments.Nodes) - 1; i >= 0; i-- {
@@ -31,7 +31,7 @@ func (p *Planner) getPendinPRUpdates(ctx context.Context, pr pr) []output {
 	return outputs
 }
 
-func (p *Planner) checkPRCommentForOutputRequests(ctx context.Context, outputs *[]output, pr pr, comment prComment) {
+func (p *Planner) checkPRCommentForOutputRequests(ctx context.Context, outputs *[]output, pr *pr, comment prComment) {
 	fmt.Println("checkPRCommentsForOutputRequests")
 	// TODO: Find "Received terraform plan request" comment using regex
 	// requestAckRegex := regexp.MustCompile(`Module: ` + "`" + `(.+?)` + "`" + ` Request ID: ` + "`" + `(.+?)` + "`")
@@ -125,7 +125,7 @@ func (p *Planner) findModuleNameInRunRequestComment(commentBody string) (string,
 }
 
 func (p *Planner) postPlanOutput(output output, repo *mirror.GitURL) {
-	_, err := p.postToGitHub(repo, "PATCH", output.commentID, output.prNumber, output.body)
+	_, err := p.github.postComment(repo, output.commentID, output.prNumber, output.body)
 	if err != nil {
 		p.Log.Error("error posting PR comment:", err)
 	}

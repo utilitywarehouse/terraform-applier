@@ -259,6 +259,23 @@ var (
 			Value:   false,
 			Usage:   "disable plugin cache created / reconciler",
 		},
+		&cli.BoolFlag{
+			Name:    "disable-pr-planner",
+			EnvVars: []string{"DISABLE_PR_PLANNER"},
+			Value:   false,
+			Usage:   "disable plan on PR feature",
+		},
+		&cli.IntFlag{
+			Name:    "pr-planner-interval",
+			EnvVars: []string{"PR_PLANNER_INTERVAL"},
+			Value:   30,
+			Usage:   "disable plan on PR feature",
+		},
+		&cli.StringFlag{
+			Name:    "github-token",
+			EnvVars: []string{"GITHUB_TOKEN"},
+			Usage:   "provide GH API token with write to PR access",
+		},
 	}
 )
 
@@ -705,20 +722,20 @@ func run(c *cli.Context) {
 		}
 	}()
 
-	username := "DTLP" // TODO: Sort out the credentials
-	token := os.Getenv("GITHUB_TOKEN")
+	if !c.Bool("disable-pr-planner") {
+		prPlanner := &prplanner.Planner{
+			GitMirror:   conf.GitMirror,
+			Interval:    time.Duration(c.Int("pr-planner-interval")) * time.Second,
+			ClusterClt:  mgr.GetClient(),
+			Repos:       repos,
+			RedisClient: sysutil.Redis{Client: rdb},
+			Log:         logger.With("logger", "pr-planner"),
+		}
 
-	prPlanner := &prplanner.Planner{
-		GitMirror:   conf.GitMirror,
-		Interval:    10 * time.Second,
-		ClusterClt:  mgr.GetClient(),
-		Repos:       repos,
-		RedisClient: sysutil.Redis{Client: rdb},
-		Log:         logger.With("logger", "prPlanner"),
+		prPlanner.Init(c.String("github-token"))
+
+		go prPlanner.Start(ctx)
 	}
-	prPlanner.Init(username, token)
-
-	go prPlanner.Start(ctx)
 
 	logger.Info("starting manager")
 	if err := mgr.Start(ctx); err != nil {

@@ -40,7 +40,7 @@ var (
 //     if yes:
 
 // 2. request run
-func (p *Planner) ensurePlanRequests(ctx context.Context, repo *mirror.GitURL, pr pr, prModules []types.NamespacedName) {
+func (p *Planner) ensurePlanRequests(ctx context.Context, repo *mirror.GitURL, pr *pr, prModules []types.NamespacedName) {
 	for _, moduleName := range prModules {
 
 		var module tfaplv1beta1.Module
@@ -65,7 +65,7 @@ func (p *Planner) ensurePlanRequests(ctx context.Context, repo *mirror.GitURL, p
 	}
 }
 
-func (p *Planner) ensurePlanRequest(ctx context.Context, repo *mirror.GitURL, pr pr, module tfaplv1beta1.Module) error {
+func (p *Planner) ensurePlanRequest(ctx context.Context, repo *mirror.GitURL, pr *pr, module tfaplv1beta1.Module) error {
 	// 2. loop through commits from latest to oldest
 	ok, err := p.checkPRCommits(ctx, repo, pr, module)
 	if err != nil {
@@ -80,7 +80,7 @@ func (p *Planner) ensurePlanRequest(ctx context.Context, repo *mirror.GitURL, pr
 	return err
 }
 
-func (p *Planner) checkPRCommits(ctx context.Context, repo *mirror.GitURL, pr pr, module tfaplv1beta1.Module) (bool, error) {
+func (p *Planner) checkPRCommits(ctx context.Context, repo *mirror.GitURL, pr *pr, module tfaplv1beta1.Module) (bool, error) {
 	// loop through commits to check if module path is updated
 	for i := len(pr.Commits.Nodes) - 1; i >= 0; i-- {
 		commit := pr.Commits.Nodes[i].Commit
@@ -119,7 +119,7 @@ func (p *Planner) checkPRCommits(ctx context.Context, repo *mirror.GitURL, pr pr
 }
 
 // TODO: Move regex patterns compiles outside of these functions and store in one place
-func (p *Planner) planOutputPostedForCommit(pr pr, commitID string, module types.NamespacedName) bool {
+func (p *Planner) planOutputPostedForCommit(pr *pr, commitID string, module types.NamespacedName) bool {
 	for i := len(pr.Comments.Nodes) - 1; i >= 0; i-- {
 		comment := pr.Comments.Nodes[i]
 
@@ -136,7 +136,7 @@ func (p *Planner) planOutputPostedForCommit(pr pr, commitID string, module types
 	return false
 }
 
-func (p *Planner) planRequestAcknowledgedForCommit(pr pr, module types.NamespacedName) bool {
+func (p *Planner) planRequestAcknowledgedForCommit(pr *pr, module types.NamespacedName) bool {
 	for i := len(pr.Comments.Nodes) - 1; i >= 0; i-- {
 		comment := pr.Comments.Nodes[i]
 
@@ -163,7 +163,7 @@ func (p *Planner) isModuleUpdated(ctx context.Context, commitHash string, module
 	return pathBelongsToModule(filesChangedInCommit, module), nil
 }
 
-func (p *Planner) checkPRCommentsForPlanRequests(ctx context.Context, pr pr, repo *mirror.GitURL, module tfaplv1beta1.Module) (bool, error) {
+func (p *Planner) checkPRCommentsForPlanRequests(ctx context.Context, pr *pr, repo *mirror.GitURL, module tfaplv1beta1.Module) (bool, error) {
 	// TODO: Allow users manually request plan runs for PRs with a large number of modules,
 	// but only ONE module at a time
 
@@ -192,7 +192,7 @@ func (p *Planner) checkPRCommentsForPlanRequests(ctx context.Context, pr pr, rep
 	return false, nil
 }
 
-func (p *Planner) addNewRequest(ctx context.Context, module tfaplv1beta1.Module, pr pr, repo *mirror.GitURL, commitID string) error {
+func (p *Planner) addNewRequest(ctx context.Context, module tfaplv1beta1.Module, pr *pr, repo *mirror.GitURL, commitID string) error {
 	req := module.NewRunRequest(tfaplv1beta1.PRPlan)
 
 	commentBody := prComment{
@@ -200,7 +200,7 @@ func (p *Planner) addNewRequest(ctx context.Context, module tfaplv1beta1.Module,
 		Body: fmt.Sprintf("Received terraform plan request. Module: `%s` Request ID: `%s` Commit ID: `%s`", module.NamespacedName(), req.ID, commitID),
 	}
 
-	commentID, err := p.postToGitHub(repo, "POST", 0, pr.Number, commentBody)
+	commentID, err := p.github.postComment(repo, 0, pr.Number, commentBody)
 	if err != nil {
 		return fmt.Errorf("unable to post pending request comment: %w", err)
 	}

@@ -6,102 +6,100 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"os"
 	"strings"
 
 	"github.com/utilitywarehouse/git-mirror/pkg/mirror"
 )
 
-func (ps *Planner) getOpenPullRequests(ctx context.Context, repo *mirror.GitURL) ([]pr, error) {
-	url := "https://api.github.com/graphql"
+type gitHubClient struct {
+	rootURL string
+	http    *http.Client
+	token   string
+}
+
+func (gc *gitHubClient) openPRs(ctx context.Context, repo *mirror.GitURL) ([]*pr, error) {
 	repoName := strings.TrimSuffix(repo.Repo, ".git")
 
-	query := `
-	query {
-		repository(owner: "` + repo.Path + `", name: "` + repoName + `") {
-			pullRequests(states: OPEN, last: 100) {
-				nodes {
-					number
-					headRefName
-					commits(last: 20) {
-						nodes {
-							commit {
-								oid
-							}
-						}
-					}
-					comments(last:20) {
-						nodes {
-							databaseId
-							body
-						}
-					}
-					files(first: 100) {
-						nodes {
-							path
-						}
-					}
-				}
-			}
-		}
-	}`
+	q := gitPRRequest{Query: queryRepoPRs}
+	q.Variables.Owner = repo.Path
+	q.Variables.RepoName = repoName
 
-	q := gitPRRequest{Query: query}
+	payload, err := json.Marshal(q)
+	if err != nil {
+		return nil, fmt.Errorf("error marshalling pr query err:%w", err)
+	}
 
-	resp, err := ps.github.http.R().
-		SetContext(ctx).
-		SetBody(q).
-		SetResult(&gitPRResponse{}).
-		Post(url)
+	// Create a new HTTP request
+	req, err := http.NewRequestWithContext(ctx, "POST", gc.rootURL+"/graphql", bytes.NewBuffer(payload))
+	if err != nil {
+		return nil, fmt.Errorf("error creating HTTP request: %w", err)
+	}
+
+	// Set headers
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+gc.token)
+
+	// Send the HTTP request
+	resp, err := gc.http.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("error sending HTTP request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	// Check the response status
+	if resp.StatusCode != 200 && resp.StatusCode != 201 {
+		return nil, fmt.Errorf("http error getting prs: %s", resp.Status)
+	}
+
+	var result gitPRResponse
+
+	err = json.NewDecoder(resp.Body).Decode(&result)
 	if err != nil {
 		return nil, err
 	}
-	if resp.StatusCode() != http.StatusOK {
-		return nil, fmt.Errorf("http status %d Error: %s", resp.StatusCode(), resp.Body())
-	}
-
-	result := resp.Result().(*gitPRResponse)
 
 	return result.Data.Repository.PullRequests.Nodes, nil
 }
 
-func (ps *Planner) postToGitHub(repo *mirror.GitURL, method string, commentID, prNumber int, commentBody prComment) (int, error) {
-	// TODO: Update credentials
-	// Temporarily using my own github user and token
-	username := "DTLP"
-	token := os.Getenv("GITHUB_TOKEN")
+func (gc *gitHubClient) postComment(repo *mirror.GitURL, commentID, prNumber int, commentBody prComment) (int, error) {
 
 	repoName := strings.TrimSuffix(repo.Repo, ".git")
 
-	// Post a comment
-	url := fmt.Sprintf("https://api.github.com/repos/%s/%s/issues/%d/comments", repo.Path, repoName, prNumber)
-	if method == "PATCH" {
-		url = fmt.Sprintf("https://api.github.com/repos/%s/%s/issues/comments/%d", repo.Path, repoName, commentID)
+	method := "POST"
+	reqURL := fmt.Sprintf("%s/repos/%s/%s/issues/%d/comments", gc.rootURL, repo.Path, repoName, prNumber)
+
+	// if comment ID provided update same comment
+	if commentID != 0 {
+		method = "PATCH"
+		reqURL = fmt.Sprintf("%s/repos/%s/%s/issues/comments/%d", gc.rootURL, repo.Path, repoName, commentID)
 	}
 
-	// Marshal the comment object to JSON
-	commentJSON, err := json.Marshal(commentBody)
+	payload, err := json.Marshal(commentBody)
 	if err != nil {
 		return 0, fmt.Errorf("error marshalling comment to JSON: %w", err)
 	}
 
 	// Create a new HTTP request
-	req, err := http.NewRequest(method, url, bytes.NewBuffer(commentJSON))
+	req, err := http.NewRequest(method, reqURL, bytes.NewBuffer(payload))
 	if err != nil {
 		return 0, fmt.Errorf("error creating HTTP request: %w", err)
 	}
 
 	// Set headers
 	req.Header.Set("Content-Type", "application/json")
-	req.SetBasicAuth(username, token)
+	req.Header.Set("Authorization", "Bearer "+gc.token)
 
 	// Send the HTTP request
-	client := &http.Client{}
-	resp, err := client.Do(req)
+	resp, err := gc.http.Do(req)
 	if err != nil {
 		return 0, fmt.Errorf("error sending HTTP request: %w", err)
 	}
 	defer resp.Body.Close()
+
+	// Check the response status
+	if resp.StatusCode != 200 && resp.StatusCode != 201 {
+		return 0, fmt.Errorf("error posting PR comment: %s", resp.Status)
+	}
 
 	var commentResponse struct {
 		ID int `json:"id"`
@@ -110,11 +108,6 @@ func (ps *Planner) postToGitHub(repo *mirror.GitURL, method string, commentID, p
 	err = json.NewDecoder(resp.Body).Decode(&commentResponse)
 	if err != nil {
 		return 0, err
-	}
-
-	// Check the response status
-	if resp.StatusCode != 200 && resp.StatusCode != 201 {
-		return 0, fmt.Errorf("error creating PR comment: %s", resp.Status)
 	}
 
 	return commentResponse.ID, nil
