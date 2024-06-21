@@ -3,7 +3,6 @@ package prplanner
 import (
 	"context"
 	"fmt"
-	"regexp"
 	"strings"
 
 	"github.com/utilitywarehouse/git-mirror/pkg/mirror"
@@ -33,95 +32,70 @@ func (p *Planner) getPendinPRUpdates(ctx context.Context, pr *pr) []output {
 
 func (p *Planner) checkPRCommentForOutputRequests(ctx context.Context, outputs *[]output, pr *pr, comment prComment) {
 	fmt.Println("checkPRCommentsForOutputRequests")
-	// TODO: Find "Received terraform plan request" comment using regex
-	// requestAckRegex := regexp.MustCompile(`Module: ` + "`" + `(.+?)` + "`" + ` Request ID: ` + "`" + `(.+?)` + "`")
-	//
-	//
-	//
-	//
 	outputRequest := p.findOutputRequestDataInComment(comment.Body)
-	fmt.Println("outputRequest:", outputRequest)
-	fmt.Println("len outputRequest:", outputRequest)
-	// if strings.Contains(comment.Body, "Received terraform plan request") {
-	// 	prCommentModule, err := ps.findModuleNameInComment(comment.Body)
-	// 	if err != nil {
-	// 		ps.Log.Error("error getting module name and req ID from PR comment", err)
-	// 		return
-	// 	}
-	//
-	// 	// if module.Name == prCommentModule {
-	// 	run, err := ps.getRunFromRedis(ctx, pr, "", prCommentModule)
-	// 	if err != nil {
-	// 		ps.Log.Error("can't check plan output in Redis:", err)
-	// 		return
-	// 	}
-	//
-	// 	if run.Output == "" {
-	// 		return // plan output is not ready yet
-	// 	}
-	//
-	// 	commentBody := prComment{
-	// 		Body: fmt.Sprintf(
-	// 			"Terraform plan output for module `%s`. Commit ID: `%s`\n```terraform\n%s\n```",
-	// 			prCommentModule,
-	// 			run.CommitHash,
-	// 			run.Output,
-	// 		),
-	// 	}
-	//
-	// 	newOutput := output{
-	// 		module:    prCommentModule,
-	// 		commentID: comment.DatabaseID,
-	// 		prNumber:  pr.Number,
-	// 		body:      commentBody,
-	// 	}
-	// 	*outputs = append(*outputs, newOutput)
-	// 	// }
-	// }
+	if len(outputRequest) != 4 {
+		return
+	}
+
+	moduleName := outputRequest[1]
+	moduleSplit := strings.Split(moduleName, "/")
+	moduleNamespacedName := types.NamespacedName{
+		Namespace: moduleSplit[0],
+		Name:      moduleSplit[1],
+	}
+	commitID := outputRequest[3]
+
+	// ger run output from Redis
+	run, err := p.RedisClient.PRRun(ctx, moduleNamespacedName, pr.Number, commitID)
+	if err != nil && err.Error() != "unable to get value err:redis: nil" {
+		p.Log.Error("error contacting redis", err)
+		return
+	}
+
+	if run.Output == "" {
+		return // plan output is not ready yet
+	}
+
+	commentBody := prComment{
+		Body: fmt.Sprintf(
+			"Terraform plan output for module `%s`. Commit ID: `%s`\n```terraform\n%s\n```",
+			moduleName,
+			run.CommitHash,
+			run.Output,
+		),
+	}
+
+	newOutput := output{
+		module:    moduleNamespacedName,
+		commentID: comment.DatabaseID,
+		prNumber:  pr.Number,
+		body:      commentBody,
+	}
+	*outputs = append(*outputs, newOutput)
 }
 
 func (p *Planner) findOutputRequestDataInComment(commentBody string) []string {
-	// TODO: Dirty prototype
-	// Improve flow and formatting if this works
-	searchPattern := fmt.Sprintf("Received terraform plan request. Module: `(.+?)` Request ID: `(.+?)` Commit ID: `(.+?)`")
-	re := regexp.MustCompile(searchPattern)
-	matches := re.FindStringSubmatch(commentBody)
-	// searchString := regexp.MustCompile(`Module: ` + "`" + `(.+?)` + "`" + ` Request ID: ` + "`" + `(.+?)` + "`")
-	// if strings.Contains(comment.Body, commitID) {
-	if len(matches) == 4 {
-		return matches
+	matches := requestAcknowledgedRegex.FindStringSubmatch(commentBody)
+	if len(matches) != 4 {
+		return []string{}
 	}
 
-	return []string{}
+	return matches
 }
 
-// TODO: regex should be compiled outside of func
-func (p *Planner) findModuleNameInComment(commentBody string) (types.NamespacedName, error) {
-	// Search for module name and req ID
-	re1 := regexp.MustCompile(`Module: ` + "`" + `(.+?)` + "`" + ` Request ID: ` + "`" + `(.+?)` + "`")
+func (p *Planner) findModuleNameInPlanRequestComment(commentBody string) (bool, types.NamespacedName) {
+	matches := terraformPlanRequestRegex.FindStringSubmatch(commentBody)
 
-	matches := re1.FindStringSubmatch(commentBody)
+	if len(matches) == 0 {
+		return false, types.NamespacedName{}
+	}
 
-	if len(matches) == 3 {
+	if len(matches) == 3 && matches[2] != "" {
 		namespacedName := strings.Split(matches[1], "/")
-		return types.NamespacedName{Namespace: namespacedName[0], Name: namespacedName[1]}, nil
-
+		return true, types.NamespacedName{Namespace: namespacedName[1], Name: namespacedName[2]}
 	}
 
-	return types.NamespacedName{}, nil
-}
-
-func (p *Planner) findModuleNameInRunRequestComment(commentBody string) (string, error) {
-	// TODO: Match "@terraform-applier plan "
-	// Search for module name only
-	re2 := regexp.MustCompile("`([^`]*)`")
-	matches := re2.FindStringSubmatch(commentBody)
-
-	if len(matches) > 1 {
-		return matches[1], nil
-	}
-
-	return "", fmt.Errorf("module data not found")
+	return true, types.NamespacedName{}
 }
 
 func (p *Planner) postPlanOutput(output output, repo *mirror.GitURL) {
