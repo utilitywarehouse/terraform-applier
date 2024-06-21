@@ -14,8 +14,9 @@ import (
 )
 
 var (
-	terraformPlanOutRegex    = regexp.MustCompile("Terraform plan output for module `(.+?)`. Commit ID: `(.+?)`")
-	requestAcknowledgedRegex = regexp.MustCompile("Received terraform plan request. Module: `(.+?)`")
+	terraformPlanRequestRegex = regexp.MustCompile("(@terraform-applier plan).?(`.+?`)?")
+	terraformPlanOutRegex     = regexp.MustCompile("Terraform plan output for module `(.+?)`. Commit ID: `(.+?)`")
+	requestAcknowledgedRegex  = regexp.MustCompile("Received terraform plan request. Module: `(.+?)` Request ID: `(.+?)` Commit ID: `(.+?)`")
 )
 
 // 3. loop through pr modules:
@@ -118,22 +119,105 @@ func (p *Planner) checkPRCommits(ctx context.Context, repo *mirror.GitURL, pr pr
 	return false, nil
 }
 
-// TODO: Move regex patterns compiles outside of these functions and store in one place
-func (p *Planner) planOutputPostedForCommit(pr pr, commitID string, module types.NamespacedName) bool {
+func (p *Planner) isModuleUpdated(ctx context.Context, commitHash string, module tfaplv1beta1.Module) (bool, error) {
+	filesChangedInCommit, err := p.Repos.ChangedFiles(ctx, module.Spec.RepoURL, commitHash)
+	if err != nil {
+		return false, fmt.Errorf("error getting commit info: %w", err)
+	}
+
+	return pathBelongsToModule(filesChangedInCommit, module), nil
+}
+
+func (p *Planner) checkPRCommentsForPlanRequests(ctx context.Context, pr pr, repo *mirror.GitURL, module tfaplv1beta1.Module) (bool, error) {
+	// TODO: Allow users manually request plan runs for PRs with a large number of modules,
+	// but only ONE module at a time
+	// Go through PR comments in reverse order
 	for i := len(pr.Comments.Nodes) - 1; i >= 0; i-- {
 		comment := pr.Comments.Nodes[i]
 
-		matches := terraformPlanOutRegex.FindStringSubmatch(comment.Body)
-		if len(matches) != 3 {
-			return false
+		ok := p.planRequestedForModule(comment.Body, module.NamespacedName())
+		if ok {
+			return false, nil
 		}
-		// TODO: S1025: should use String() instead of fmt.Sprintf
-		if matches[1] == fmt.Sprintf("%s", module) && matches[2] == commitID {
-			return true
+
+		// Check if user requested terraform plan run
+		// if strings.Contains(comment.Body, "@terraform-applier plan") {
+		// Give users ability to request plan for all modules or just one
+		// terraform-applier plan [`<module name>`]
+		ok, prCommentModule := p.getRunRequestInfoFromComment(comment.Body)
+		if !ok {
+			continue
 		}
+
+		if prCommentModule.Name == "" {
+			// TODO: request plan for all modules if no module name specified in comment
+			// pr.RequestPlanForAllModules()
+			//
+			// return true, nil
+		}
+
+		if prCommentModule.Name != module.Name {
+			continue
+		}
+
+		p.Log.Debug("new plan request received. creating new plan request", "namespace", module.ObjectMeta.Namespace, "module", module.Name)
+		return true, p.addNewRequest(ctx, module, pr, repo, pr.Commits.Nodes[len(pr.Commits.Nodes)-1].Commit.Oid)
+		// }
+	}
+
+	return false, nil
+}
+
+func (p *Planner) planRequestedForModule(comment string, module types.NamespacedName) bool {
+	reckAck := p.getRequestAcknowledgementInfoFromComment(comment)
+	if len(reckAck) != 0 && reckAck[1] == fmt.Sprintf("%s", module) {
+		return true
+	}
+
+	runOut := p.getRunOutputFromComment(comment)
+	if len(runOut) != 0 && runOut[1] == fmt.Sprintf("%s", module) {
+		return true
 	}
 
 	return false
+}
+
+// TODO: getRequestAcknowledgementInfoFromComment
+// getRequestAcknowledgementInfoFromComment
+// getPlanRunOutputFromComment
+func (p *Planner) getRunRequestInfoFromComment(commentBody string) (bool, types.NamespacedName) {
+	matches := terraformPlanRequestRegex.FindStringSubmatch(commentBody)
+
+	if len(matches) == 0 {
+		return false, types.NamespacedName{}
+	}
+
+	if len(matches) == 3 && matches[1] != "" {
+		// TODO: Need more debugging here
+		// Need to know why it's crashing
+		namespacedName := strings.Split(matches[2], "/")
+		return true, types.NamespacedName{Namespace: namespacedName[0], Name: namespacedName[1]}
+	}
+
+	return true, types.NamespacedName{}
+}
+
+func (p *Planner) getRequestAcknowledgementInfoFromComment(comment string) []string {
+	matches := requestAcknowledgedRegex.FindStringSubmatch(comment)
+	if len(matches) == 4 {
+		return matches
+	}
+
+	return []string{}
+}
+
+func (p *Planner) getRunOutputFromComment(comment string) []string {
+	matches := terraformPlanOutRegex.FindStringSubmatch(comment)
+	if len(matches) == 3 {
+		return matches
+	}
+
+	return []string{}
 }
 
 func (p *Planner) planRequestAcknowledgedForCommit(pr pr, module types.NamespacedName) bool {
@@ -141,10 +225,10 @@ func (p *Planner) planRequestAcknowledgedForCommit(pr pr, module types.Namespace
 		comment := pr.Comments.Nodes[i]
 
 		matches := requestAcknowledgedRegex.FindStringSubmatch(comment.Body)
-		if len(matches) != 2 {
+		if len(matches) != 4 {
 			return false
 		}
-		// TODO: S1025: should use String() instead of fmt.Sprintf
+
 		if matches[1] == fmt.Sprintf("%s", module) {
 			return true
 		}
@@ -153,43 +237,21 @@ func (p *Planner) planRequestAcknowledgedForCommit(pr pr, module types.Namespace
 	return false
 }
 
-func (p *Planner) isModuleUpdated(ctx context.Context, commitHash string, module tfaplv1beta1.Module) (bool, error) {
-	filesChangedInCommit, err := p.Repos.ChangedFiles(ctx, module.Spec.RepoURL, commitHash)
-	if err != nil {
-		return false, fmt.Errorf("error getting commit info: %w", err)
-	}
-	fmt.Println("filesChangedInCommit:", filesChangedInCommit)
-
-	return pathBelongsToModule(filesChangedInCommit, module), nil
-}
-
-func (p *Planner) checkPRCommentsForPlanRequests(ctx context.Context, pr pr, repo *mirror.GitURL, module tfaplv1beta1.Module) (bool, error) {
-	// TODO: Allow users manually request plan runs for PRs with a large number of modules,
-	// but only ONE module at a time
-
-	// Go through PR comments in reverse order
+func (p *Planner) planOutputPostedForCommit(pr pr, commitID string, module types.NamespacedName) bool {
 	for i := len(pr.Comments.Nodes) - 1; i >= 0; i-- {
 		comment := pr.Comments.Nodes[i]
 
-		// TODO: 1st check if plan output for THIS module is uploaded/requested
-		// if find return
+		matches := terraformPlanOutRegex.FindStringSubmatch(comment.Body)
+		if len(matches) != 3 {
+			continue
+		}
 
-		// Check if user requested terraform plan run
-		if strings.Contains(comment.Body, "@terraform-applier plan") {
-			// Give users ability to request plan for all modules or just one
-			// terraform-applier plan [`<module name>`]
-			prCommentModule, _ := p.findModuleNameInComment(comment.Body)
-
-			if prCommentModule.Name != "" && module.Name != prCommentModule.Name {
-				continue
-			}
-
-			p.Log.Debug("new plan request received. creating new plan request", "namespace", module.ObjectMeta.Namespace, "module", module.Name)
-			return true, p.addNewRequest(ctx, module, pr, repo, pr.Commits.Nodes[len(pr.Commits.Nodes)-1].Commit.Oid)
+		if matches[1] == fmt.Sprintf("%s", module) && matches[2] == commitID {
+			return true
 		}
 	}
 
-	return false, nil
+	return false
 }
 
 func (p *Planner) addNewRequest(ctx context.Context, module tfaplv1beta1.Module, pr pr, repo *mirror.GitURL, commitID string) error {
