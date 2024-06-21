@@ -1,7 +1,6 @@
 package prplanner
 
 import (
-	"github.com/go-resty/resty/v2"
 	"k8s.io/apimachinery/pkg/types"
 )
 
@@ -34,11 +33,6 @@ query ($owner: String!,$repoName: String! ) {
     }
   }
 }`
-
-type gitHubRepo struct {
-	name  string
-	owner string
-}
 
 type gitPRRequest struct {
 	Query     string `json:"query,omitempty"`
@@ -90,9 +84,4 @@ type output struct {
 	body      prComment
 	commentID int
 	prNumber  int
-}
-
-type graphqlClient struct {
-	url  string
-	http *resty.Client
 }

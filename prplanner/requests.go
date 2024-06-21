@@ -14,9 +14,10 @@ import (
 )
 
 var (
-	terraformPlanRequestRegex = regexp.MustCompile("@terraform-applier plan( `(.+?)`)?")
-	terraformPlanOutRegex     = regexp.MustCompile("Terraform plan output for module `(.+?)`. Commit ID: `(.+?)`")
-	requestAcknowledgedRegex  = regexp.MustCompile("Received terraform plan request. Module: `(.+?)` Request ID: `(.+?)` Commit ID: `(.+?)`")
+	terraformPlanRequestRegex = regexp.MustCompile("@terraform-applier plan( (.+?))?")
+
+	requestAcknowledgedTml   = "Received terraform plan request. Module: `%s` Request ID: `%s` Commit ID: `%s`"
+	requestAcknowledgedRegex = regexp.MustCompile("Received terraform plan request. Module: `(.+?)` Request ID: `(.+?)` Commit ID: `(.+?)`")
 )
 
 // 3. loop through pr modules:
@@ -49,15 +50,13 @@ func (p *Planner) ensurePlanRequests(ctx context.Context, repo *mirror.GitURL, p
 
 	for _, moduleName := range prModules {
 
+		// 1. Check if module has any pending plan request
 		var module tfaplv1beta1.Module
 		err := p.ClusterClt.Get(ctx, moduleName, &module)
 		if err != nil {
 			p.Log.Error("unable to get module", "module", moduleName, "error", err)
 			continue
 		}
-
-		// 1. Check if module is annotated
-		// no need to proceed if there's already a plan request for the module
 		_, ok := module.PendingRunRequest()
 		if ok {
 			continue
@@ -73,7 +72,7 @@ func (p *Planner) ensurePlanRequests(ctx context.Context, repo *mirror.GitURL, p
 
 func (p *Planner) ensurePlanRequest(ctx context.Context, repo *mirror.GitURL, pr *pr, module tfaplv1beta1.Module, skipCommitRun bool) error {
 	if !skipCommitRun {
-		// 2. loop through commits from latest to oldest
+		// 1. loop through commits from latest to oldest
 		ok, err := p.checkPRCommits(ctx, repo, pr, module)
 		if err != nil {
 			return err
@@ -82,7 +81,7 @@ func (p *Planner) ensurePlanRequest(ctx context.Context, repo *mirror.GitURL, pr
 			return nil
 		}
 	}
-	// 3. loop through comments
+	// 2. loop through comments
 	_, err := p.checkPRCommentsForPlanRequests(ctx, pr, repo, module)
 	return err
 }
@@ -102,13 +101,8 @@ func (p *Planner) checkPRCommits(ctx context.Context, repo *mirror.GitURL, pr *p
 		}
 
 		// 2. check if we have already processed (uploaded output) this commit
-		outputPosted := p.planOutputPostedForCommit(pr, commit.Oid, module.NamespacedName())
+		outputPosted := isPlanOutputPostedForCommit(pr, commit.Oid, module.NamespacedName())
 		if outputPosted {
-			return false, nil
-		}
-
-		requestAcknowledged := p.planRequestAcknowledgedForCommit(pr, module.NamespacedName())
-		if requestAcknowledged {
 			return false, nil
 		}
 
@@ -118,7 +112,7 @@ func (p *Planner) checkPRCommits(ctx context.Context, repo *mirror.GitURL, pr *p
 			return false, nil
 		}
 
-		// 3. request run
+		// 4. request run
 		return true, p.addNewRequest(ctx, module, pr, repo, commit.Oid)
 	}
 
@@ -139,123 +133,88 @@ func (p *Planner) checkPRCommentsForPlanRequests(ctx context.Context, pr *pr, re
 	for i := len(pr.Comments.Nodes) - 1; i >= 0; i-- {
 		comment := pr.Comments.Nodes[i]
 
-		reckAck := p.getRequestAcknowledgementInfoFromComment(comment.Body)
-		if len(reckAck) != 0 && reckAck[1] == fmt.Sprintf("%s", module.NamespacedName()) {
-			return false, nil
-		}
+		// No need to check for pending run as there is no annotation
+		// reckAck := p.getRequestAcknowledgementInfoFromComment(comment.Body)
+		// if len(reckAck) != 0 && reckAck[1] == module.NamespacedName().String() {
+		// 	return false, nil
+		// }
 
-		runOut := p.getRunOutputFromComment(comment.Body)
-		if len(runOut) != 0 && runOut[1] == fmt.Sprintf("%s", module.NamespacedName()) {
+		commentModule, _ := getPostedRunOutputInfo(comment.Body)
+		if commentModule == module.NamespacedName() {
 			return false, nil
 		}
 
 		// Check if user requested terraform plan run
-		// if strings.Contains(comment.Body, "@terraform-applier plan") {
-		// Give users ability to request plan for all modules or just one
-		// terraform-applier plan [`<module name>`]
-		prCommentModule, ok := p.getRunRequestFromComment(comment.Body)
-		if !ok {
+		// '@terraform-applier plan [<module namespace>]/<module name>'
+		commentModule = getRunRequestFromComment(comment.Body)
+		if commentModule.Name != module.Name {
 			continue
 		}
-
-		if prCommentModule.Name != module.Name {
+		// commented module's namespace needs to match as well if its given by user
+		if commentModule.Namespace != "" && commentModule.Namespace != module.Namespace {
 			continue
 		}
 
 		p.Log.Debug("new plan request received. creating new plan request", "namespace", module.ObjectMeta.Namespace, "module", module.Name)
 		return true, p.addNewRequest(ctx, module, pr, repo, pr.Commits.Nodes[len(pr.Commits.Nodes)-1].Commit.Oid)
-		// }
 	}
 
 	return false, nil
 }
 
-func (p *Planner) planAlreadyRequestedForModule(comment string, module types.NamespacedName) bool {
-	reckAck := p.getRequestAcknowledgementInfoFromComment(comment)
-	if len(reckAck) != 0 && reckAck[1] == fmt.Sprintf("%s", module) {
-		return true
-	}
+// isPlanOutputPostedForCommit loops through all the comments to check if given commit
+// ids plan output is already posted
+func isPlanOutputPostedForCommit(pr *pr, commitID string, module types.NamespacedName) bool {
+	for i := len(pr.Comments.Nodes) - 1; i >= 0; i-- {
+		comment := pr.Comments.Nodes[i]
 
-	runOut := p.getRunOutputFromComment(comment)
-	if len(runOut) != 0 && runOut[1] == fmt.Sprintf("%s", module) {
-		return true
+		commentModule, commentCommitID := getPostedRunOutputInfo(comment.Body)
+		if commentModule == module && commentCommitID == commitID {
+			return true
+		}
 	}
 
 	return false
 }
 
-func (p *Planner) getRunRequestFromComment(commentBody string) (types.NamespacedName, bool) {
-	matches := terraformPlanRequestRegex.FindStringSubmatch(commentBody)
-
-	if len(matches) == 0 {
-		return types.NamespacedName{}, false
-	}
-
-	if len(matches) == 3 && matches[2] != "" {
-		namespacedName := strings.Split(matches[2], "/")
-		return types.NamespacedName{Namespace: namespacedName[0], Name: namespacedName[1]}, true
-	}
-
-	return types.NamespacedName{}, true
-}
-
-func (p *Planner) getRequestAcknowledgementInfoFromComment(comment string) []string {
-	matches := requestAcknowledgedRegex.FindStringSubmatch(comment)
-	if len(matches) == 4 {
-		return matches
-	}
-
-	return []string{}
-}
-
-func (p *Planner) getRunOutputFromComment(comment string) []string {
+func getPostedRunOutputInfo(comment string) (module types.NamespacedName, commit string) {
 	matches := terraformPlanOutRegex.FindStringSubmatch(comment)
 	if len(matches) == 3 {
-		return matches
+		return parseNamespaceName(matches[1]), matches[2]
 	}
 
-	return []string{}
+	return types.NamespacedName{}, ""
 }
 
-func (p *Planner) planRequestAcknowledgedForCommit(pr *pr, module types.NamespacedName) bool {
-	for i := len(pr.Comments.Nodes) - 1; i >= 0; i-- {
-		comment := pr.Comments.Nodes[i]
+// TODO: comment can be with or without namespaced name
+func getRunRequestFromComment(commentBody string) types.NamespacedName {
+	matches := terraformPlanRequestRegex.FindStringSubmatch(commentBody)
 
-		matches := requestAcknowledgedRegex.FindStringSubmatch(comment.Body)
-		if len(matches) != 4 {
-			return false
-		}
-
-		if matches[1] == fmt.Sprintf("%s", module) {
-			return true
-		}
+	if len(matches) == 3 && matches[2] != "" {
+		return parseNamespaceName(matches[2])
 	}
 
-	return false
+	return types.NamespacedName{}
 }
 
-func (p *Planner) planOutputPostedForCommit(pr *pr, commitID string, module types.NamespacedName) bool {
-	for i := len(pr.Comments.Nodes) - 1; i >= 0; i-- {
-		comment := pr.Comments.Nodes[i]
-
-		matches := terraformPlanOutRegex.FindStringSubmatch(comment.Body)
-		if len(matches) != 3 {
-			continue
-		}
-
-		if matches[1] == fmt.Sprintf("%s", module) && matches[2] == commitID {
-			return true
-		}
+func parseNamespaceName(str string) types.NamespacedName {
+	namespacedName := strings.Split(str, "/")
+	if len(namespacedName) == 2 {
+		return types.NamespacedName{Namespace: namespacedName[0], Name: namespacedName[1]}
 	}
 
-	return false
+	if len(namespacedName) == 1 {
+		return types.NamespacedName{Name: namespacedName[0]}
+	}
+
+	return types.NamespacedName{}
 }
 
 func (p *Planner) addNewRequest(ctx context.Context, module tfaplv1beta1.Module, pr *pr, repo *mirror.GitURL, commitID string) error {
 	req := module.NewRunRequest(tfaplv1beta1.PRPlan)
 
 	commentBody := prComment{
-		Body: fmt.Sprintf("Received terraform plan request. Module: `%s` Request ID: `%s` Commit ID: `%s`", module.NamespacedName(), req.ID, commitID),
+		Body: fmt.Sprintf(requestAcknowledgedTml, module.NamespacedName(), req.ID, commitID),
 	}
 
 	commentID, err := p.github.postComment(repo, 0, pr.Number, commentBody)
