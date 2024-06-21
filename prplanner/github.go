@@ -62,7 +62,6 @@ func (gc *gitHubClient) openPRs(ctx context.Context, repo *mirror.GitURL) ([]*pr
 }
 
 func (gc *gitHubClient) postComment(repo *mirror.GitURL, commentID, prNumber int, commentBody prComment) (int, error) {
-
 	repoName := strings.TrimSuffix(repo.Repo, ".git")
 
 	method := "POST"

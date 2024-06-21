@@ -37,7 +37,7 @@ func (p *Planner) Init(token string) {
 }
 
 func (p *Planner) Start(ctx context.Context) {
-	ticker := time.NewTicker(p.Interval) // TODO: Adjust this as needed
+	ticker := time.NewTicker(p.Interval)
 	defer ticker.Stop()
 
 	for {
@@ -48,7 +48,7 @@ func (p *Planner) Start(ctx context.Context) {
 
 			kubeModuleList := &tfaplv1beta1.ModuleList{}
 			if err := p.ClusterClt.List(ctx, kubeModuleList); err != nil {
-				p.Log.Error("error retrieving list of modules", err)
+				p.Log.Error("error retrieving list of modules", "error", err)
 				return
 			}
 
@@ -56,14 +56,14 @@ func (p *Planner) Start(ctx context.Context) {
 
 				repo, err := mirror.ParseGitURL(repoConf.Remote)
 				if err != nil {
-					p.Log.Error("unable to parse repo url", err)
+					p.Log.Error("unable to parse repo url", "error", err)
 					return
 				}
 
 				// Make a GraphQL query to fetch all open Pull Requests from Github
 				prs, err := p.github.openPRs(ctx, repo)
 				if err != nil {
-					p.Log.Error("error making GraphQL request:", err)
+					p.Log.Error("error making GraphQL request:", "error", err)
 					return
 				}
 
@@ -72,7 +72,7 @@ func (p *Planner) Start(ctx context.Context) {
 					// 1. Verify if pr belongs to module based on files changed
 					prModules, err := p.getPRModuleList(pr.Files.Nodes, kubeModuleList)
 					if err != nil {
-						p.Log.Error("error getting a list of modules in PR", err)
+						p.Log.Error("error getting a list of modules in PR", "error", err)
 					}
 
 					if len(prModules) == 0 {

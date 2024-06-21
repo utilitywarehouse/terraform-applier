@@ -289,7 +289,7 @@ func (r *Runner) runTF(
 	commitHash string,
 	cancelChan <-chan struct{},
 ) bool {
-	log := r.Log.With("module", run.Module)
+	log := r.Log.With("module", run.Module, "ref", run.RepoRef)
 	var err error
 
 	run.InitOutput, err = te.init(ctx, backendConf)
@@ -391,7 +391,6 @@ func (r *Runner) runTF(
 }
 
 func (r *Runner) SetRunStartedStatus(run *tfaplv1beta1.Run, m *tfaplv1beta1.Module, msg, commitHash, commitMsg, remoteURL string, now time.Time) error {
-
 	run.StartedAt = &metav1.Time{Time: now}
 	run.CommitHash = commitHash
 	run.CommitMsg = commitMsg
@@ -409,7 +408,6 @@ func (r *Runner) SetRunStartedStatus(run *tfaplv1beta1.Run, m *tfaplv1beta1.Modu
 }
 
 func (r *Runner) SetRunFinishedStatus(run *tfaplv1beta1.Run, m *tfaplv1beta1.Module, reason, msg string, now time.Time) error {
-
 	run.Status = tfaplv1beta1.StatusOk
 	run.Duration = time.Since(run.StartedAt.Time)
 	m.Status.StateReason = reason
@@ -425,7 +423,6 @@ func (r *Runner) SetRunFinishedStatus(run *tfaplv1beta1.Run, m *tfaplv1beta1.Mod
 }
 
 func (r *Runner) setFailedStatus(run *tfaplv1beta1.Run, module *tfaplv1beta1.Module, reason, msg string, now time.Time) {
-
 	run.Status = tfaplv1beta1.StatusErrored
 	run.Duration = time.Since(run.StartedAt.Time)
 	// msg in this case is an error message
@@ -455,7 +452,6 @@ func isChannelClosed(cancelChan <-chan struct{}) bool {
 
 // updateRedis will add given run to Redis
 func (r *Runner) updateRedis(ctx context.Context, run *tfaplv1beta1.Run) error {
-
 	// if its PR run only update relevant PR key
 	if run.Request.Type == tfaplv1beta1.PRPlan {
 		return r.Redis.SetPRRun(ctx, run)

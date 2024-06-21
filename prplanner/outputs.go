@@ -47,8 +47,7 @@ func (p *Planner) checkPRCommentForOutputRequests(ctx context.Context, outputs *
 
 	// ger run output from Redis
 	run, err := p.RedisClient.PRRun(ctx, moduleNamespacedName, pr.Number, commitID)
-	if err != nil && err.Error() != "unable to get value err:redis: nil" {
-		p.Log.Error("error contacting redis", err)
+	if err != nil {
 		return
 	}
 

@@ -6,9 +6,9 @@ import (
 )
 
 const queryRepoPRs = `
-query {
+query ($owner: String!,$repoName: String! ) {
   repository(owner: $owner, name: $repoName) {
-    pullRequests(states: OPEN, last: 100) {
+    pullRequests(states: OPEN, last: 20) {
       nodes {
         number
         headRefName
