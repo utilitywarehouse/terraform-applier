@@ -7,32 +7,32 @@ import (
 
 const queryRepoPRs = `
 query {
-	repository(owner: $owner, name: $repoName) {
-		pullRequests(states: OPEN, last: 100) {
-			nodes {
-				number
-				headRefName
-				commits(last: 20) {
-					nodes {
-						commit {
-							oid
-						}
-					}
-				}
-				comments(last:20) {
-					nodes {
-						databaseId
-						body
-					}
-				}
-				files(last: 100) {
-					nodes {
-						path
-					}
-				}
-			}
-		}
-	}
+  repository(owner: $owner, name: $repoName) {
+    pullRequests(states: OPEN, last: 100) {
+      nodes {
+        number
+        headRefName
+        commits(last: 20) {
+          nodes {
+            commit {
+              oid
+            }
+          }
+        }
+        comments(last:20) {
+          nodes {
+            databaseId
+            body
+          }
+        }
+        files(first: 100) {
+          nodes {
+            path
+          }
+        }
+      }
+    }
+  }
 }`
 
 type gitHubRepo struct {
