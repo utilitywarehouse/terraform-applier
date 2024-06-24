@@ -56,18 +56,20 @@ type pr struct {
 	Number      int    `json:"number"`
 	HeadRefName string `json:"headRefName"`
 	Commits     struct {
-		Nodes []struct {
-			Commit struct {
-				Oid string `json:"oid"`
-			} `json:"commit"`
-		} `json:"nodes"`
+		Nodes []prCommit `json:"nodes"`
 	} `json:"commits"`
 	Comments struct {
 		Nodes []prComment `json:"nodes"`
 	} `json:"comments"`
 	Files struct {
-		Nodes prFiles `json:"nodes"`
+		Nodes []prFiles `json:"nodes"`
 	} `json:"files"`
+}
+
+type prCommit struct {
+	Commit struct {
+		Oid string `json:"oid"`
+	} `json:"commit"`
 }
 
 type prComment struct {
@@ -75,7 +77,7 @@ type prComment struct {
 	Body       string `json:"body"`
 }
 
-type prFiles []struct {
+type prFiles struct {
 	Path string `json:"path"`
 }
 

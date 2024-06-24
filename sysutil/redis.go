@@ -3,6 +3,7 @@ package sysutil
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -13,6 +14,7 @@ import (
 
 var (
 	PRKeyExpirationDur = 7 * 24 * time.Hour
+	ErrKeyNotFound     = errors.New("key not found")
 )
 
 //go:generate go run github.com/golang/mock/mockgen -package sysutil -destination redis_mock.go github.com/utilitywarehouse/terraform-applier/sysutil RedisInterface
@@ -119,7 +121,9 @@ func (r Redis) GetCommitHash(ctx context.Context, key string) (string, error) {
 
 func (r Redis) getKV(ctx context.Context, key string) (*tfaplv1beta1.Run, error) {
 	output, err := r.Client.Get(ctx, key).Result()
-	if err != nil {
+	if err == redis.Nil {
+		return nil, ErrKeyNotFound
+	} else if err != nil {
 		return nil, fmt.Errorf("unable to get value err:%w", err)
 	}
 

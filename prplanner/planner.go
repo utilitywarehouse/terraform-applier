@@ -21,7 +21,7 @@ type Planner struct {
 	ClusterClt  client.Client
 	Repos       git.Repositories
 	RedisClient sysutil.RedisInterface
-	github      *gitHubClient
+	github      GithubInterface
 	Interval    time.Duration
 	Log         *slog.Logger
 }
@@ -70,7 +70,7 @@ func (p *Planner) Start(ctx context.Context) {
 				// Loop through all open PRs
 				for _, pr := range prs {
 					// 1. Verify if pr belongs to module based on files changed
-					prModules, err := p.getPRModuleList(pr.Files.Nodes, kubeModuleList)
+					prModules, err := p.getPRModuleList(pr, kubeModuleList)
 					if err != nil {
 						p.Log.Error("error getting a list of modules in PR", "error", err)
 					}
@@ -107,16 +107,19 @@ func (p *Planner) isLocalRepoUpToDate(ctx context.Context, repo string, pr *pr) 
 	return err == nil
 }
 
-func (p *Planner) getPRModuleList(prFiles prFiles, kubeModules *tfaplv1beta1.ModuleList) ([]types.NamespacedName, error) {
+func (p *Planner) getPRModuleList(pr *pr, kubeModules *tfaplv1beta1.ModuleList) ([]types.NamespacedName, error) {
 	var pathList []string
 
-	for _, file := range prFiles {
+	for _, file := range pr.Files.Nodes {
 		pathList = append(pathList, file.Path)
 	}
 
 	var modulesUpdated []types.NamespacedName
 
 	for _, kubeModule := range kubeModules.Items {
+
+		// TODO: we should also match repo URL
+
 		if pathBelongsToModule(pathList, kubeModule) {
 			modulesUpdated = append(modulesUpdated, kubeModule.NamespacedName())
 		}
