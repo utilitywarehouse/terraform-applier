@@ -96,7 +96,6 @@ func (p *Planner) ensurePlanRequest(ctx context.Context, repo *mirror.GitURL, pr
 }
 
 func (p *Planner) checkPRCommits(ctx context.Context, repo *mirror.GitURL, pr *pr, module tfaplv1beta1.Module) (*tfaplv1beta1.Request, error) {
-	var req *tfaplv1beta1.Request
 	// loop through commits to check if module path is updated
 	for i := len(pr.Commits.Nodes) - 1; i >= 0; i-- {
 		commit := pr.Commits.Nodes[i].Commit
@@ -104,7 +103,7 @@ func (p *Planner) checkPRCommits(ctx context.Context, repo *mirror.GitURL, pr *p
 		// 1. check if module path is updated in this commit
 		updated, err := p.isModuleUpdated(ctx, commit.Oid, module)
 		if err != nil {
-			return req, err
+			return &tfaplv1beta1.Request{}, err
 		}
 		if !updated {
 			continue
@@ -113,20 +112,20 @@ func (p *Planner) checkPRCommits(ctx context.Context, repo *mirror.GitURL, pr *p
 		// 2. check if we have already processed (uploaded output) this commit
 		outputPosted := isPlanOutputPostedForCommit(pr, commit.Oid, module.NamespacedName())
 		if outputPosted {
-			return req, nil
+			return &tfaplv1beta1.Request{}, nil
 		}
 
 		// 3. check if run is already completed for this commit
 		_, err = p.RedisClient.PRRun(ctx, module.NamespacedName(), pr.Number, commit.Oid)
 		if err != nil && err.Error() != "unable to get value err:redis: nil" {
-			return req, nil
+			return &tfaplv1beta1.Request{}, nil
 		}
 
 		// 4. request run
-		return p.addNewRequest(ctx, module, pr, repo, commit.Oid, req)
+		return p.addNewRequest(ctx, module, pr, repo, commit.Oid)
 	}
 
-	return req, nil
+	return &tfaplv1beta1.Request{}, nil
 }
 
 func (p *Planner) isModuleUpdated(ctx context.Context, commitHash string, module tfaplv1beta1.Module) (bool, error) {
@@ -139,7 +138,6 @@ func (p *Planner) isModuleUpdated(ctx context.Context, commitHash string, module
 }
 
 func (p *Planner) checkPRCommentsForPlanRequests(ctx context.Context, pr *pr, repo *mirror.GitURL, module tfaplv1beta1.Module) (*tfaplv1beta1.Request, error) {
-	var req *tfaplv1beta1.Request
 	// Go through PR comments in reverse order
 	for i := len(pr.Comments.Nodes) - 1; i >= 0; i-- {
 		comment := pr.Comments.Nodes[i]
@@ -152,7 +150,7 @@ func (p *Planner) checkPRCommentsForPlanRequests(ctx context.Context, pr *pr, re
 
 		commentModule, _ := getPostedRunOutputInfo(comment.Body)
 		if commentModule == module.NamespacedName() {
-			return req, nil
+			return &tfaplv1beta1.Request{}, nil
 		}
 
 		// Check if user requested terraform plan run
@@ -167,10 +165,10 @@ func (p *Planner) checkPRCommentsForPlanRequests(ctx context.Context, pr *pr, re
 		}
 
 		p.Log.Debug("new plan request received. creating new plan request", "namespace", module.ObjectMeta.Namespace, "module", module.Name)
-		return p.addNewRequest(ctx, module, pr, repo, pr.Commits.Nodes[len(pr.Commits.Nodes)-1].Commit.Oid, req)
+		return p.addNewRequest(ctx, module, pr, repo, pr.Commits.Nodes[len(pr.Commits.Nodes)-1].Commit.Oid)
 	}
 
-	return req, nil
+	return &tfaplv1beta1.Request{}, nil
 }
 
 // isPlanOutputPostedForCommit loops through all the comments to check if given commit
@@ -221,7 +219,9 @@ func parseNamespaceName(str string) types.NamespacedName {
 	return types.NamespacedName{}
 }
 
-func (p *Planner) addNewRequest(ctx context.Context, module tfaplv1beta1.Module, pr *pr, repo *mirror.GitURL, commitID string, req *tfaplv1beta1.Request) (*tfaplv1beta1.Request, error) {
+func (p *Planner) addNewRequest(ctx context.Context, module tfaplv1beta1.Module, pr *pr, repo *mirror.GitURL, commitID string) (*tfaplv1beta1.Request, error) {
+	req := module.NewRunRequest(tfaplv1beta1.PRPlan)
+
 	commentBody := prComment{
 		Body: fmt.Sprintf(requestAcknowledgedTml, module.NamespacedName(), req.ID, commitID),
 	}
