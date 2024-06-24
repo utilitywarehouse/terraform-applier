@@ -11,8 +11,8 @@ import (
 )
 
 var (
-	outputBodyTml         = "Terraform plan output for module `%s`. Commit ID: `%s`\n```terraform\n%s\n```"
-	terraformPlanOutRegex = regexp.MustCompile("Terraform plan output for module `(.+?)`. Commit ID: `(.+?)`")
+	outputBodyTml         = "Terraform plan output for module `%s` Commit ID: `%s`\n```terraform\n%s\n```"
+	terraformPlanOutRegex = regexp.MustCompile("Terraform plan output for module `(.+?)` Commit ID: `(.+?)`")
 )
 
 func (p *Planner) uploadRequestOutput(ctx context.Context, repo *mirror.GitURL, pr *pr) {
@@ -57,7 +57,6 @@ func (p *Planner) checkPRCommentForOutputRequests(ctx context.Context, pr *pr, c
 		prNumber:  pr.Number,
 		body:      commentBody,
 	}, true
-
 }
 
 func findOutputRequestDataInComment(commentBody string) (types.NamespacedName, string) {
@@ -72,6 +71,6 @@ func findOutputRequestDataInComment(commentBody string) (types.NamespacedName, s
 func (p *Planner) postPlanOutput(output output, repo *mirror.GitURL) {
 	_, err := p.github.postComment(repo, output.commentID, output.prNumber, output.body)
 	if err != nil {
-		p.Log.Error("error posting PR comment:", err)
+		p.Log.Error("error posting PR comment:", "error", err)
 	}
 }

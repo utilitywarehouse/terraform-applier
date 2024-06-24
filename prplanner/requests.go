@@ -80,11 +80,9 @@ func (p *Planner) ensurePlanRequests(ctx context.Context, repo *mirror.GitURL, p
 }
 
 func (p *Planner) ensurePlanRequest(ctx context.Context, repo *mirror.GitURL, pr *pr, module tfaplv1beta1.Module, skipCommitRun bool) (*tfaplv1beta1.Request, error) {
-	var req *tfaplv1beta1.Request
-
 	if !skipCommitRun {
 		// 1. loop through commits from latest to oldest
-		req, err := p.checkPRCommits(ctx, repo, pr, module, req)
+		req, err := p.checkPRCommits(ctx, repo, pr, module)
 		if err != nil {
 			return req, err
 		}
@@ -94,10 +92,11 @@ func (p *Planner) ensurePlanRequest(ctx context.Context, repo *mirror.GitURL, pr
 	}
 
 	// 2. loop through comments
-	return p.checkPRCommentsForPlanRequests(ctx, pr, repo, module, req)
+	return p.checkPRCommentsForPlanRequests(ctx, pr, repo, module)
 }
 
-func (p *Planner) checkPRCommits(ctx context.Context, repo *mirror.GitURL, pr *pr, module tfaplv1beta1.Module, req *tfaplv1beta1.Request) (*tfaplv1beta1.Request, error) {
+func (p *Planner) checkPRCommits(ctx context.Context, repo *mirror.GitURL, pr *pr, module tfaplv1beta1.Module) (*tfaplv1beta1.Request, error) {
+	var req *tfaplv1beta1.Request
 	// loop through commits to check if module path is updated
 	for i := len(pr.Commits.Nodes) - 1; i >= 0; i-- {
 		commit := pr.Commits.Nodes[i].Commit
@@ -139,7 +138,8 @@ func (p *Planner) isModuleUpdated(ctx context.Context, commitHash string, module
 	return pathBelongsToModule(filesChangedInCommit, module), nil
 }
 
-func (p *Planner) checkPRCommentsForPlanRequests(ctx context.Context, pr *pr, repo *mirror.GitURL, module tfaplv1beta1.Module, req *tfaplv1beta1.Request) (*tfaplv1beta1.Request, error) {
+func (p *Planner) checkPRCommentsForPlanRequests(ctx context.Context, pr *pr, repo *mirror.GitURL, module tfaplv1beta1.Module) (*tfaplv1beta1.Request, error) {
+	var req *tfaplv1beta1.Request
 	// Go through PR comments in reverse order
 	for i := len(pr.Comments.Nodes) - 1; i >= 0; i-- {
 		comment := pr.Comments.Nodes[i]

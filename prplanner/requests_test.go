@@ -17,7 +17,42 @@ func Test_getPostedRunOutputInfo(t *testing.T) {
 		wantModule types.NamespacedName
 		wantCommit string
 	}{
-		// TODO: Add test cases.
+		{
+			name:       "NamespaceName + Commit ID",
+			args:       args{comment: "Terraform plan output for module `terraform/my-module` Commit ID: `e3c7d4a60b8c9b4c9211a7b4e1a837e9e9c3b5f7`"},
+			wantModule: types.NamespacedName{Namespace: "terraform", Name: "my-module"},
+			wantCommit: "e3c7d4a60b8c9b4c9211a7b4e1a837e9e9c3b5f7",
+		},
+		{
+			name:       "NamespaceName only",
+			args:       args{comment: "Terraform plan output for module `terraform/my-module` Commit ID: ``"},
+			wantModule: types.NamespacedName{Namespace: "terraform", Name: "my-module"},
+			wantCommit: "",
+		},
+		{
+			name:       "Commit ID only",
+			args:       args{comment: "Terraform plan output for module `` Commit ID: `e3c7d4a60b8c9b4c9211a7b4e1a837e9e9c3b5f7`"},
+			wantModule: types.NamespacedName{},
+			wantCommit: "e3c7d4a60b8c9b4c9211a7b4e1a837e9e9c3b5f7",
+		},
+		{
+			name:       "Name + Commit ID",
+			args:       args{comment: "Terraform plan output for module `my-module` Commit ID: `e3c7d4a60b8c9b4c9211a7b4e1a837e9e9c3b5f7`"},
+			wantModule: types.NamespacedName{Name: "my-module"},
+			wantCommit: "e3c7d4a60b8c9b4c9211a7b4e1a837e9e9c3b5f7",
+		},
+		{
+			name:       "Empty string",
+			args:       args{comment: ""},
+			wantModule: types.NamespacedName{},
+			wantCommit: "",
+		},
+		{
+			name:       "@terraform-applier plan only",
+			args:       args{comment: "@terraform-applier plan"},
+			wantModule: types.NamespacedName{},
+			wantCommit: "",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -43,13 +78,13 @@ func Test_getRunRequestFromComment(t *testing.T) {
 	}{
 		{
 			name: "Namespace and Name",
-			args: args{commentBody: "@terraform-applier plan utilitywarehouse/terraform"},
-			want: types.NamespacedName{Namespace: "utilitywarehouse", Name: "terraform"},
+			args: args{commentBody: "@terraform-applier plan terraform/my-module"},
+			want: types.NamespacedName{Namespace: "terraform", Name: "my-module"},
 		},
 		{
 			name: "Name only",
-			args: args{commentBody: "@terraform-applier plan terraform"},
-			want: types.NamespacedName{Name: "terraform"},
+			args: args{commentBody: "@terraform-applier plan my-module"},
+			want: types.NamespacedName{Name: "my-module"},
 		},
 		{
 			name: "Empty string",
@@ -92,13 +127,13 @@ func Test_parseNamespaceName(t *testing.T) {
 	}{
 		{
 			name: "Namespace and Name",
-			args: args{str: "utilitywarehouse/terraform"},
-			want: types.NamespacedName{Namespace: "utilitywarehouse", Name: "terraform"},
+			args: args{str: "terraform/my-module"},
+			want: types.NamespacedName{Namespace: "terraform", Name: "my-module"},
 		},
 		{
 			name: "Name only",
-			args: args{str: "terraform"},
-			want: types.NamespacedName{Name: "terraform"},
+			args: args{str: "my-module"},
+			want: types.NamespacedName{Name: "my-module"},
 		},
 		{
 			name: "Empty string",
