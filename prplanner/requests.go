@@ -14,10 +14,10 @@ import (
 )
 
 var (
-	terraformPlanRequestRegex = regexp.MustCompile("@terraform-applier plan( (.+?))?")
+	terraformPlanRequestRegex = regexp.MustCompile("@terraform-applier plan (.+)")
 
 	requestAcknowledgedTml   = "Received terraform plan request. Module: `%s` Request ID: `%s` Commit ID: `%s`"
-	requestAcknowledgedRegex = regexp.MustCompile("Received terraform plan request. Module: `(.+?)` Request ID: `(.+?)` Commit ID: `(.+?)`")
+	requestAcknowledgedRegex = regexp.MustCompile("Received terraform plan request. Module: `(.+)` Request ID: `(.+)` Commit ID: `(.+)`")
 )
 
 // 3. loop through pr modules:
@@ -62,31 +62,41 @@ func (p *Planner) ensurePlanRequests(ctx context.Context, repo *mirror.GitURL, p
 			continue
 		}
 
-		err = p.ensurePlanRequest(ctx, repo, pr, module, skipCommitRun)
+		req, err := p.ensurePlanRequest(ctx, repo, pr, module, skipCommitRun)
 		if err != nil {
 			p.Log.Error("unable to generate new plan request", "module", moduleName, "error", err)
 			continue
 		}
+		if req != nil {
+			err = sysutil.EnsureRequest(ctx, p.ClusterClt, module.NamespacedName(), req)
+			if err != nil {
+				p.Log.Error("failed to request plan job", "error", err)
+			}
+
+			p.Log.Info("requested terraform plan for the PR", "module", module.NamespacedName(), "requestID", req.ID, "pr", pr.Number)
+		}
 	}
 }
 
-func (p *Planner) ensurePlanRequest(ctx context.Context, repo *mirror.GitURL, pr *pr, module tfaplv1beta1.Module, skipCommitRun bool) error {
+func (p *Planner) ensurePlanRequest(ctx context.Context, repo *mirror.GitURL, pr *pr, module tfaplv1beta1.Module, skipCommitRun bool) (*tfaplv1beta1.Request, error) {
+	var req *tfaplv1beta1.Request
+
 	if !skipCommitRun {
 		// 1. loop through commits from latest to oldest
-		ok, err := p.checkPRCommits(ctx, repo, pr, module)
+		req, err := p.checkPRCommits(ctx, repo, pr, module, req)
 		if err != nil {
-			return err
+			return req, err
 		}
-		if ok {
-			return nil
+		if req != nil {
+			return req, nil
 		}
 	}
+
 	// 2. loop through comments
-	_, err := p.checkPRCommentsForPlanRequests(ctx, pr, repo, module)
-	return err
+	return p.checkPRCommentsForPlanRequests(ctx, pr, repo, module, req)
 }
 
-func (p *Planner) checkPRCommits(ctx context.Context, repo *mirror.GitURL, pr *pr, module tfaplv1beta1.Module) (bool, error) {
+func (p *Planner) checkPRCommits(ctx context.Context, repo *mirror.GitURL, pr *pr, module tfaplv1beta1.Module, req *tfaplv1beta1.Request) (*tfaplv1beta1.Request, error) {
 	// loop through commits to check if module path is updated
 	for i := len(pr.Commits.Nodes) - 1; i >= 0; i-- {
 		commit := pr.Commits.Nodes[i].Commit
@@ -94,7 +104,7 @@ func (p *Planner) checkPRCommits(ctx context.Context, repo *mirror.GitURL, pr *p
 		// 1. check if module path is updated in this commit
 		updated, err := p.isModuleUpdated(ctx, commit.Oid, module)
 		if err != nil {
-			return false, err
+			return req, err
 		}
 		if !updated {
 			continue
@@ -103,20 +113,20 @@ func (p *Planner) checkPRCommits(ctx context.Context, repo *mirror.GitURL, pr *p
 		// 2. check if we have already processed (uploaded output) this commit
 		outputPosted := isPlanOutputPostedForCommit(pr, commit.Oid, module.NamespacedName())
 		if outputPosted {
-			return false, nil
+			return req, nil
 		}
 
 		// 3. check if run is already completed for this commit
 		_, err = p.RedisClient.PRRun(ctx, module.NamespacedName(), pr.Number, commit.Oid)
 		if err != nil && err.Error() != "unable to get value err:redis: nil" {
-			return false, nil
+			return req, nil
 		}
 
 		// 4. request run
-		return true, p.addNewRequest(ctx, module, pr, repo, commit.Oid)
+		return p.addNewRequest(ctx, module, pr, repo, commit.Oid, req)
 	}
 
-	return false, nil
+	return req, nil
 }
 
 func (p *Planner) isModuleUpdated(ctx context.Context, commitHash string, module tfaplv1beta1.Module) (bool, error) {
@@ -128,7 +138,7 @@ func (p *Planner) isModuleUpdated(ctx context.Context, commitHash string, module
 	return pathBelongsToModule(filesChangedInCommit, module), nil
 }
 
-func (p *Planner) checkPRCommentsForPlanRequests(ctx context.Context, pr *pr, repo *mirror.GitURL, module tfaplv1beta1.Module) (bool, error) {
+func (p *Planner) checkPRCommentsForPlanRequests(ctx context.Context, pr *pr, repo *mirror.GitURL, module tfaplv1beta1.Module, req *tfaplv1beta1.Request) (*tfaplv1beta1.Request, error) {
 	// Go through PR comments in reverse order
 	for i := len(pr.Comments.Nodes) - 1; i >= 0; i-- {
 		comment := pr.Comments.Nodes[i]
@@ -141,7 +151,7 @@ func (p *Planner) checkPRCommentsForPlanRequests(ctx context.Context, pr *pr, re
 
 		commentModule, _ := getPostedRunOutputInfo(comment.Body)
 		if commentModule == module.NamespacedName() {
-			return false, nil
+			return req, nil
 		}
 
 		// Check if user requested terraform plan run
@@ -156,10 +166,10 @@ func (p *Planner) checkPRCommentsForPlanRequests(ctx context.Context, pr *pr, re
 		}
 
 		p.Log.Debug("new plan request received. creating new plan request", "namespace", module.ObjectMeta.Namespace, "module", module.Name)
-		return true, p.addNewRequest(ctx, module, pr, repo, pr.Commits.Nodes[len(pr.Commits.Nodes)-1].Commit.Oid)
+		return p.addNewRequest(ctx, module, pr, repo, pr.Commits.Nodes[len(pr.Commits.Nodes)-1].Commit.Oid, req)
 	}
 
-	return false, nil
+	return req, nil
 }
 
 // isPlanOutputPostedForCommit loops through all the comments to check if given commit
@@ -210,16 +220,14 @@ func parseNamespaceName(str string) types.NamespacedName {
 	return types.NamespacedName{}
 }
 
-func (p *Planner) addNewRequest(ctx context.Context, module tfaplv1beta1.Module, pr *pr, repo *mirror.GitURL, commitID string) error {
-	req := module.NewRunRequest(tfaplv1beta1.PRPlan)
-
+func (p *Planner) addNewRequest(ctx context.Context, module tfaplv1beta1.Module, pr *pr, repo *mirror.GitURL, commitID string, req *tfaplv1beta1.Request) (*tfaplv1beta1.Request, error) {
 	commentBody := prComment{
 		Body: fmt.Sprintf(requestAcknowledgedTml, module.NamespacedName(), req.ID, commitID),
 	}
 
 	commentID, err := p.github.postComment(repo, 0, pr.Number, commentBody)
 	if err != nil {
-		return fmt.Errorf("unable to post pending request comment: %w", err)
+		return req, fmt.Errorf("unable to post pending request comment: %w", err)
 	}
 
 	req.PR = &tfaplv1beta1.PullRequest{
@@ -229,11 +237,5 @@ func (p *Planner) addNewRequest(ctx context.Context, module tfaplv1beta1.Module,
 		GitCommitHash: commitID,
 	}
 
-	err = sysutil.EnsureRequest(ctx, p.ClusterClt, module.NamespacedName(), req)
-	if err != nil {
-		p.Log.Error("failed to request plan job", err)
-	}
-
-	p.Log.Info("requested terraform plan for the PR", "module", module.NamespacedName(), "requestID", req.ID, "pr", pr.Number)
-	return nil
+	return req, nil
 }

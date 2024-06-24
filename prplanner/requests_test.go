@@ -41,7 +41,36 @@ func Test_getRunRequestFromComment(t *testing.T) {
 		args args
 		want types.NamespacedName
 	}{
-		// TODO: Add test cases.
+		{
+			name: "Namespace and Name",
+			args: args{commentBody: "@terraform-applier plan utilitywarehouse/terraform"},
+			want: types.NamespacedName{Namespace: "utilitywarehouse", Name: "terraform"},
+		},
+		{
+			name: "Name only",
+			args: args{commentBody: "@terraform-applier plan terraform"},
+			want: types.NamespacedName{Name: "terraform"},
+		},
+		{
+			name: "Empty string",
+			args: args{commentBody: ""},
+			want: types.NamespacedName{},
+		},
+		{
+			name: "Multiple slashes",
+			args: args{commentBody: "namespace/name/extra"},
+			want: types.NamespacedName{},
+		},
+		{
+			name: "Leading slash",
+			args: args{commentBody: "/name"},
+			want: types.NamespacedName{},
+		},
+		{
+			name: "Trailing slash",
+			args: args{commentBody: "namespace/"},
+			want: types.NamespacedName{Namespace: "namespace"},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -61,7 +90,36 @@ func Test_parseNamespaceName(t *testing.T) {
 		args args
 		want types.NamespacedName
 	}{
-		// TODO: Add test cases.
+		{
+			name: "Namespace and Name",
+			args: args{str: "utilitywarehouse/terraform"},
+			want: types.NamespacedName{Namespace: "utilitywarehouse", Name: "terraform"},
+		},
+		{
+			name: "Name only",
+			args: args{str: "terraform"},
+			want: types.NamespacedName{Name: "terraform"},
+		},
+		{
+			name: "Empty string",
+			args: args{str: ""},
+			want: types.NamespacedName{},
+		},
+		{
+			name: "Multiple slashes",
+			args: args{str: "namespace/name/extra"},
+			want: types.NamespacedName{},
+		},
+		{
+			name: "Leading slash",
+			args: args{str: "/name"},
+			want: types.NamespacedName{},
+		},
+		{
+			name: "Trailing slash",
+			args: args{str: "namespace/"},
+			want: types.NamespacedName{Namespace: "namespace"},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
