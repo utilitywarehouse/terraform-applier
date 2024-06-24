@@ -103,7 +103,7 @@ func (p *Planner) checkPRCommits(ctx context.Context, repo *mirror.GitURL, pr *p
 		// 1. check if module path is updated in this commit
 		updated, err := p.isModuleUpdated(ctx, commit.Oid, module)
 		if err != nil {
-			return &tfaplv1beta1.Request{}, err
+			return nil, err
 		}
 		if !updated {
 			continue
@@ -112,20 +112,20 @@ func (p *Planner) checkPRCommits(ctx context.Context, repo *mirror.GitURL, pr *p
 		// 2. check if we have already processed (uploaded output) this commit
 		outputPosted := isPlanOutputPostedForCommit(pr, commit.Oid, module.NamespacedName())
 		if outputPosted {
-			return &tfaplv1beta1.Request{}, nil
+			return nil, nil
 		}
 
 		// 3. check if run is already completed for this commit
 		_, err = p.RedisClient.PRRun(ctx, module.NamespacedName(), pr.Number, commit.Oid)
 		if err != nil && err.Error() != "unable to get value err:redis: nil" {
-			return &tfaplv1beta1.Request{}, nil
+			return nil, nil
 		}
 
 		// 4. request run
 		return p.addNewRequest(ctx, module, pr, repo, commit.Oid)
 	}
 
-	return &tfaplv1beta1.Request{}, nil
+	return nil, nil
 }
 
 func (p *Planner) isModuleUpdated(ctx context.Context, commitHash string, module tfaplv1beta1.Module) (bool, error) {
@@ -150,7 +150,7 @@ func (p *Planner) checkPRCommentsForPlanRequests(ctx context.Context, pr *pr, re
 
 		commentModule, _ := getPostedRunOutputInfo(comment.Body)
 		if commentModule == module.NamespacedName() {
-			return &tfaplv1beta1.Request{}, nil
+			return nil, nil
 		}
 
 		// Check if user requested terraform plan run
@@ -168,7 +168,7 @@ func (p *Planner) checkPRCommentsForPlanRequests(ctx context.Context, pr *pr, re
 		return p.addNewRequest(ctx, module, pr, repo, pr.Commits.Nodes[len(pr.Commits.Nodes)-1].Commit.Oid)
 	}
 
-	return &tfaplv1beta1.Request{}, nil
+	return nil, nil
 }
 
 // isPlanOutputPostedForCommit loops through all the comments to check if given commit
