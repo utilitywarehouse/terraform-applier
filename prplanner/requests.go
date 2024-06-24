@@ -71,6 +71,7 @@ func (p *Planner) ensurePlanRequests(ctx context.Context, repo *mirror.GitURL, p
 			err = sysutil.EnsureRequest(ctx, p.ClusterClt, module.NamespacedName(), req)
 			if err != nil {
 				p.Log.Error("failed to request plan job", "error", err)
+				continue
 			}
 
 			p.Log.Info("requested terraform plan for the PR", "module", module.NamespacedName(), "requestID", req.ID, "pr", pr.Number)
