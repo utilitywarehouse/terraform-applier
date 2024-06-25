@@ -11,6 +11,14 @@ import (
 	"github.com/utilitywarehouse/git-mirror/pkg/mirror"
 )
 
+//go:generate go run github.com/golang/mock/mockgen -package prplanner -destination github_mock.go github.com/utilitywarehouse/terraform-applier/prplanner GithubInterface
+
+// GithubInterface allows for mocking out the functionality of GitHub API Calls
+type GithubInterface interface {
+	openPRs(ctx context.Context, repo *mirror.GitURL) ([]*pr, error)
+	postComment(repo *mirror.GitURL, commentID, prNumber int, commentBody prComment) (int, error)
+}
+
 type gitHubClient struct {
 	rootURL string
 	http    *http.Client

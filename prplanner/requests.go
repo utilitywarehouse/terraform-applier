@@ -2,6 +2,7 @@ package prplanner
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"regexp"
 	"strings"
@@ -116,8 +117,12 @@ func (p *Planner) checkPRCommits(ctx context.Context, repo *mirror.GitURL, pr *p
 		}
 
 		// 3. check if run is already completed for this commit
-		_, err = p.RedisClient.PRRun(ctx, module.NamespacedName(), pr.Number, commit.Oid)
-		if err != nil && err.Error() != "unable to get value err:redis: nil" {
+		runOutput, err := p.RedisClient.PRRun(ctx, module.NamespacedName(), pr.Number, commit.Oid)
+		if err != nil && !errors.Is(err, sysutil.ErrKeyNotFound) {
+			return nil, err
+		}
+
+		if runOutput != nil {
 			return nil, nil
 		}
 
