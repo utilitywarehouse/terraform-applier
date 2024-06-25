@@ -225,7 +225,7 @@ func TestCheckPRCommits(t *testing.T) {
 
 		p := generateMockPR(123, "ref1",
 			[]string{"hash1", "hash2", "hash3"},
-			[]string{"random comment", "Terraform plan output for module `foo/two` Commit ID: `hash3`", "random comment"},
+			[]string{"random comment", fmt.Sprintf(outputBodyTml, "foo/two", "hash3", "some output"), "random comment"},
 			nil,
 		)
 
@@ -304,7 +304,6 @@ func TestCheckPRCommits(t *testing.T) {
 		if diff := cmp.Diff(wantReq, gotReq, cmpIgnoreRandFields); diff != "" {
 			t.Errorf("checkPRCommits() mismatch (-want +got):\n%s", diff)
 		}
-
 	})
 
 	t.Run("module run finished but output is not yet uploaded", func(t *testing.T) {
@@ -330,7 +329,7 @@ func TestCheckPRCommits(t *testing.T) {
 		// mock db call with output found
 		testRedis.EXPECT().PRRun(gomock.Any(),
 			types.NamespacedName{Namespace: "foo", Name: "two"}, 123, "hash3").
-			Return(&tfaplv1beta1.Run{}, nil)
+			Return(&tfaplv1beta1.Run{CommitHash: "hash3"}, nil)
 
 		// Call Test function
 		gotReq, err := planner.checkPRCommits(ctx, repoURL, p, module)
@@ -344,5 +343,4 @@ func TestCheckPRCommits(t *testing.T) {
 			t.Errorf("checkPRCommits() mismatch (-want +got):\n%s", diff)
 		}
 	})
-
 }

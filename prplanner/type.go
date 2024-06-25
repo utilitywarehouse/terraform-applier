@@ -4,6 +4,19 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
+// TODO: Add isDraft to filter out draft PRs in the PR loop
+// skip all pullRequests.nodes.isDraft = true
+//
+//	query {
+//	  repository(owner: "utilitywarehouse", name: "tf_okta") {
+//	    pullRequests(states: OPEN, last: 20) {
+//	      nodes {
+//	        number
+//	        isDraft
+//	      }
+//	    }
+//	  }
+//	}
 const queryRepoPRs = `
 query ($owner: String!,$repoName: String! ) {
   repository(owner: $owner, name: $repoName) {

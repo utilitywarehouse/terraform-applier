@@ -1,17 +1,9 @@
 package prplanner
 
 import (
-	"context"
-	"log/slog"
 	"reflect"
 	"testing"
-	"time"
 
-	"github.com/utilitywarehouse/git-mirror/pkg/mirror"
-	tfaplv1beta1 "github.com/utilitywarehouse/terraform-applier/api/v1beta1"
-	"github.com/utilitywarehouse/terraform-applier/git"
-	"github.com/utilitywarehouse/terraform-applier/sysutil"
-	"golang.org/x/vuln/client"
 	"k8s.io/apimachinery/pkg/types"
 )
 
@@ -286,68 +278,6 @@ func Test_isPlanOutputPostedForCommit(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := isPlanOutputPostedForCommit(tt.args.pr, tt.args.commitID, tt.args.module); got != tt.want {
 				t.Errorf("isPlanOutputPostedForCommit() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func Test_addNewRequest(t *testing.T) {
-	type fields struct {
-		GitMirror   mirror.RepoPoolConfig
-		ClusterClt  client.Client
-		Repos       git.Repositories
-		RedisClient sysutil.RedisInterface
-		github      *gitHubClient
-		Interval    time.Duration
-		Log         *slog.Logger
-	}
-	type args struct {
-		ctx      context.Context
-		module   tfaplv1beta1.Module
-		pr       *pr
-		repo     *mirror.GitURL
-		commitID string
-	}
-	tests := []struct {
-		name    string
-		fields  fields
-		args    args
-		want    *tfaplv1beta1.Request
-		wantErr bool
-	}{
-		{
-			name:   "test1",
-			fields: fields{},
-			args: args{
-				ctx:      context.Background(),
-				module:   tfaplv1beta1.Module{ObjectMeta: {Namespace: "terraform", Name: "my-module"}},
-				pr:       &pr{},
-				repo:     &mirror.GitURL{},
-				commitID: "e3c7d4a60b8c9b4c9211a7b4e1a837e9e9c3b5f7",
-			},
-			want:    &tfaplv1beta1.Request{},
-			wantErr: false,
-		},
-		// TODO: Add test cases.
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			p := &Planner{
-				GitMirror:   tt.fields.GitMirror,
-				ClusterClt:  tt.fields.ClusterClt,
-				Repos:       tt.fields.Repos,
-				RedisClient: tt.fields.RedisClient,
-				github:      tt.fields.github,
-				Interval:    tt.fields.Interval,
-				Log:         tt.fields.Log,
-			}
-			got, err := p.addNewRequest(tt.args.ctx, tt.args.module, tt.args.pr, tt.args.repo, tt.args.commitID)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("Planner.addNewRequest() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("Planner.addNewRequest() = %v, want %v", got, tt.want)
 			}
 		})
 	}

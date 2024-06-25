@@ -15,7 +15,7 @@ import (
 )
 
 var (
-	terraformPlanRequestRegex = regexp.MustCompile("@terraform-applier plan (.+)")
+	terraformPlanRequestRegex = regexp.MustCompile("@terraform-applier plan ([\\w'-]+\\/?[\\w'-]+)")
 
 	requestAcknowledgedTml   = "Received terraform plan request. Module: `%s` Request ID: `%s` Commit ID: `%s`"
 	requestAcknowledgedRegex = regexp.MustCompile("Received terraform plan request. Module: `(.+)` Request ID: `(.+)` Commit ID: `(.+)`")
@@ -93,7 +93,7 @@ func (p *Planner) ensurePlanRequest(ctx context.Context, repo *mirror.GitURL, pr
 	}
 
 	// 2. loop through comments
-	return p.checkPRCommentsForPlanRequests(ctx, pr, repo, module)
+	return p.checkPRCommentsForPlanRequests(pr, repo, module)
 }
 
 func (p *Planner) checkPRCommits(ctx context.Context, repo *mirror.GitURL, pr *pr, module tfaplv1beta1.Module) (*tfaplv1beta1.Request, error) {
@@ -122,7 +122,7 @@ func (p *Planner) checkPRCommits(ctx context.Context, repo *mirror.GitURL, pr *p
 			return nil, err
 		}
 
-		if runOutput != nil {
+		if runOutput != nil && runOutput.CommitHash == commit.Oid {
 			return nil, nil
 		}
 
@@ -142,16 +142,10 @@ func (p *Planner) isModuleUpdated(ctx context.Context, commitHash string, module
 	return pathBelongsToModule(filesChangedInCommit, module), nil
 }
 
-func (p *Planner) checkPRCommentsForPlanRequests(ctx context.Context, pr *pr, repo *mirror.GitURL, module tfaplv1beta1.Module) (*tfaplv1beta1.Request, error) {
+func (p *Planner) checkPRCommentsForPlanRequests(pr *pr, repo *mirror.GitURL, module tfaplv1beta1.Module) (*tfaplv1beta1.Request, error) {
 	// Go through PR comments in reverse order
 	for i := len(pr.Comments.Nodes) - 1; i >= 0; i-- {
 		comment := pr.Comments.Nodes[i]
-
-		// No need to check for pending run as there is no annotation
-		// reckAck := p.getRequestAcknowledgementInfoFromComment(comment.Body)
-		// if len(reckAck) != 0 && reckAck[1] == module.NamespacedName().String() {
-		// 	return false, nil
-		// }
 
 		commentModule, _ := getPostedRunOutputInfo(comment.Body)
 		if commentModule == module.NamespacedName() {
