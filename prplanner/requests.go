@@ -127,7 +127,7 @@ func (p *Planner) checkPRCommits(ctx context.Context, repo *mirror.GitURL, pr *p
 		}
 
 		// 4. request run
-		return p.addNewRequest(ctx, module, pr, repo, commit.Oid)
+		return p.addNewRequest(module, pr, repo, commit.Oid)
 	}
 
 	return nil, nil
@@ -170,7 +170,7 @@ func (p *Planner) checkPRCommentsForPlanRequests(ctx context.Context, pr *pr, re
 		}
 
 		p.Log.Debug("new plan request received. creating new plan request", "namespace", module.ObjectMeta.Namespace, "module", module.Name)
-		return p.addNewRequest(ctx, module, pr, repo, pr.Commits.Nodes[len(pr.Commits.Nodes)-1].Commit.Oid)
+		return p.addNewRequest(module, pr, repo, pr.Commits.Nodes[len(pr.Commits.Nodes)-1].Commit.Oid)
 	}
 
 	return nil, nil
@@ -204,8 +204,8 @@ func getPostedRunOutputInfo(comment string) (module types.NamespacedName, commit
 func getRunRequestFromComment(commentBody string) types.NamespacedName {
 	matches := terraformPlanRequestRegex.FindStringSubmatch(commentBody)
 
-	if len(matches) == 3 && matches[2] != "" {
-		return parseNamespaceName(matches[2])
+	if len(matches) == 2 && matches[1] != "" {
+		return parseNamespaceName(matches[1])
 	}
 
 	return types.NamespacedName{}
@@ -224,7 +224,7 @@ func parseNamespaceName(str string) types.NamespacedName {
 	return types.NamespacedName{}
 }
 
-func (p *Planner) addNewRequest(ctx context.Context, module tfaplv1beta1.Module, pr *pr, repo *mirror.GitURL, commitID string) (*tfaplv1beta1.Request, error) {
+func (p *Planner) addNewRequest(module tfaplv1beta1.Module, pr *pr, repo *mirror.GitURL, commitID string) (*tfaplv1beta1.Request, error) {
 	req := module.NewRunRequest(tfaplv1beta1.PRPlan)
 
 	commentBody := prComment{
