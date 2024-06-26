@@ -133,6 +133,22 @@ func (p *Planner) checkPRCommits(ctx context.Context, repo *mirror.GitURL, pr *p
 	return nil, nil
 }
 
+func (p *Planner) getLastCommitHashForModule(commits []prCommit, module tfaplv1beta1.Module) (string, error) {
+	for i := len(commits) - 1; i >= 0; i-- {
+		commit := commits[i].Commit
+		ok, err := p.isModuleUpdated(context.Background(), commit.Oid, module)
+		if err != nil {
+			return "", err
+		}
+
+		if ok {
+			return commit.Oid, nil
+		}
+	}
+
+	return "", nil
+}
+
 func (p *Planner) isModuleUpdated(ctx context.Context, commitHash string, module tfaplv1beta1.Module) (bool, error) {
 	filesChangedInCommit, err := p.Repos.ChangedFiles(ctx, module.Spec.RepoURL, commitHash)
 	if err != nil {
@@ -171,7 +187,11 @@ func (p *Planner) checkPRCommentsForPlanRequests(pr *pr, repo *mirror.GitURL, mo
 		}
 
 		p.Log.Debug("new plan request received. creating new plan request", "namespace", module.ObjectMeta.Namespace, "module", module.Name)
-		return p.addNewRequest(module, pr, repo, pr.Commits.Nodes[len(pr.Commits.Nodes)-1].Commit.Oid)
+		moduleLastCommitHash, err := p.getLastCommitHashForModule(pr.Commits.Nodes, module)
+		if err != nil {
+			return nil, err
+		}
+		return p.addNewRequest(module, pr, repo, moduleLastCommitHash)
 	}
 
 	return nil, nil

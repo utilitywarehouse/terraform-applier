@@ -1,6 +1,7 @@
 package prplanner
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"testing"
@@ -111,12 +112,27 @@ func Test_checkPRCommentsForPlanRequests(t *testing.T) {
 		p := generateMockPR(123, "ref1",
 			[]string{"hash1", "hash2", "hash3"},
 			[]string{
-				fmt.Sprintf("@terraform-applier plan foo/two"),
 				fmt.Sprintf("@terraform-applier plan foo/one"),
+				fmt.Sprintf("@terraform-applier plan foo/two"),
 				fmt.Sprintf("@terraform-applier plan foo/three"),
 			},
 			nil,
 		)
+
+		// Mock Repo calls with files changed
+		testGit.EXPECT().ChangedFiles(gomock.Any(), gomock.Any(), gomock.Any()).
+			DoAndReturn(func(_ context.Context, _, hash string) ([]string, error) {
+				switch hash {
+				case "hash1":
+					return []string{"foo/one"}, nil
+				case "hash2":
+					return []string{"foo/two"}, nil
+				case "hash3":
+					return []string{"foo/one", "foo/three"}, nil
+				default:
+					return nil, fmt.Errorf("hash not found")
+				}
+			}).AnyTimes()
 
 		// mock github API Call adding new request info
 		testGithub.EXPECT().postComment(gomock.Any(), 0, 123, gomock.Any()).
@@ -140,7 +156,7 @@ func Test_checkPRCommentsForPlanRequests(t *testing.T) {
 				Number:        123,
 				HeadBranch:    "ref1",
 				CommentID:     111,
-				GitCommitHash: "hash3",
+				GitCommitHash: "hash2",
 			},
 		}
 
@@ -154,11 +170,10 @@ func Test_checkPRCommentsForPlanRequests(t *testing.T) {
 		planner.github = testGithub
 
 		p := generateMockPR(123, "ref1",
-			[]string{"hash1", "hash2", "hash3", "hash4"},
+			[]string{"hash1", "hash2", "hash3"},
 			[]string{
-				fmt.Sprintf("@terraform-applier plan foo/two"),
-				fmt.Sprintf("@terraform-applier plan one"),
-				fmt.Sprintf("@terraform-applier plan foo/three"),
+				fmt.Sprintf("@terraform-applier plan foo/one"),
+				fmt.Sprintf("@terraform-applier plan two"),
 				fmt.Sprintf("@terraform-applier plan three"),
 			},
 			nil,
@@ -186,7 +201,7 @@ func Test_checkPRCommentsForPlanRequests(t *testing.T) {
 				Number:        123,
 				HeadBranch:    "ref1",
 				CommentID:     111,
-				GitCommitHash: "hash4",
+				GitCommitHash: "hash2",
 			},
 		}
 
@@ -222,11 +237,10 @@ func Test_checkPRCommentsForPlanRequests(t *testing.T) {
 		planner.github = testGithub
 
 		p := generateMockPR(123, "ref1",
-			[]string{"hash1", "hash2", "hash3", "hash4"},
+			[]string{"hash1", "hash2", "hash3"},
 			[]string{
-				fmt.Sprintf("@terraform-applier plan foo/two"),
-				fmt.Sprintf("@terraform-applier plan one please"),
-				fmt.Sprintf("@terraform-applier plan foo/three"),
+				fmt.Sprintf("@terraform-applier plan foo/one"),
+				fmt.Sprintf("@terraform-applier plan two please"),
 				fmt.Sprintf("@terraform-applier plan three"),
 			},
 			nil,
@@ -254,7 +268,7 @@ func Test_checkPRCommentsForPlanRequests(t *testing.T) {
 				Number:        123,
 				HeadBranch:    "ref1",
 				CommentID:     111,
-				GitCommitHash: "hash4",
+				GitCommitHash: "hash2",
 			},
 		}
 
