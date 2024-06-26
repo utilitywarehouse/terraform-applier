@@ -144,6 +144,12 @@ func Test_checkPRCommentsForPlanRequests(t *testing.T) {
 				return 111, nil
 			})
 
+		// mock git repositories hash call to get latest hash for the module provided
+		testGit.EXPECT().Hash(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+			DoAndReturn(func(_ context.Context, _, _, _ string) (string, error) {
+				return "hash2", nil
+			})
+
 		// Call Test function
 		gotReq, err := planner.checkPRCommentsForPlanRequests(p, repoURL, module)
 		if err != nil {
@@ -187,6 +193,12 @@ func Test_checkPRCommentsForPlanRequests(t *testing.T) {
 					return 0, fmt.Errorf("comment body doesn't match requestAcknowledgedRegex")
 				}
 				return 111, nil
+			})
+
+		// mock git repositories hash call to get latest hash for the module provided
+		testGit.EXPECT().Hash(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+			DoAndReturn(func(_ context.Context, _, _, _ string) (string, error) {
+				return "hash2", nil
 			})
 
 		// Call Test function
@@ -254,6 +266,12 @@ func Test_checkPRCommentsForPlanRequests(t *testing.T) {
 					return 0, fmt.Errorf("comment body doesn't match requestAcknowledgedRegex")
 				}
 				return 111, nil
+			})
+
+		// mock git repositories hash call to get latest hash for the module provided
+		testGit.EXPECT().Hash(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+			DoAndReturn(func(_ context.Context, _, _, _ string) (string, error) {
+				return "hash2", nil
 			})
 
 		// Call Test function
