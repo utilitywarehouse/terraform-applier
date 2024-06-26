@@ -31,12 +31,37 @@ func Test_checkPRCommentsForPlanRequests(t *testing.T) {
 	}
 
 	module := tfaplv1beta1.Module{
-		ObjectMeta: metav1.ObjectMeta{Namespace: "foo", Name: "one"},
+		ObjectMeta: metav1.ObjectMeta{Namespace: "foo", Name: "two"},
 		Spec: tfaplv1beta1.ModuleSpec{
 			RepoURL: "https://github.com/owner-a/repo-a.git",
-			Path:    "foo/one",
+			Path:    "foo/two",
 		},
 	}
+
+	t.Run("request acknowledged for module", func(t *testing.T) {
+		// avoid generating another request from `@terraform-applier plan` comment
+		// is there's already a request ID posted for the module
+		// module might not be annotated by the time the loop checks it, which in this
+		// case would mean plan out is ready ot be posted and NOT run hasn't been requested yet
+		pr := generateMockPR(123, "ref1",
+			[]string{"hash1", "hash2", "hash3"},
+			[]string{
+				"@terraform-applier plan foo/two",
+				fmt.Sprintf(requestAcknowledgedTml, "foo/two", "reqID2", "hash2"),
+				fmt.Sprintf(requestAcknowledgedTml, "foo/three", "reqID3", "hash3"),
+			},
+			nil,
+		)
+
+		gotReq, err := planner.checkPRCommentsForPlanRequests(pr, repoURL, module)
+		if err != nil {
+			t.Fatalf("unexpected error: %s", err)
+		}
+
+		if gotReq != nil {
+			t.Errorf("checkPRCommentsForPlanRequests() returner non-nil Request")
+		}
+	})
 
 	t.Run("plan out posted for module", func(t *testing.T) {
 		pr := generateMockPR(123, "ref1",
@@ -62,8 +87,8 @@ func Test_checkPRCommentsForPlanRequests(t *testing.T) {
 		pr := generateMockPR(123, "ref1",
 			[]string{"hash1", "hash2", "hash3"},
 			[]string{
-				fmt.Sprintf("@terraform-applier plan two"),
-				fmt.Sprintf("@terraform-applier plan foo/two"),
+				fmt.Sprintf("@terraform-applier plan one"),
+				fmt.Sprintf("@terraform-applier plan foo/one"),
 				fmt.Sprintf("@terraform-applier plan foo/three"),
 			},
 			nil,
@@ -174,8 +199,8 @@ func Test_checkPRCommentsForPlanRequests(t *testing.T) {
 		p := generateMockPR(123, "ref1",
 			[]string{"hash1", "hash2", "hash3"},
 			[]string{
-				fmt.Sprintf("@terraform-applier plan foo/two"),
-				fmt.Sprintf("@terraform-applier plan bar/one"),
+				fmt.Sprintf("@terraform-applier plan foo/one"),
+				fmt.Sprintf("@terraform-applier plan bar/two"),
 				fmt.Sprintf("@terraform-applier plan foo/three"),
 			},
 			nil,

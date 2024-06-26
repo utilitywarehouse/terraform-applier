@@ -147,7 +147,14 @@ func (p *Planner) checkPRCommentsForPlanRequests(pr *pr, repo *mirror.GitURL, mo
 	for i := len(pr.Comments.Nodes) - 1; i >= 0; i-- {
 		comment := pr.Comments.Nodes[i]
 
-		commentModule, _ := getPostedRunOutputInfo(comment.Body)
+		// Skip if request already acknowledged for module
+		commentModule, _ := getRequestAcknowledgedCommentInfo(comment.Body)
+		if commentModule == module.NamespacedName() {
+			return nil, nil
+		}
+
+		// Skip if terraform plan output is already posted
+		commentModule, _ = getPostedRunOutputInfo(comment.Body)
 		if commentModule == module.NamespacedName() {
 			return nil, nil
 		}
@@ -183,6 +190,15 @@ func isPlanOutputPostedForCommit(pr *pr, commitID string, module types.Namespace
 	}
 
 	return false
+}
+
+func getRequestAcknowledgedCommentInfo(comment string) (module types.NamespacedName, commit string) {
+	matches := requestAcknowledgedRegex.FindStringSubmatch(comment)
+	if len(matches) == 4 {
+		return parseNamespaceName(matches[1]), matches[3]
+	}
+
+	return types.NamespacedName{}, ""
 }
 
 func getPostedRunOutputInfo(comment string) (module types.NamespacedName, commit string) {

@@ -117,7 +117,6 @@ func (p *Planner) getPRModuleList(pr *pr, kubeModules *tfaplv1beta1.ModuleList) 
 	var modulesUpdated []types.NamespacedName
 
 	for _, kubeModule := range kubeModules.Items {
-
 		// TODO: we should also match repo URL
 
 		if pathBelongsToModule(pathList, kubeModule) {

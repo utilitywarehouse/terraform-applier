@@ -26,13 +26,13 @@ func Test_findOutputRequestDataInComment(t *testing.T) {
 	}{
 		{
 			name:       "NamespacedName + Request ID + Commit ID",
-			args:       args{commentBody: "Received terraform plan request. Module: `terraform/my-module` Request ID: `a1b2c3d4` Commit ID: `e3c7d4a60b8c9b4c9211a7b4e1a837e9e9c3b5f7`"},
-			wantModule: types.NamespacedName{Namespace: "terraform", Name: "my-module"},
+			args:       args{commentBody: "Received terraform plan request. Module: `foo/one` Request ID: `a1b2c3d4` Commit ID: `e3c7d4a60b8c9b4c9211a7b4e1a837e9e9c3b5f7`"},
+			wantModule: types.NamespacedName{Namespace: "foo", Name: "one"},
 			wantCommit: "e3c7d4a60b8c9b4c9211a7b4e1a837e9e9c3b5f7",
 		},
 		{
 			name:       "Missing Commit ID",
-			args:       args{commentBody: "Received terraform plan request. Module: `terraform/my-module` Request ID: `a1b2c3d4` Commit ID: ``"},
+			args:       args{commentBody: "Received terraform plan request. Module: `foo/one` Request ID: `a1b2c3d4` Commit ID: ``"},
 			wantModule: types.NamespacedName{},
 			wantCommit: "",
 		},
@@ -44,13 +44,13 @@ func Test_findOutputRequestDataInComment(t *testing.T) {
 		},
 		{
 			name:       "Missing Request ID",
-			args:       args{commentBody: "Received terraform plan request. Module: `my-module` Request ID: `` Commit ID: `e3c7d4a60b8c9b4c9211a7b4e1a837e9e9c3b5f7`"},
+			args:       args{commentBody: "Received terraform plan request. Module: `one` Request ID: `` Commit ID: `e3c7d4a60b8c9b4c9211a7b4e1a837e9e9c3b5f7`"},
 			wantModule: types.NamespacedName{},
 			wantCommit: "",
 		},
 		{
 			name:       "Terraform plan output for module",
-			args:       args{commentBody: "Terraform plan output for module `terraform/my-module` Commit ID: `e3c7d4a60b8c9b4c9211a7b4e1a837e9e9c3b5f7`"},
+			args:       args{commentBody: "Terraform plan output for module `foo/one` Commit ID: `e3c7d4a60b8c9b4c9211a7b4e1a837e9e9c3b5f7`"},
 			wantModule: types.NamespacedName{},
 			wantCommit: "",
 		},

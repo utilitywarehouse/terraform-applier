@@ -78,13 +78,13 @@ func Test_getRunRequestFromComment(t *testing.T) {
 	}{
 		{
 			name: "Namespace and Name",
-			args: args{commentBody: "@terraform-applier plan terraform/my-module"},
-			want: types.NamespacedName{Namespace: "terraform", Name: "my-module"},
+			args: args{commentBody: "@terraform-applier plan foo/one"},
+			want: types.NamespacedName{Namespace: "foo", Name: "one"},
 		},
 		{
 			name: "Name only",
-			args: args{commentBody: "@terraform-applier plan my-module"},
-			want: types.NamespacedName{Name: "my-module"},
+			args: args{commentBody: "@terraform-applier plan one"},
+			want: types.NamespacedName{Name: "one"},
 		},
 		{
 			name: "Empty string",
@@ -93,17 +93,17 @@ func Test_getRunRequestFromComment(t *testing.T) {
 		},
 		{
 			name: "Multiple slashes",
-			args: args{commentBody: "namespace/name/extra"},
+			args: args{commentBody: "foo/one/extra"},
 			want: types.NamespacedName{},
 		},
 		{
 			name: "Leading slash",
-			args: args{commentBody: "/name"},
+			args: args{commentBody: "/one"},
 			want: types.NamespacedName{},
 		},
 		{
 			name: "Trailing slash",
-			args: args{commentBody: "namespace/"},
+			args: args{commentBody: "foo/"},
 			want: types.NamespacedName{},
 		},
 	}
@@ -127,18 +127,18 @@ func Test_parseNamespaceName(t *testing.T) {
 	}{
 		{
 			name: "NamespacedName",
-			args: args{str: "terraform/my-module"},
-			want: types.NamespacedName{Namespace: "terraform", Name: "my-module"},
+			args: args{str: "foo/one"},
+			want: types.NamespacedName{Namespace: "foo", Name: "one"},
 		},
 		{
 			name: "Namespace only",
-			args: args{str: "terraform/"},
-			want: types.NamespacedName{Namespace: "terraform"},
+			args: args{str: "foo/"},
+			want: types.NamespacedName{Namespace: "foo"},
 		},
 		{
 			name: "Name only",
-			args: args{str: "my-module"},
-			want: types.NamespacedName{Name: "my-module"},
+			args: args{str: "one"},
+			want: types.NamespacedName{Name: "one"},
 		},
 		{
 			name: "Empty string",
@@ -147,13 +147,13 @@ func Test_parseNamespaceName(t *testing.T) {
 		},
 		{
 			name: "Multiple slashes",
-			args: args{str: "namespace/name/extra"},
+			args: args{str: "foo/one/extra"},
 			want: types.NamespacedName{},
 		},
 		{
 			name: "Leading slash",
-			args: args{str: "/my-module"},
-			want: types.NamespacedName{Name: "my-module"},
+			args: args{str: "/one"},
+			want: types.NamespacedName{Name: "one"},
 		},
 	}
 	for _, tt := range tests {
@@ -185,11 +185,11 @@ func Test_isPlanOutputPostedForCommit(t *testing.T) {
 				}{Nodes: []prComment{
 					{
 						DatabaseID: 01234567,
-						Body:       "Terraform plan output for module `terraform/my-module` Commit ID: `e3c7d4a60b8c9b4c9211a7b4e1a837e9e9c3b5f7`",
+						Body:       "Terraform plan output for module `foo/one` Commit ID: `e3c7d4a60b8c9b4c9211a7b4e1a837e9e9c3b5f7`",
 					},
 				}}},
 				commitID: "e3c7d4a60b8c9b4c9211a7b4e1a837e9e9c3b5f7",
-				module:   types.NamespacedName{Namespace: "terraform", Name: "my-module"},
+				module:   types.NamespacedName{Namespace: "foo", Name: "one"},
 			},
 			want: true,
 		},
@@ -201,11 +201,11 @@ func Test_isPlanOutputPostedForCommit(t *testing.T) {
 				}{Nodes: []prComment{
 					{
 						DatabaseID: 01234567,
-						Body:       "Terraform plan output for module `my-module` Commit ID: `e3c7d4a60b8c9b4c9211a7b4e1a837e9e9c3b5f7`",
+						Body:       "Terraform plan output for module `one` Commit ID: `e3c7d4a60b8c9b4c9211a7b4e1a837e9e9c3b5f7`",
 					},
 				}}},
 				commitID: "e3c7d4a60b8c9b4c9211a7b4e1a837e9e9c3b5f7",
-				module:   types.NamespacedName{Name: "my-module"},
+				module:   types.NamespacedName{Name: "one"},
 			},
 			want: true,
 		},
@@ -217,11 +217,11 @@ func Test_isPlanOutputPostedForCommit(t *testing.T) {
 				}{Nodes: []prComment{
 					{
 						DatabaseID: 01234567,
-						Body:       "Terraform plan output for module `terraform/my-module` Commit ID: `e3c7d4a60b8c9b4c9211a7b4e1a837e9e9c3b5f7`",
+						Body:       "Terraform plan output for module `foo/one` Commit ID: `e3c7d4a60b8c9b4c9211a7b4e1a837e9e9c3b5f7`",
 					},
 				}}},
 				commitID: "e3c7d4a60b8c9b4c9211a7b4e1a837e9e9c3aaaa",
-				module:   types.NamespacedName{Namespace: "terraform", Name: "my-module"},
+				module:   types.NamespacedName{Namespace: "foo", Name: "one"},
 			},
 			want: false,
 		},
@@ -233,11 +233,11 @@ func Test_isPlanOutputPostedForCommit(t *testing.T) {
 				}{Nodes: []prComment{
 					{
 						DatabaseID: 01234567,
-						Body:       "Terraform plan output for module `not-terraform/my-module` Commit ID: `e3c7d4a60b8c9b4c9211a7b4e1a837e9e9c3b5f7`",
+						Body:       "Terraform plan output for module `bar/one` Commit ID: `e3c7d4a60b8c9b4c9211a7b4e1a837e9e9c3b5f7`",
 					},
 				}}},
 				commitID: "e3c7d4a60b8c9b4c9211a7b4e1a837e9e9c3b5f7",
-				module:   types.NamespacedName{Namespace: "terraform", Name: "my-module"},
+				module:   types.NamespacedName{Namespace: "foo", Name: "one"},
 			},
 			want: false,
 		},
@@ -249,11 +249,11 @@ func Test_isPlanOutputPostedForCommit(t *testing.T) {
 				}{Nodes: []prComment{
 					{
 						DatabaseID: 01234567,
-						Body:       "Received terraform plan request. Module: `terraform/my-module` Request ID: `a1b2c3d4` Commit ID: `e3c7d4a60b8c9b4c9211a7b4e1a837e9e9c3b5f7`",
+						Body:       "Received terraform plan request. Module: `foo/one` Request ID: `a1b2c3d4` Commit ID: `e3c7d4a60b8c9b4c9211a7b4e1a837e9e9c3b5f7`",
 					},
 				}}},
 				commitID: "e3c7d4a60b8c9b4c9211a7b4e1a837e9e9c3b5f7",
-				module:   types.NamespacedName{Namespace: "terraform", Name: "my-module"},
+				module:   types.NamespacedName{Namespace: "foo", Name: "one"},
 			},
 			want: false,
 		},
@@ -269,7 +269,7 @@ func Test_isPlanOutputPostedForCommit(t *testing.T) {
 					},
 				}}},
 				commitID: "e3c7d4a60b8c9b4c9211a7b4e1a837e9e9c3b5f7",
-				module:   types.NamespacedName{Namespace: "terraform", Name: "my-module"},
+				module:   types.NamespacedName{Namespace: "foo", Name: "one"},
 			},
 			want: false,
 		},
