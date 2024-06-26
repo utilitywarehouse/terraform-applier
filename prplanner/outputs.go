@@ -52,10 +52,10 @@ func (p *Planner) checkPRCommentForOutputRequests(ctx context.Context, pr *pr, c
 	}
 
 	return output{
-		module:    moduleNamespacedName,
-		commentID: comment.DatabaseID,
-		prNumber:  pr.Number,
-		body:      commentBody,
+		Module:    moduleNamespacedName,
+		CommentID: comment.DatabaseID,
+		PrNumber:  pr.Number,
+		Body:      commentBody,
 	}, true
 }
 
@@ -69,7 +69,7 @@ func findOutputRequestDataInComment(commentBody string) (types.NamespacedName, s
 }
 
 func (p *Planner) postPlanOutput(output output, repo *mirror.GitURL) {
-	_, err := p.github.postComment(repo, output.commentID, output.prNumber, output.body)
+	_, err := p.github.postComment(repo, output.CommentID, output.PrNumber, output.Body)
 	if err != nil {
 		p.Log.Error("error posting PR comment:", "error", err)
 	}

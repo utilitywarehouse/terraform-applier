@@ -95,8 +95,8 @@ type prFiles struct {
 }
 
 type output struct {
-	module    types.NamespacedName
-	body      prComment
-	commentID int
-	prNumber  int
+	Module    types.NamespacedName
+	Body      prComment
+	CommentID int
+	PrNumber  int
 }
