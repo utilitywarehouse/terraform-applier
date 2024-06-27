@@ -2,13 +2,8 @@ package prplanner
 
 import (
 	"context"
-	"fmt"
-	"time"
 
 	"github.com/utilitywarehouse/git-mirror/pkg/mirror"
-	"github.com/utilitywarehouse/terraform-applier/api/v1beta1"
-
-	"k8s.io/apimachinery/pkg/types"
 )
 
 func (p *Planner) uploadRequestOutput(ctx context.Context, repo *mirror.GitURL, pr *pr) {
@@ -27,7 +22,7 @@ func (p *Planner) uploadRequestOutput(ctx context.Context, repo *mirror.GitURL, 
 }
 
 func (p *Planner) checkPRCommentForOutputRequests(ctx context.Context, comment prComment) (prComment, bool) {
-	moduleNamespacedName, path, requestedAt := requestAcknowledgedCommentInfo(comment.Body)
+	moduleNamespacedName, path, requestedAt := parseRequestAcknowledgedMsg(comment.Body)
 	if requestedAt == nil {
 		return prComment{}, false
 	}
@@ -46,37 +41,10 @@ func (p *Planner) checkPRCommentForOutputRequests(ctx context.Context, comment p
 			}
 
 			return prComment{
-				Body: outputBody(moduleNamespacedName.String(), path, run),
+				Body: runOutputMsg(moduleNamespacedName.String(), path, run),
 			}, true
 		}
 	}
 
 	return prComment{}, false
-}
-
-func requestAcknowledgedCommentInfo(commentBody string) (types.NamespacedName, string, *time.Time) {
-	matches := requestAcknowledgedRegex.FindStringSubmatch(commentBody)
-	if len(matches) == 4 {
-		t, err := time.Parse(time.RFC3339, matches[3])
-		if err == nil {
-			return parseNamespaceName(matches[1]), matches[2], &t
-		}
-		return parseNamespaceName(matches[1]), matches[2], nil
-	}
-
-	return types.NamespacedName{}, "", nil
-}
-
-func outputBody(module, path string, run *v1beta1.Run) string {
-	// https://github.com/orgs/community/discussions/27190
-	characterLimit := 65000
-	runOutput := run.Output
-	runes := []rune(runOutput)
-
-	if len(runes) > characterLimit {
-		runOutput = "Plan output has reached the max character limit of " + fmt.Sprintf("%d", characterLimit) + " characters. " +
-			"The output is truncated from the top.\n" + string(runes[characterLimit:])
-	}
-
-	return fmt.Sprintf(outputBodyTml, module, path, run.CommitHash, run.Summary, runOutput)
 }

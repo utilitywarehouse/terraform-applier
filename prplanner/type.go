@@ -1,34 +1,5 @@
 package prplanner
 
-import (
-	"regexp"
-)
-
-var (
-	terraformPlanRequestRegex = regexp.MustCompile(`@terraform-applier plan ([\w'-]+\/?[\w'-]+)`)
-
-	requestAcknowledgedTml = "Received terraform plan request\n" +
-		"```\n" +
-		"Module: %s\n" +
-		"Path: %s\n" +
-		"Requested At: %s\n" +
-		"```\n" +
-		"Do not edit this comment"
-
-	requestAcknowledgedRegex = regexp.MustCompile(`Received terraform plan request\n\x60{3}\nModule: (.+)\nPath: (.+)\nRequested At: (.+)`)
-
-	outputBodyTml = "Terraform plan output for\n" +
-		"```\n" +
-		"Module: %s\n" +
-		"Path: %s\n" +
-		"Commit ID: %s\n" +
-		"```\n" +
-		"<details><summary><b>Run Status: %s, Run Summary: %s</b></summary>" +
-		"\n\n```terraform\n%s\n```\n</details>"
-
-	terraformPlanOutRegex = regexp.MustCompile(`Terraform plan output for\n\x60{3}\nModule: (.+)\nPath: (.+)\nCommit ID: (.+)\n`)
-)
-
 // TODO: Add isDraft to filter out draft PRs in the PR loop
 // skip all pullRequests.nodes.isDraft = true
 //

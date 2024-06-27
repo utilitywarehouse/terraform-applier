@@ -49,8 +49,8 @@ func Test_checkPRCommentsForPlanRequests(t *testing.T) {
 			[]string{"hash1", "hash2", "hash3"},
 			[]string{
 				"@terraform-applier plan foo/two",
-				fmt.Sprintf(requestAcknowledgedTml, "foo/two", "reqID2", "hash2"),
-				fmt.Sprintf(requestAcknowledgedTml, "foo/three", "reqID3", "hash3"),
+				fmt.Sprintf(requestAcknowledgedMsgTml, "foo/two", "reqID2", "hash2"),
+				fmt.Sprintf(requestAcknowledgedMsgTml, "foo/three", "reqID3", "hash3"),
 			},
 			nil,
 		)
@@ -69,8 +69,8 @@ func Test_checkPRCommentsForPlanRequests(t *testing.T) {
 		pr := generateMockPR(123, "ref1",
 			[]string{"hash1", "hash2", "hash3"},
 			[]string{
-				outputBody("foo/two", "module/path/is/going/to/be/here", &v1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy.", Output: "tf plan output"}),
-				outputBody("foo/three", "module/path/is/going/to/be/here", &v1beta1.Run{CommitHash: "hash3", Summary: "Plan: x to add, x to change, x to destroy.", Output: "tf plan output"}),
+				runOutputMsg("foo/two", "module/path/is/going/to/be/here", &v1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy.", Output: "tf plan output"}),
+				runOutputMsg("foo/three", "module/path/is/going/to/be/here", &v1beta1.Run{CommitHash: "hash3", Summary: "Plan: x to add, x to change, x to destroy.", Output: "tf plan output"}),
 			},
 			nil,
 		)
@@ -139,7 +139,7 @@ func Test_checkPRCommentsForPlanRequests(t *testing.T) {
 		testGithub.EXPECT().postComment(gomock.Any(), 0, 123, gomock.Any()).
 			DoAndReturn(func(repo *mirror.GitURL, commentID, prNumber int, commentBody prComment) (int, error) {
 				// validate comment message
-				if !requestAcknowledgedRegex.Match([]byte(commentBody.Body)) {
+				if !requestAcknowledgedMsgRegex.Match([]byte(commentBody.Body)) {
 					return 0, fmt.Errorf("comment body doesn't match requestAcknowledgedRegex")
 				}
 				return 111, nil
@@ -183,7 +183,7 @@ func Test_checkPRCommentsForPlanRequests(t *testing.T) {
 		testGithub.EXPECT().postComment(gomock.Any(), 0, 123, gomock.Any()).
 			DoAndReturn(func(repo *mirror.GitURL, commentID, prNumber int, commentBody prComment) (int, error) {
 				// validate comment message
-				if !requestAcknowledgedRegex.Match([]byte(commentBody.Body)) {
+				if !requestAcknowledgedMsgRegex.Match([]byte(commentBody.Body)) {
 					return 0, fmt.Errorf("comment body doesn't match requestAcknowledgedRegex")
 				}
 				return 111, nil
@@ -249,7 +249,7 @@ func Test_checkPRCommentsForPlanRequests(t *testing.T) {
 		testGithub.EXPECT().postComment(gomock.Any(), 0, 123, gomock.Any()).
 			DoAndReturn(func(repo *mirror.GitURL, commentID, prNumber int, commentBody prComment) (int, error) {
 				// validate comment message
-				if !requestAcknowledgedRegex.Match([]byte(commentBody.Body)) {
+				if !requestAcknowledgedMsgRegex.Match([]byte(commentBody.Body)) {
 					return 0, fmt.Errorf("comment body doesn't match requestAcknowledgedRegex")
 				}
 				return 111, nil

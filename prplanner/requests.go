@@ -4,13 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
-	"time"
 
 	"github.com/utilitywarehouse/git-mirror/pkg/mirror"
 	tfaplv1beta1 "github.com/utilitywarehouse/terraform-applier/api/v1beta1"
 	"github.com/utilitywarehouse/terraform-applier/sysutil"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
 
@@ -140,20 +137,20 @@ func (p *Planner) checkPRCommentsForPlanRequests(pr *pr, repo *mirror.GitURL, mo
 		comment := pr.Comments.Nodes[i]
 
 		// Skip if request already acknowledged for module
-		commentModule, _, _ := requestAcknowledgedCommentInfo(comment.Body)
+		commentModule, _, _ := parseRequestAcknowledgedMsg(comment.Body)
 		if commentModule == module.NamespacedName() {
 			return nil, nil
 		}
 
 		// Skip if terraform plan output is already posted
-		commentModule, _ = getPostedRunOutputInfo(comment.Body)
+		commentModule, _ = parseRunOutputMsg(comment.Body)
 		if commentModule == module.NamespacedName() {
 			return nil, nil
 		}
 
 		// Check if user requested terraform plan run
 		// '@terraform-applier plan [<module namespace>]/<module name>'
-		commentModule = getRunRequestFromComment(comment.Body)
+		commentModule = parsePlanReqMsg(comment.Body)
 		if commentModule.Name != module.Name {
 			continue
 		}
@@ -175,46 +172,13 @@ func isPlanOutputPostedForCommit(pr *pr, commitID string, module types.Namespace
 	for i := len(pr.Comments.Nodes) - 1; i >= 0; i-- {
 		comment := pr.Comments.Nodes[i]
 
-		commentModule, commentCommitID := getPostedRunOutputInfo(comment.Body)
+		commentModule, commentCommitID := parseRunOutputMsg(comment.Body)
 		if commentModule == module && commentCommitID == commitID {
 			return true
 		}
 	}
 
 	return false
-}
-
-func getPostedRunOutputInfo(comment string) (module types.NamespacedName, commit string) {
-	matches := terraformPlanOutRegex.FindStringSubmatch(comment)
-	if len(matches) == 4 {
-		return parseNamespaceName(matches[1]), matches[3]
-	}
-
-	return types.NamespacedName{}, ""
-}
-
-// TODO: comment can be with or without namespaced name
-func getRunRequestFromComment(commentBody string) types.NamespacedName {
-	matches := terraformPlanRequestRegex.FindStringSubmatch(commentBody)
-
-	if len(matches) == 2 && matches[1] != "" {
-		return parseNamespaceName(matches[1])
-	}
-
-	return types.NamespacedName{}
-}
-
-func parseNamespaceName(str string) types.NamespacedName {
-	namespacedName := strings.Split(str, "/")
-	if len(namespacedName) == 2 {
-		return types.NamespacedName{Namespace: namespacedName[0], Name: namespacedName[1]}
-	}
-
-	if len(namespacedName) == 1 {
-		return types.NamespacedName{Name: namespacedName[0]}
-	}
-
-	return types.NamespacedName{}
 }
 
 func (p *Planner) addNewRequest(module tfaplv1beta1.Module, pr *pr, repo *mirror.GitURL) (*tfaplv1beta1.Request, error) {
@@ -236,8 +200,4 @@ func (p *Planner) addNewRequest(module tfaplv1beta1.Module, pr *pr, repo *mirror
 	}
 
 	return req, nil
-}
-
-func requestAcknowledgedMsg(module, path string, reqAt *metav1.Time) string {
-	return fmt.Sprintf(requestAcknowledgedTml, module, path, reqAt.Format(time.RFC3339))
 }
