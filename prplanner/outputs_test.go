@@ -12,6 +12,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/utilitywarehouse/terraform-applier/api/v1beta1"
 	"github.com/utilitywarehouse/terraform-applier/sysutil"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
 
@@ -21,6 +22,13 @@ func mustParseTime(str string) *time.Time {
 		panic(err)
 	}
 	return &at
+}
+func mustParseMetaTime(str string) *metav1.Time {
+	at, err := time.Parse(time.RFC3339, str)
+	if err != nil {
+		panic(err)
+	}
+	return &metav1.Time{Time: at}
 }
 
 func Test_requestAcknowledgedCommentInfo(t *testing.T) {
@@ -92,17 +100,24 @@ func Test_requestAcknowledgedCommentInfo(t *testing.T) {
 func Test_checkPRCommentForOutputRequests(t *testing.T) {
 	ctx := context.Background()
 	goMockCtrl := gomock.NewController(t)
+	testRedis := sysutil.NewMockRedisInterface(goMockCtrl)
 
 	planner := &Planner{
-		Log: slog.Default(),
+		Log:         slog.Default(),
+		RedisClient: testRedis,
 	}
 
 	slog.SetLogLoggerLevel(slog.LevelDebug)
 
-	t.Run("terraform plan output comment", func(t *testing.T) {
-		testRedis := sysutil.NewMockRedisInterface(goMockCtrl)
-		planner.RedisClient = testRedis
+	mockRuns := []*v1beta1.Run{
+		{Request: &v1beta1.Request{RequestedAt: mustParseMetaTime("2023-04-02T15:01:05Z")}, CommitHash: "hash1", Output: "terraform plan output"},
+		{Request: &v1beta1.Request{RequestedAt: mustParseMetaTime("2023-04-02T15:02:05Z")}},
+	}
 
+	testRedis.EXPECT().Runs(gomock.Any(), types.NamespacedName{Namespace: "foo", Name: "two"}).
+		Return(mockRuns, nil).AnyTimes()
+
+	t.Run("terraform plan output comment", func(t *testing.T) {
 		comment := prComment{
 			Body: fmt.Sprintf(outputBodyTml, "foo/two", "hash1", "terraform plan output"),
 		}
@@ -120,12 +135,9 @@ func Test_checkPRCommentForOutputRequests(t *testing.T) {
 		}
 	})
 
-	t.Run("empty commit id", func(t *testing.T) {
-		testRedis := sysutil.NewMockRedisInterface(goMockCtrl)
-		planner.RedisClient = testRedis
-
+	t.Run("empty request time", func(t *testing.T) {
 		comment := prComment{
-			Body: fmt.Sprintf(requestAcknowledgedTml, "foo/two", "2023-04-02T15:04:05Z"),
+			Body: fmt.Sprintf(requestAcknowledgedTml, "foo/two", ""),
 		}
 
 		gotOut, gotOk := planner.checkPRCommentForOutputRequests(ctx, comment)
@@ -141,18 +153,10 @@ func Test_checkPRCommentForOutputRequests(t *testing.T) {
 		}
 	})
 
-	t.Run("key not found in redis", func(t *testing.T) {
-		testRedis := sysutil.NewMockRedisInterface(goMockCtrl)
-		planner.RedisClient = testRedis
-
+	t.Run("run not found in redis", func(t *testing.T) {
 		comment := prComment{
-			Body: fmt.Sprintf(requestAcknowledgedTml, "foo/two", "2023-04-02T15:04:05Z"),
+			Body: fmt.Sprintf(requestAcknowledgedTml, "foo/two", "2023-04-02T15:03:05Z"),
 		}
-
-		// mock db call with no result found
-		testRedis.EXPECT().PRRun(gomock.Any(),
-			types.NamespacedName{Namespace: "foo", Name: "two"}, 123, "hash1").
-			Return(nil, sysutil.ErrKeyNotFound)
 
 		gotOut, gotOk := planner.checkPRCommentForOutputRequests(ctx, comment)
 
@@ -168,17 +172,9 @@ func Test_checkPRCommentForOutputRequests(t *testing.T) {
 	})
 
 	t.Run("empty run output in redis", func(t *testing.T) {
-		testRedis := sysutil.NewMockRedisInterface(goMockCtrl)
-		planner.RedisClient = testRedis
-
 		comment := prComment{
-			Body: fmt.Sprintf(requestAcknowledgedTml, "foo/two", "2023-04-02T15:04:05Z"),
+			Body: fmt.Sprintf(requestAcknowledgedTml, "foo/two", "2023-04-02T15:02:05Z"),
 		}
-
-		// mock db call with no result found
-		testRedis.EXPECT().PRRun(gomock.Any(),
-			types.NamespacedName{Namespace: "foo", Name: "two"}, 123, "hash1").
-			Return(&v1beta1.Run{Output: ""}, nil)
 
 		gotOut, gotOk := planner.checkPRCommentForOutputRequests(ctx, comment)
 
@@ -194,18 +190,10 @@ func Test_checkPRCommentForOutputRequests(t *testing.T) {
 	})
 
 	t.Run("plan output ready in redis", func(t *testing.T) {
-		testRedis := sysutil.NewMockRedisInterface(goMockCtrl)
-		planner.RedisClient = testRedis
-
 		comment := prComment{
-			Body:       fmt.Sprintf(requestAcknowledgedTml, "foo/two", "2023-04-02T15:04:05Z"),
+			Body:       fmt.Sprintf(requestAcknowledgedTml, "foo/two", "2023-04-02T15:01:05Z"),
 			DatabaseID: 111,
 		}
-
-		// mock db call with no result found
-		testRedis.EXPECT().PRRun(gomock.Any(),
-			types.NamespacedName{Namespace: "foo", Name: "two"}, 123, "hash1").
-			Return(&v1beta1.Run{CommitHash: "hash1", Output: "terraform plan output"}, nil)
 
 		gotOut, gotOk := planner.checkPRCommentForOutputRequests(ctx, comment)
 
