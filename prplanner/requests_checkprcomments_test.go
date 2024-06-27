@@ -9,6 +9,7 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/google/go-cmp/cmp"
 	"github.com/utilitywarehouse/git-mirror/pkg/mirror"
+	"github.com/utilitywarehouse/terraform-applier/api/v1beta1"
 	tfaplv1beta1 "github.com/utilitywarehouse/terraform-applier/api/v1beta1"
 	"github.com/utilitywarehouse/terraform-applier/git"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -68,8 +69,8 @@ func Test_checkPRCommentsForPlanRequests(t *testing.T) {
 		pr := generateMockPR(123, "ref1",
 			[]string{"hash1", "hash2", "hash3"},
 			[]string{
-				fmt.Sprintf(outputBodyTml, "foo/two", "hash2", "Plan: x to add, x to change, x to destroy.", "tf plan output"),
-				fmt.Sprintf(outputBodyTml, "foo/three", "hash3", "Plan: x to add, x to change, x to destroy.", "tf plan output"),
+				outputBody("foo/two", "module/path/is/going/to/be/here", &v1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy.", Output: "tf plan output"}),
+				outputBody("foo/three", "module/path/is/going/to/be/here", &v1beta1.Run{CommitHash: "hash3", Summary: "Plan: x to add, x to change, x to destroy.", Output: "tf plan output"}),
 			},
 			nil,
 		)

@@ -1,10 +1,10 @@
 package prplanner
 
 import (
-	"fmt"
 	"reflect"
 	"testing"
 
+	"github.com/utilitywarehouse/terraform-applier/api/v1beta1"
 	"k8s.io/apimachinery/pkg/types"
 )
 
@@ -20,25 +20,25 @@ func Test_getPostedRunOutputInfo(t *testing.T) {
 	}{
 		{
 			name:       "NamespaceName + Commit ID",
-			args:       args{comment: fmt.Sprintf(outputBodyTml, "foo/one", "foo/one", "hash2", "Plan: x to add, x to change, x to destroy.")},
+			args:       args{comment: outputBody("foo/one", "foo/one", &v1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy."})},
 			wantModule: types.NamespacedName{Namespace: "foo", Name: "one"},
 			wantCommit: "hash2",
 		},
 		{
 			name:       "NamespaceName only",
-			args:       args{comment: fmt.Sprintf(outputBodyTml, "one", "foo/one", "", "Plan: x to add, x to change, x to destroy.")},
+			args:       args{comment: outputBody("one", "foo/one", &v1beta1.Run{Summary: "Plan: x to add, x to change, x to destroy."})},
 			wantModule: types.NamespacedName{},
 			wantCommit: "",
 		},
 		{
-			name:       "Commit ID only",
-			args:       args{comment: fmt.Sprintf(outputBodyTml, "", "foo/one", "hash2", "Plan: x to add, x to change, x to destroy.")},
+			name:       "missing name",
+			args:       args{comment: outputBody("", "foo/one", &v1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy."})},
 			wantModule: types.NamespacedName{},
 			wantCommit: "",
 		},
 		{
 			name:       "Name + Commit ID",
-			args:       args{comment: fmt.Sprintf(outputBodyTml, "one", "foo/one", "hash2", "Plan: x to add, x to change, x to destroy.")},
+			args:       args{comment: outputBody("one", "foo/one", &v1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy."})},
 			wantModule: types.NamespacedName{Name: "one"},
 			wantCommit: "hash2",
 		},
@@ -186,7 +186,7 @@ func Test_isPlanOutputPostedForCommit(t *testing.T) {
 				}{Nodes: []prComment{
 					{
 						DatabaseID: 01234567,
-						Body:       fmt.Sprintf(outputBodyTml, "foo/one", "foo/one", "hash2", "Plan: x to add, x to change, x to destroy."),
+						Body:       outputBody("foo/one", "foo/one", &v1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy."}),
 					},
 				}}},
 				commitID: "hash2",
@@ -202,7 +202,7 @@ func Test_isPlanOutputPostedForCommit(t *testing.T) {
 				}{Nodes: []prComment{
 					{
 						DatabaseID: 01234567,
-						Body:       fmt.Sprintf(outputBodyTml, "one", "foo/one", "hash2", "Plan: x to add, x to change, x to destroy."),
+						Body:       outputBody("one", "foo/one", &v1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy."}),
 					},
 				}}},
 				commitID: "hash2",

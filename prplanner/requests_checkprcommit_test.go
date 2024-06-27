@@ -10,6 +10,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/utilitywarehouse/git-mirror/pkg/mirror"
+	"github.com/utilitywarehouse/terraform-applier/api/v1beta1"
 	tfaplv1beta1 "github.com/utilitywarehouse/terraform-applier/api/v1beta1"
 	"github.com/utilitywarehouse/terraform-applier/git"
 	"github.com/utilitywarehouse/terraform-applier/sysutil"
@@ -223,7 +224,8 @@ func TestCheckPRCommits(t *testing.T) {
 
 		p := generateMockPR(123, "ref1",
 			[]string{"hash1", "hash2", "hash3"},
-			[]string{"random comment", fmt.Sprintf(outputBodyTml, "foo/two", "foo/two", "hash3", "Plan: x to add, x to change, x to destroy.", "some output"), "random comment"},
+			[]string{"random comment", outputBody("foo/two", "foo/two", &v1beta1.Run{CommitHash: "hash3", Summary: "Plan: x to add, x to change, x to destroy.", Output: "some output"}), "random comment"},
+
 			nil,
 		)
 

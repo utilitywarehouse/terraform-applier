@@ -10,7 +10,7 @@ import (
 	"github.com/utilitywarehouse/git-mirror/pkg/mirror"
 	tfaplv1beta1 "github.com/utilitywarehouse/terraform-applier/api/v1beta1"
 	"github.com/utilitywarehouse/terraform-applier/sysutil"
-
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
 
@@ -140,7 +140,7 @@ func (p *Planner) checkPRCommentsForPlanRequests(pr *pr, repo *mirror.GitURL, mo
 		comment := pr.Comments.Nodes[i]
 
 		// Skip if request already acknowledged for module
-		commentModule, _ := requestAcknowledgedCommentInfo(comment.Body)
+		commentModule, _, _ := requestAcknowledgedCommentInfo(comment.Body)
 		if commentModule == module.NamespacedName() {
 			return nil, nil
 		}
@@ -221,7 +221,7 @@ func (p *Planner) addNewRequest(module tfaplv1beta1.Module, pr *pr, repo *mirror
 	req := module.NewRunRequest(tfaplv1beta1.PRPlan)
 
 	commentBody := prComment{
-		Body: fmt.Sprintf(requestAcknowledgedTml, module.NamespacedName(), "module/path/is/going/to/be/here", req.RequestedAt.Format(time.RFC3339)),
+		Body: requestAcknowledgedMsg(module.NamespacedName().String(), module.Spec.Path, req.RequestedAt),
 	}
 
 	commentID, err := p.github.postComment(repo, 0, pr.Number, commentBody)
@@ -236,4 +236,8 @@ func (p *Planner) addNewRequest(module tfaplv1beta1.Module, pr *pr, repo *mirror
 	}
 
 	return req, nil
+}
+
+func requestAcknowledgedMsg(module, path string, reqAt *metav1.Time) string {
+	return fmt.Sprintf(requestAcknowledgedTml, module, path, reqAt.Format(time.RFC3339))
 }

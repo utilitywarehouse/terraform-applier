@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/utilitywarehouse/git-mirror/pkg/mirror"
+	"github.com/utilitywarehouse/terraform-applier/api/v1beta1"
 
 	"k8s.io/apimachinery/pkg/types"
 )
@@ -26,7 +27,7 @@ func (p *Planner) uploadRequestOutput(ctx context.Context, repo *mirror.GitURL, 
 }
 
 func (p *Planner) checkPRCommentForOutputRequests(ctx context.Context, comment prComment) (prComment, bool) {
-	moduleNamespacedName, requestedAt := requestAcknowledgedCommentInfo(comment.Body)
+	moduleNamespacedName, path, requestedAt := requestAcknowledgedCommentInfo(comment.Body)
 	if requestedAt == nil {
 		return prComment{}, false
 	}
@@ -45,16 +46,7 @@ func (p *Planner) checkPRCommentForOutputRequests(ctx context.Context, comment p
 			}
 
 			return prComment{
-				Body: fmt.Sprintf(
-					outputBodyTml,
-					moduleNamespacedName,
-					"module/path/is/going/to/be/here",
-					run.CommitHash,
-					run.Summary,
-					run.Output,
-					// TODO: max character limit needs to be set for run.Output
-					// https://github.com/orgs/community/discussions/27190
-				),
+				Body: outputBody(moduleNamespacedName.String(), path, run),
 			}, true
 		}
 	}
@@ -62,15 +54,24 @@ func (p *Planner) checkPRCommentForOutputRequests(ctx context.Context, comment p
 	return prComment{}, false
 }
 
-func requestAcknowledgedCommentInfo(commentBody string) (types.NamespacedName, *time.Time) {
+func requestAcknowledgedCommentInfo(commentBody string) (types.NamespacedName, string, *time.Time) {
 	matches := requestAcknowledgedRegex.FindStringSubmatch(commentBody)
 	if len(matches) == 4 {
 		t, err := time.Parse(time.RFC3339, matches[3])
 		if err == nil {
-			return parseNamespaceName(matches[1]), &t
+			return parseNamespaceName(matches[1]), matches[2], &t
 		}
-		return parseNamespaceName(matches[1]), nil
+		return parseNamespaceName(matches[1]), matches[2], nil
 	}
 
-	return types.NamespacedName{}, nil
+	return types.NamespacedName{}, "", nil
+}
+
+func outputBody(module, path string, run *v1beta1.Run) string {
+	// TODO: max character limit needs to be set for run.Output
+	// https://github.com/orgs/community/discussions/27190
+	return fmt.Sprintf(
+		outputBodyTml,
+		module, path, run.CommitHash, run.Summary, run.Output,
+	)
 }
