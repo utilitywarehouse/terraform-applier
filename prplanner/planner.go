@@ -69,6 +69,11 @@ func (p *Planner) Start(ctx context.Context) {
 
 				// Loop through all open PRs
 				for _, pr := range prs {
+					// skip Draft PRs
+					if pr.IsDraft {
+						continue
+					}
+
 					// 1. Verify if pr belongs to module based on files changed
 					prModules, err := p.getPRModuleList(pr, kubeModuleList)
 					if err != nil {
