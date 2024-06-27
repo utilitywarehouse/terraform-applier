@@ -48,6 +48,7 @@ func (p *Planner) checkPRCommentForOutputRequests(ctx context.Context, comment p
 				Body: fmt.Sprintf(
 					outputBodyTml,
 					moduleNamespacedName,
+					"module/path/is/going/to/be/here",
 					run.CommitHash,
 					run.Output,
 				),
@@ -60,8 +61,8 @@ func (p *Planner) checkPRCommentForOutputRequests(ctx context.Context, comment p
 
 func requestAcknowledgedCommentInfo(commentBody string) (types.NamespacedName, *time.Time) {
 	matches := requestAcknowledgedRegex.FindStringSubmatch(commentBody)
-	if len(matches) == 3 {
-		t, err := time.Parse(time.RFC3339, matches[2])
+	if len(matches) == 4 {
+		t, err := time.Parse(time.RFC3339, matches[3])
 		if err == nil {
 			return parseNamespaceName(matches[1]), &t
 		}

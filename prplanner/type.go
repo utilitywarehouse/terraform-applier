@@ -7,11 +7,19 @@ import (
 var (
 	terraformPlanRequestRegex = regexp.MustCompile(`@terraform-applier plan ([\w'-]+\/?[\w'-]+)`)
 
-	requestAcknowledgedTml   = "Received terraform plan request. Module: `%s` Requested At: `%s`"
-	requestAcknowledgedRegex = regexp.MustCompile("Received terraform plan request. Module: `(.+)` Requested At: `(.+)`")
+	requestAcknowledgedTml = "Received terraform plan request\n" +
+		"Module: `%s`\n" +
+		"Path: `%s`\n" +
+		"Requested At: `%s`"
+	requestAcknowledgedRegex = regexp.MustCompile("Received terraform plan request\\s+Module: `(.+)`\\s+Path: `(.+)`\\s+Requested At: `(.+)`")
 
-	outputBodyTml         = "Terraform plan output for module `%s` Commit ID: `%s`\n```terraform\n%s\n```"
-	terraformPlanOutRegex = regexp.MustCompile("Terraform plan output for module `(.+?)` Commit ID: `(.+?)`")
+	outputBodyTml = "Terraform plan output for\n" +
+		"Module: `%s`\n" +
+		"Path: `%s`\n" +
+		"Commit ID: `%s`\n" +
+		"<details><summary><b>Run output:<br>&nbsp;&nbsp;&nbsp;&nbsp;Plan: 1 to add, 0 to change, 0 to destroy.</b></summary>" +
+		"\n\n```terraform\n%s\n```\n</details>"
+	terraformPlanOutRegex = regexp.MustCompile("Terraform plan output for\\s+Module:\\s+`(.+?)`\\s+Path:\\s+`(.+?)`\\s+Commit ID: `(.+?)`")
 )
 
 // TODO: Add isDraft to filter out draft PRs in the PR loop
