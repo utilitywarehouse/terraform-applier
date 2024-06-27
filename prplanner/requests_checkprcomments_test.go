@@ -159,10 +159,9 @@ func Test_checkPRCommentsForPlanRequests(t *testing.T) {
 		wantReq := &tfaplv1beta1.Request{
 			Type: "PullRequestPlan",
 			PR: &tfaplv1beta1.PullRequest{
-				Number:        123,
-				HeadBranch:    "ref1",
-				CommentID:     111,
-				GitCommitHash: "hash2",
+				Number:     123,
+				HeadBranch: "ref1",
+				CommentID:  111,
 			},
 		}
 
@@ -210,10 +209,9 @@ func Test_checkPRCommentsForPlanRequests(t *testing.T) {
 		wantReq := &tfaplv1beta1.Request{
 			Type: "PullRequestPlan",
 			PR: &tfaplv1beta1.PullRequest{
-				Number:        123,
-				HeadBranch:    "ref1",
-				CommentID:     111,
-				GitCommitHash: "hash2",
+				Number:     123,
+				HeadBranch: "ref1",
+				CommentID:  111,
 			},
 		}
 
@@ -283,10 +281,9 @@ func Test_checkPRCommentsForPlanRequests(t *testing.T) {
 		wantReq := &tfaplv1beta1.Request{
 			Type: "PullRequestPlan",
 			PR: &tfaplv1beta1.PullRequest{
-				Number:        123,
-				HeadBranch:    "ref1",
-				CommentID:     111,
-				GitCommitHash: "hash2",
+				Number:     123,
+				HeadBranch: "ref1",
+				CommentID:  111,
 			},
 		}
 
