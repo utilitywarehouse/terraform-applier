@@ -52,6 +52,8 @@ func (p *Planner) checkPRCommentForOutputRequests(ctx context.Context, comment p
 					run.CommitHash,
 					run.Summary,
 					run.Output,
+					// TODO: max character limit needs to be set for run.Output
+					// https://github.com/orgs/community/discussions/27190
 				),
 			}, true
 		}

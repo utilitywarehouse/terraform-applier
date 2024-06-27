@@ -114,6 +114,7 @@ func Test_checkPRCommentForOutputRequests(t *testing.T) {
 	mockRuns := []*v1beta1.Run{
 		{Request: &v1beta1.Request{RequestedAt: mustParseMetaTime("2023-04-02T15:01:05Z")}, CommitHash: "hash1", Output: "terraform plan output"},
 		{Request: &v1beta1.Request{RequestedAt: mustParseMetaTime("2023-04-02T15:02:05Z")}},
+		{Request: &v1beta1.Request{RequestedAt: mustParseMetaTime("2023-04-02T15:04:05Z")}, CommitHash: "hash1", Module: types.NamespacedName{Namespace: "foo", Name: "bar"}, Summary: "plan summary", Output: "terraform plan output"},
 	}
 
 	testRedis.EXPECT().Runs(gomock.Any(), types.NamespacedName{Namespace: "foo", Name: "two"}).
@@ -197,15 +198,12 @@ func Test_checkPRCommentForOutputRequests(t *testing.T) {
 			DatabaseID: 111,
 		}
 
-		// testRedis.EXPECT().Runs(gomock.Any(), gomock.Any()).
-		// 	// TODO: Sorry, can't figure out this thing :D
-		// 	Return([]*v1beta1.Run{{CommitHash: "hash1", Output: "terraform plan output"}}, nil)
 		gotOut, gotOk := planner.checkPRCommentForOutputRequests(ctx, comment)
 
 		wantOut := prComment{
 			Body: fmt.Sprintf(
 				outputBodyTml, types.NamespacedName{Namespace: "foo", Name: "two"}, "module/path/is/going/to/be/here",
-				"hash1", "Plan: x to add, x to change, x to destroy.", "terraform plan output"),
+				"hash1", "plan summary", "terraform plan output"),
 		}
 		wantOk := true
 
