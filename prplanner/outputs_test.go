@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/golang/mock/gomock"
 	"github.com/google/go-cmp/cmp"
@@ -14,7 +15,15 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
-func Test_findOutputRequestDataInComment(t *testing.T) {
+func mustParseTime(str string) *time.Time {
+	at, err := time.Parse(time.RFC3339, str)
+	if err != nil {
+		panic(err)
+	}
+	return &at
+}
+
+func Test_requestAcknowledgedCommentInfo(t *testing.T) {
 	type args struct {
 		commentBody string
 	}
@@ -22,53 +31,59 @@ func Test_findOutputRequestDataInComment(t *testing.T) {
 		name       string
 		args       args
 		wantModule types.NamespacedName
-		wantCommit string
+		wantReqAt  *time.Time
 	}{
-		{
-			name:       "NamespacedName + Request ID + Commit ID",
-			args:       args{commentBody: "Received terraform plan request. Module: `foo/one` Request ID: `a1b2c3d4` Commit ID: `e3c7d4a60b8c9b4c9211a7b4e1a837e9e9c3b5f7`"},
-			wantModule: types.NamespacedName{Namespace: "foo", Name: "one"},
-			wantCommit: "e3c7d4a60b8c9b4c9211a7b4e1a837e9e9c3b5f7",
-		},
-		{
-			name:       "Missing Commit ID",
-			args:       args{commentBody: "Received terraform plan request. Module: `foo/one` Request ID: `a1b2c3d4` Commit ID: ``"},
-			wantModule: types.NamespacedName{},
-			wantCommit: "",
-		},
-		{
-			name:       "Missing module",
-			args:       args{commentBody: "Received terraform plan request. Module: `` Request ID: `a1b2c3d4` Commit ID: `e3c7d4a60b8c9b4c9211a7b4e1a837e9e9c3b5f7`"},
-			wantModule: types.NamespacedName{},
-			wantCommit: "",
-		},
-		{
-			name:       "Missing Request ID",
-			args:       args{commentBody: "Received terraform plan request. Module: `one` Request ID: `` Commit ID: `e3c7d4a60b8c9b4c9211a7b4e1a837e9e9c3b5f7`"},
-			wantModule: types.NamespacedName{},
-			wantCommit: "",
-		},
-		{
-			name:       "Terraform plan output for module",
-			args:       args{commentBody: "Terraform plan output for module `foo/one` Commit ID: `e3c7d4a60b8c9b4c9211a7b4e1a837e9e9c3b5f7`"},
-			wantModule: types.NamespacedName{},
-			wantCommit: "",
-		},
 		{
 			name:       "Empty string",
 			args:       args{commentBody: ""},
 			wantModule: types.NamespacedName{},
-			wantCommit: "",
+			wantReqAt:  nil,
+		},
+		{
+			name:       "NamespacedName + Requested At",
+			args:       args{commentBody: "Received terraform plan request. Module: `foo/one` Requested At: `2006-01-02T15:04:05+07:00`"},
+			wantModule: types.NamespacedName{Namespace: "foo", Name: "one"},
+			wantReqAt:  mustParseTime("2006-01-02T15:04:05+07:00"),
+		},
+		{
+			name:       "NamespacedName + Requested At UTC",
+			args:       args{commentBody: "Received terraform plan request. Module: `foo/one` Requested At: `2023-04-02T15:04:05Z`"},
+			wantModule: types.NamespacedName{Namespace: "foo", Name: "one"},
+			wantReqAt:  mustParseTime("2023-04-02T15:04:05Z"),
+		},
+		{
+			name:       "Name + Requested At",
+			args:       args{commentBody: "Received terraform plan request. Module: `one` Requested At: `2023-04-02T15:04:05Z`"},
+			wantModule: types.NamespacedName{Name: "one"},
+			wantReqAt:  mustParseTime("2023-04-02T15:04:05Z"),
+		},
+		{
+			name:       "missing Requested At",
+			args:       args{commentBody: "Received terraform plan request. Module: `foo/one` Requested At: ``"},
+			wantModule: types.NamespacedName{Namespace: "foo", Name: "one"},
+			wantReqAt:  nil,
+		},
+		{
+			name:       "Missing module",
+			args:       args{commentBody: "Received terraform plan request. Module: `` Requested At: `2006-01-02T15:04:05+07:00`"},
+			wantModule: types.NamespacedName{},
+			wantReqAt:  nil,
+		},
+		{
+			name:       "Terraform plan output for module",
+			args:       args{commentBody: "Terraform plan output for module `foo/one`"},
+			wantModule: types.NamespacedName{},
+			wantReqAt:  nil,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gotModule, gotCommit := findOutputRequestDataInComment(tt.args.commentBody)
+			gotModule, gotReqAt := requestAcknowledgedCommentInfo(tt.args.commentBody)
 			if !reflect.DeepEqual(gotModule, tt.wantModule) {
-				t.Errorf("findOutputRequestDataInComment() gotModule = %v, want %v", gotModule, tt.wantModule)
+				t.Errorf("requestAcknowledgedCommentInfo() gotModule = %v, want %v", gotModule, tt.wantModule)
 			}
-			if gotCommit != tt.wantCommit {
-				t.Errorf("findOutputRequestDataInComment() gotCommit = %v, want %v", gotCommit, tt.wantCommit)
+			if diff := cmp.Diff(tt.wantReqAt, gotReqAt); diff != "" {
+				t.Errorf("requestAcknowledgedCommentInfo() mismatch (-want +got):\n%s", diff)
 			}
 		})
 	}
@@ -85,15 +100,16 @@ func Test_checkPRCommentForOutputRequests(t *testing.T) {
 	slog.SetLogLoggerLevel(slog.LevelDebug)
 
 	t.Run("terraform plan output comment", func(t *testing.T) {
-		pr := generateMockPR(123, "ref1", []string{}, []string{}, nil)
+		testRedis := sysutil.NewMockRedisInterface(goMockCtrl)
+		planner.RedisClient = testRedis
 
 		comment := prComment{
 			Body: fmt.Sprintf(outputBodyTml, "foo/two", "hash1", "terraform plan output"),
 		}
 
-		gotOut, gotOk := planner.checkPRCommentForOutputRequests(ctx, pr, comment)
+		gotOut, gotOk := planner.checkPRCommentForOutputRequests(ctx, comment)
 
-		wantOut := output{}
+		wantOut := prComment{}
 		wantOk := false
 
 		if diff := cmp.Diff(wantOut, gotOut, cmpIgnoreRandFields); diff != "" {
@@ -105,15 +121,16 @@ func Test_checkPRCommentForOutputRequests(t *testing.T) {
 	})
 
 	t.Run("empty commit id", func(t *testing.T) {
-		pr := generateMockPR(123, "ref1", []string{}, []string{}, nil)
+		testRedis := sysutil.NewMockRedisInterface(goMockCtrl)
+		planner.RedisClient = testRedis
 
 		comment := prComment{
-			Body: fmt.Sprintf(requestAcknowledgedTml, "foo/two", "reqID1", ""),
+			Body: fmt.Sprintf(requestAcknowledgedTml, "foo/two", "2023-04-02T15:04:05Z"),
 		}
 
-		gotOut, gotOk := planner.checkPRCommentForOutputRequests(ctx, pr, comment)
+		gotOut, gotOk := planner.checkPRCommentForOutputRequests(ctx, comment)
 
-		wantOut := output{}
+		wantOut := prComment{}
 		wantOk := false
 
 		if diff := cmp.Diff(wantOut, gotOut, cmpIgnoreRandFields); diff != "" {
@@ -128,10 +145,8 @@ func Test_checkPRCommentForOutputRequests(t *testing.T) {
 		testRedis := sysutil.NewMockRedisInterface(goMockCtrl)
 		planner.RedisClient = testRedis
 
-		pr := generateMockPR(123, "ref1", []string{}, []string{}, nil)
-
 		comment := prComment{
-			Body: fmt.Sprintf(requestAcknowledgedTml, "foo/two", "reqID1", "hash1"),
+			Body: fmt.Sprintf(requestAcknowledgedTml, "foo/two", "2023-04-02T15:04:05Z"),
 		}
 
 		// mock db call with no result found
@@ -139,9 +154,9 @@ func Test_checkPRCommentForOutputRequests(t *testing.T) {
 			types.NamespacedName{Namespace: "foo", Name: "two"}, 123, "hash1").
 			Return(nil, sysutil.ErrKeyNotFound)
 
-		gotOut, gotOk := planner.checkPRCommentForOutputRequests(ctx, pr, comment)
+		gotOut, gotOk := planner.checkPRCommentForOutputRequests(ctx, comment)
 
-		wantOut := output{}
+		wantOut := prComment{}
 		wantOk := false
 
 		if diff := cmp.Diff(wantOut, gotOut, cmpIgnoreRandFields); diff != "" {
@@ -156,10 +171,8 @@ func Test_checkPRCommentForOutputRequests(t *testing.T) {
 		testRedis := sysutil.NewMockRedisInterface(goMockCtrl)
 		planner.RedisClient = testRedis
 
-		pr := generateMockPR(123, "ref1", []string{}, []string{}, nil)
-
 		comment := prComment{
-			Body: fmt.Sprintf(requestAcknowledgedTml, "foo/two", "reqID1", "hash1"),
+			Body: fmt.Sprintf(requestAcknowledgedTml, "foo/two", "2023-04-02T15:04:05Z"),
 		}
 
 		// mock db call with no result found
@@ -167,9 +180,9 @@ func Test_checkPRCommentForOutputRequests(t *testing.T) {
 			types.NamespacedName{Namespace: "foo", Name: "two"}, 123, "hash1").
 			Return(&v1beta1.Run{Output: ""}, nil)
 
-		gotOut, gotOk := planner.checkPRCommentForOutputRequests(ctx, pr, comment)
+		gotOut, gotOk := planner.checkPRCommentForOutputRequests(ctx, comment)
 
-		wantOut := output{}
+		wantOut := prComment{}
 		wantOk := false
 
 		if diff := cmp.Diff(wantOut, gotOut, cmpIgnoreRandFields); diff != "" {
@@ -184,10 +197,8 @@ func Test_checkPRCommentForOutputRequests(t *testing.T) {
 		testRedis := sysutil.NewMockRedisInterface(goMockCtrl)
 		planner.RedisClient = testRedis
 
-		pr := generateMockPR(123, "ref1", []string{}, []string{}, nil)
-
 		comment := prComment{
-			Body:       fmt.Sprintf(requestAcknowledgedTml, "foo/two", "reqID1", "hash1"),
+			Body:       fmt.Sprintf(requestAcknowledgedTml, "foo/two", "2023-04-02T15:04:05Z"),
 			DatabaseID: 111,
 		}
 
@@ -196,15 +207,11 @@ func Test_checkPRCommentForOutputRequests(t *testing.T) {
 			types.NamespacedName{Namespace: "foo", Name: "two"}, 123, "hash1").
 			Return(&v1beta1.Run{CommitHash: "hash1", Output: "terraform plan output"}, nil)
 
-		gotOut, gotOk := planner.checkPRCommentForOutputRequests(ctx, pr, comment)
+		gotOut, gotOk := planner.checkPRCommentForOutputRequests(ctx, comment)
 
-		wantOut := output{
-			Module: types.NamespacedName{Namespace: "foo", Name: "two"},
-			Body: prComment{Body: fmt.Sprintf(
-				outputBodyTml, types.NamespacedName{Namespace: "foo", Name: "two"},
-				"hash1", "terraform plan output")},
-			CommentID: 111,
-			PrNumber:  123,
+		wantOut := prComment{Body: fmt.Sprintf(
+			outputBodyTml, types.NamespacedName{Namespace: "foo", Name: "two"},
+			"hash1", "terraform plan output"),
 		}
 		wantOk := true
 

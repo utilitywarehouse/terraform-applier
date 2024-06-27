@@ -1,7 +1,17 @@
 package prplanner
 
 import (
-	"k8s.io/apimachinery/pkg/types"
+	"regexp"
+)
+
+var (
+	terraformPlanRequestRegex = regexp.MustCompile(`@terraform-applier plan ([\w'-]+\/?[\w'-]+)`)
+
+	requestAcknowledgedTml   = "Received terraform plan request. Module: `%s` Requested At: `%s`"
+	requestAcknowledgedRegex = regexp.MustCompile("Received terraform plan request. Module: `(.+)` Requested At: `(.+)`")
+
+	outputBodyTml         = "Terraform plan output for module `%s` Commit ID: `%s`\n```terraform\n%s\n```"
+	terraformPlanOutRegex = regexp.MustCompile("Terraform plan output for module `(.+?)` Commit ID: `(.+?)`")
 )
 
 // TODO: Add isDraft to filter out draft PRs in the PR loop
@@ -92,11 +102,4 @@ type prComment struct {
 
 type prFiles struct {
 	Path string `json:"path"`
-}
-
-type output struct {
-	Module    types.NamespacedName
-	Body      prComment
-	CommentID int
-	PrNumber  int
 }

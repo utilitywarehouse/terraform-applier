@@ -4,21 +4,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"regexp"
 	"strings"
+	"time"
 
 	"github.com/utilitywarehouse/git-mirror/pkg/mirror"
 	tfaplv1beta1 "github.com/utilitywarehouse/terraform-applier/api/v1beta1"
 	"github.com/utilitywarehouse/terraform-applier/sysutil"
 
 	"k8s.io/apimachinery/pkg/types"
-)
-
-var (
-	terraformPlanRequestRegex = regexp.MustCompile("@terraform-applier plan ([\\w'-]+\\/?[\\w'-]+)")
-
-	requestAcknowledgedTml   = "Received terraform plan request. Module: `%s` Request ID: `%s` Commit ID: `%s`"
-	requestAcknowledgedRegex = regexp.MustCompile("Received terraform plan request. Module: `(.+)` Request ID: `(.+)` Commit ID: `(.+)`")
 )
 
 // 3. loop through pr modules:
@@ -148,7 +141,7 @@ func (p *Planner) checkPRCommentsForPlanRequests(pr *pr, repo *mirror.GitURL, mo
 		comment := pr.Comments.Nodes[i]
 
 		// Skip if request already acknowledged for module
-		commentModule, _ := getRequestAcknowledgedCommentInfo(comment.Body)
+		commentModule, _ := requestAcknowledgedCommentInfo(comment.Body)
 		if commentModule == module.NamespacedName() {
 			return nil, nil
 		}
@@ -196,15 +189,6 @@ func isPlanOutputPostedForCommit(pr *pr, commitID string, module types.Namespace
 	return false
 }
 
-func getRequestAcknowledgedCommentInfo(comment string) (module types.NamespacedName, commit string) {
-	matches := requestAcknowledgedRegex.FindStringSubmatch(comment)
-	if len(matches) == 4 {
-		return parseNamespaceName(matches[1]), matches[3]
-	}
-
-	return types.NamespacedName{}, ""
-}
-
 func getPostedRunOutputInfo(comment string) (module types.NamespacedName, commit string) {
 	matches := terraformPlanOutRegex.FindStringSubmatch(comment)
 	if len(matches) == 3 {
@@ -242,7 +226,7 @@ func (p *Planner) addNewRequest(module tfaplv1beta1.Module, pr *pr, repo *mirror
 	req := module.NewRunRequest(tfaplv1beta1.PRPlan)
 
 	commentBody := prComment{
-		Body: fmt.Sprintf(requestAcknowledgedTml, module.NamespacedName(), req.ID, commitID),
+		Body: fmt.Sprintf(requestAcknowledgedTml, module.NamespacedName(), req.ID, req.RequestedAt.Format(time.RFC3339)),
 	}
 
 	commentID, err := p.github.postComment(repo, 0, pr.Number, commentBody)
