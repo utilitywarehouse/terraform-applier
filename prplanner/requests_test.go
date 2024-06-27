@@ -20,27 +20,27 @@ func Test_getPostedRunOutputInfo(t *testing.T) {
 	}{
 		{
 			name:       "NamespaceName + Commit ID",
-			args:       args{comment: fmt.Sprintf(outputBodyTml, "foo/one", "foo/one", "e3c7d4a60b8c9b4c9211a7b4e1a837e9e9c3b5f7")},
+			args:       args{comment: fmt.Sprintf(outputBodyTml, "foo/one", "foo/one", "hash2", "Plan: x to add, x to change, x to destroy.")},
 			wantModule: types.NamespacedName{Namespace: "foo", Name: "one"},
-			wantCommit: "e3c7d4a60b8c9b4c9211a7b4e1a837e9e9c3b5f7",
+			wantCommit: "hash2",
 		},
 		{
 			name:       "NamespaceName only",
-			args:       args{comment: fmt.Sprintf(outputBodyTml, "one", "foo/one", "")},
+			args:       args{comment: fmt.Sprintf(outputBodyTml, "one", "foo/one", "", "Plan: x to add, x to change, x to destroy.")},
 			wantModule: types.NamespacedName{},
 			wantCommit: "",
 		},
 		{
 			name:       "Commit ID only",
-			args:       args{comment: fmt.Sprintf(outputBodyTml, "", "foo/one", "e3c7d4a60b8c9b4c9211a7b4e1a837e9e9c3b5f7")},
+			args:       args{comment: fmt.Sprintf(outputBodyTml, "", "foo/one", "hash2", "Plan: x to add, x to change, x to destroy.")},
 			wantModule: types.NamespacedName{},
 			wantCommit: "",
 		},
 		{
 			name:       "Name + Commit ID",
-			args:       args{comment: fmt.Sprintf(outputBodyTml, "one", "foo/one", "e3c7d4a60b8c9b4c9211a7b4e1a837e9e9c3b5f7")},
+			args:       args{comment: fmt.Sprintf(outputBodyTml, "one", "foo/one", "hash2", "Plan: x to add, x to change, x to destroy.")},
 			wantModule: types.NamespacedName{Name: "one"},
-			wantCommit: "e3c7d4a60b8c9b4c9211a7b4e1a837e9e9c3b5f7",
+			wantCommit: "hash2",
 		},
 		{
 			name:       "@terraform-applier plan only",
@@ -186,10 +186,10 @@ func Test_isPlanOutputPostedForCommit(t *testing.T) {
 				}{Nodes: []prComment{
 					{
 						DatabaseID: 01234567,
-						Body:       fmt.Sprintf(outputBodyTml, "foo/one", "foo/one", "e3c7d4a60b8c9b4c9211a7b4e1a837e9e9c3b5f7"),
+						Body:       fmt.Sprintf(outputBodyTml, "foo/one", "foo/one", "hash2", "Plan: x to add, x to change, x to destroy."),
 					},
 				}}},
-				commitID: "e3c7d4a60b8c9b4c9211a7b4e1a837e9e9c3b5f7",
+				commitID: "hash2",
 				module:   types.NamespacedName{Namespace: "foo", Name: "one"},
 			},
 			want: true,
@@ -202,10 +202,10 @@ func Test_isPlanOutputPostedForCommit(t *testing.T) {
 				}{Nodes: []prComment{
 					{
 						DatabaseID: 01234567,
-						Body:       fmt.Sprintf(outputBodyTml, "one", "foo/one", "e3c7d4a60b8c9b4c9211a7b4e1a837e9e9c3b5f7"),
+						Body:       fmt.Sprintf(outputBodyTml, "one", "foo/one", "hash2", "Plan: x to add, x to change, x to destroy."),
 					},
 				}}},
-				commitID: "e3c7d4a60b8c9b4c9211a7b4e1a837e9e9c3b5f7",
+				commitID: "hash2",
 				module:   types.NamespacedName{Name: "one"},
 			},
 			want: true,
@@ -218,7 +218,7 @@ func Test_isPlanOutputPostedForCommit(t *testing.T) {
 				}{Nodes: []prComment{
 					{
 						DatabaseID: 01234567,
-						Body:       "Terraform plan output for module `foo/one` Commit ID: `e3c7d4a60b8c9b4c9211a7b4e1a837e9e9c3b5f7`",
+						Body:       "Terraform plan output for module `foo/one` Commit ID: `hash2`",
 					},
 				}}},
 				commitID: "e3c7d4a60b8c9b4c9211a7b4e1a837e9e9c3aaaa",
@@ -234,10 +234,10 @@ func Test_isPlanOutputPostedForCommit(t *testing.T) {
 				}{Nodes: []prComment{
 					{
 						DatabaseID: 01234567,
-						Body:       "Terraform plan output for module `bar/one` Commit ID: `e3c7d4a60b8c9b4c9211a7b4e1a837e9e9c3b5f7`",
+						Body:       "Terraform plan output for module `bar/one` Commit ID: `hash2`",
 					},
 				}}},
-				commitID: "e3c7d4a60b8c9b4c9211a7b4e1a837e9e9c3b5f7",
+				commitID: "hash2",
 				module:   types.NamespacedName{Namespace: "foo", Name: "one"},
 			},
 			want: false,
@@ -250,10 +250,10 @@ func Test_isPlanOutputPostedForCommit(t *testing.T) {
 				}{Nodes: []prComment{
 					{
 						DatabaseID: 01234567,
-						Body:       "Received terraform plan request. Module: `foo/one` Request ID: `a1b2c3d4` Commit ID: `e3c7d4a60b8c9b4c9211a7b4e1a837e9e9c3b5f7`",
+						Body:       "Received terraform plan request. Module: `foo/one` Request ID: `a1b2c3d4` Commit ID: `hash2`",
 					},
 				}}},
-				commitID: "e3c7d4a60b8c9b4c9211a7b4e1a837e9e9c3b5f7",
+				commitID: "hash2",
 				module:   types.NamespacedName{Namespace: "foo", Name: "one"},
 			},
 			want: false,
@@ -269,7 +269,7 @@ func Test_isPlanOutputPostedForCommit(t *testing.T) {
 						Body:       "",
 					},
 				}}},
-				commitID: "e3c7d4a60b8c9b4c9211a7b4e1a837e9e9c3b5f7",
+				commitID: "hash2",
 				module:   types.NamespacedName{Namespace: "foo", Name: "one"},
 			},
 			want: false,

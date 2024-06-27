@@ -121,7 +121,7 @@ func Test_checkPRCommentForOutputRequests(t *testing.T) {
 
 	t.Run("terraform plan output comment", func(t *testing.T) {
 		comment := prComment{
-			Body: fmt.Sprintf(outputBodyTml, "foo/two", "hash1", "terraform plan output"),
+			Body: fmt.Sprintf(outputBodyTml, "foo/two", "hash1", "Plan: x to add, x to change, x to destroy.", "terraform plan output"),
 		}
 
 		gotOut, gotOk := planner.checkPRCommentForOutputRequests(ctx, comment)
@@ -205,12 +205,9 @@ func Test_checkPRCommentForOutputRequests(t *testing.T) {
 		wantOut := prComment{
 			Body: fmt.Sprintf(
 				outputBodyTml, types.NamespacedName{Namespace: "foo", Name: "two"}, "module/path/is/going/to/be/here",
-				"hash1", "terraform plan output"),
+				"hash1", "Plan: x to add, x to change, x to destroy.", "terraform plan output"),
 		}
 		wantOk := true
-
-		fmt.Println("§§§ wantOut:", wantOut)
-		fmt.Println("§§§ gotOut: ", gotOut)
 
 		if diff := cmp.Diff(wantOut, gotOut, cmpIgnoreRandFields); diff != "" {
 			t.Errorf("checkPRCommentForOutputRequests() mismatch (-want +got):\n%s", diff)

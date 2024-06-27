@@ -50,6 +50,7 @@ func (p *Planner) checkPRCommentForOutputRequests(ctx context.Context, comment p
 					moduleNamespacedName,
 					"module/path/is/going/to/be/here",
 					run.CommitHash,
+					run.Summary,
 					run.Output,
 				),
 			}, true

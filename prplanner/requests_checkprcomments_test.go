@@ -68,8 +68,8 @@ func Test_checkPRCommentsForPlanRequests(t *testing.T) {
 		pr := generateMockPR(123, "ref1",
 			[]string{"hash1", "hash2", "hash3"},
 			[]string{
-				fmt.Sprintf(outputBodyTml, "foo/two", "hash2", "tf plan output"),
-				fmt.Sprintf(outputBodyTml, "foo/three", "hash3", "tf plan output"),
+				fmt.Sprintf(outputBodyTml, "foo/two", "hash2", "Plan: x to add, x to change, x to destroy.", "tf plan output"),
+				fmt.Sprintf(outputBodyTml, "foo/three", "hash3", "Plan: x to add, x to change, x to destroy.", "tf plan output"),
 			},
 			nil,
 		)

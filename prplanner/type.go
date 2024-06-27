@@ -17,7 +17,7 @@ var (
 		"Module: `%s`\n" +
 		"Path: `%s`\n" +
 		"Commit ID: `%s`\n" +
-		"<details><summary><b>Run output:<br>&nbsp;&nbsp;&nbsp;&nbsp;Plan: 1 to add, 0 to change, 0 to destroy.</b></summary>" +
+		"<details><summary><b>Run output:<br>&nbsp;&nbsp;&nbsp;&nbsp;%s</b></summary>" +
 		"\n\n```terraform\n%s\n```\n</details>"
 	terraformPlanOutRegex = regexp.MustCompile("Terraform plan output for\\s+Module:\\s+`(.+?)`\\s+Path:\\s+`(.+?)`\\s+Commit ID: `(.+?)`")
 )
