@@ -83,7 +83,7 @@ func runOutputMsg(module, path string, run *v1beta1.Run) string {
 			"The output is truncated from the top.\n" + string(runes[characterLimit:])
 	}
 
-	return fmt.Sprintf(runOutputMsgTml, module, path, run.CommitHash, run.Summary, runOutput)
+	return fmt.Sprintf(runOutputMsgTml, module, path, run.CommitHash, run.Status, run.Summary, runOutput)
 }
 
 func parseNamespaceName(str string) types.NamespacedName {
