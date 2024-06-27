@@ -73,12 +73,17 @@ func parseRunOutputMsg(comment string) (module types.NamespacedName, commit stri
 }
 
 func runOutputMsg(module, path string, run *v1beta1.Run) string {
-	// TODO: max character limit needs to be set for run.Output
 	// https://github.com/orgs/community/discussions/27190
-	return fmt.Sprintf(
-		runOutputMsgTml,
-		module, path, run.CommitHash, run.Summary, run.Output,
-	)
+	characterLimit := 65000
+	runOutput := run.Output
+	runes := []rune(runOutput)
+
+	if len(runes) > characterLimit {
+		runOutput = "Plan output has reached the max character limit of " + fmt.Sprintf("%d", characterLimit) + " characters. " +
+			"The output is truncated from the top.\n" + string(runes[characterLimit:])
+	}
+
+	return fmt.Sprintf(runOutputMsgTml, module, path, run.CommitHash, run.Summary, runOutput)
 }
 
 func parseNamespaceName(str string) types.NamespacedName {
