@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"reflect"
 	"testing"
 	"time"
 
@@ -32,82 +31,6 @@ func mustParseMetaTime(str string) *metav1.Time {
 	return &metav1.Time{Time: at}
 }
 
-func Test_requestAcknowledgedCommentInfo(t *testing.T) {
-	type args struct {
-		commentBody string
-	}
-	tests := []struct {
-		name       string
-		args       args
-		wantModule types.NamespacedName
-		wantPath   string
-		wantReqAt  *time.Time
-	}{
-		{
-			name:       "Empty string",
-			args:       args{commentBody: ""},
-			wantModule: types.NamespacedName{},
-			wantReqAt:  nil,
-		},
-		{
-			name:       "NamespacedName + Requested At",
-			args:       args{commentBody: requestAcknowledgedMsg("foo/one", "path/to/module/one", mustParseMetaTime("2006-01-02T15:04:05+07:00"))},
-			wantModule: types.NamespacedName{Namespace: "foo", Name: "one"},
-			wantPath:   "path/to/module/one",
-			wantReqAt:  mustParseTime("2006-01-02T15:04:05+07:00"),
-		},
-		{
-			name:       "NamespacedName + Requested At UTC",
-			args:       args{commentBody: requestAcknowledgedMsg("foo/one", "foo/one", mustParseMetaTime("2023-04-02T15:04:05Z"))},
-			wantModule: types.NamespacedName{Namespace: "foo", Name: "one"},
-			wantPath:   "foo/one",
-			wantReqAt:  mustParseTime("2023-04-02T15:04:05Z"),
-		},
-		{
-			name:       "Name + Requested At",
-			args:       args{commentBody: requestAcknowledgedMsg("one", "foo/one", mustParseMetaTime("2023-04-02T15:04:05Z"))},
-			wantModule: types.NamespacedName{Name: "one"},
-			wantPath:   "foo/one",
-			wantReqAt:  mustParseTime("2023-04-02T15:04:05Z"),
-		},
-		{
-			name:       "missing Requested At",
-			args:       args{commentBody: fmt.Sprintf(requestAcknowledgedTml, "foo/one", "foo/one", "")},
-			wantModule: types.NamespacedName{},
-			wantPath:   "",
-			wantReqAt:  nil,
-		},
-		{
-			name:       "Missing module",
-			args:       args{commentBody: "Received terraform plan request. Module: `` Requested At: `2006-01-02T15:04:05+07:00`"},
-			wantModule: types.NamespacedName{},
-			wantPath:   "",
-			wantReqAt:  nil,
-		},
-		{
-			name:       "Terraform plan output for module",
-			args:       args{commentBody: "Terraform plan output for module `foo/one`"},
-			wantModule: types.NamespacedName{},
-			wantPath:   "",
-			wantReqAt:  nil,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			gotModule, gotPath, gotReqAt := requestAcknowledgedCommentInfo(tt.args.commentBody)
-			if !reflect.DeepEqual(gotModule, tt.wantModule) {
-				t.Errorf("requestAcknowledgedCommentInfo() gotModule = %v, want %v", gotModule, tt.wantModule)
-			}
-			if diff := cmp.Diff(tt.wantPath, gotPath); diff != "" {
-				t.Errorf("requestAcknowledgedCommentInfo() mismatch (-want +got):\n%s", diff)
-			}
-			if diff := cmp.Diff(tt.wantReqAt, gotReqAt); diff != "" {
-				t.Errorf("requestAcknowledgedCommentInfo() mismatch (-want +got):\n%s", diff)
-			}
-		})
-	}
-}
-
 func Test_checkPRCommentForOutputRequests(t *testing.T) {
 	ctx := context.Background()
 	goMockCtrl := gomock.NewController(t)
@@ -131,7 +54,7 @@ func Test_checkPRCommentForOutputRequests(t *testing.T) {
 
 	t.Run("terraform plan output comment", func(t *testing.T) {
 		comment := prComment{
-			Body: outputBody("foo/two", "foo/two", &v1beta1.Run{CommitHash: "hash1", Summary: "Plan: x to add, x to change, x to destroy.", Output: "terraform plan output"}),
+			Body: runOutputMsg("foo/two", "foo/two", &v1beta1.Run{CommitHash: "hash1", Summary: "Plan: x to add, x to change, x to destroy.", Output: "terraform plan output"}),
 		}
 
 		gotOut, gotOk := planner.checkPRCommentForOutputRequests(ctx, comment)
@@ -149,7 +72,7 @@ func Test_checkPRCommentForOutputRequests(t *testing.T) {
 
 	t.Run("empty request time", func(t *testing.T) {
 		comment := prComment{
-			Body: fmt.Sprintf(requestAcknowledgedTml, "foo/two", ""),
+			Body: fmt.Sprintf(requestAcknowledgedMsgTml, "foo/two", ""),
 		}
 
 		gotOut, gotOk := planner.checkPRCommentForOutputRequests(ctx, comment)
@@ -210,7 +133,7 @@ func Test_checkPRCommentForOutputRequests(t *testing.T) {
 		gotOut, gotOk := planner.checkPRCommentForOutputRequests(ctx, comment)
 
 		wantOut := prComment{
-			Body: outputBody("foo/two", "module/path/is/going/to/be/here", &v1beta1.Run{CommitHash: "hash1", Summary: "plan summary", Output: "terraform plan output"}),
+			Body: runOutputMsg("foo/two", "module/path/is/going/to/be/here", &v1beta1.Run{CommitHash: "hash1", Summary: "plan summary", Output: "terraform plan output"}),
 		}
 		wantOk := true
 

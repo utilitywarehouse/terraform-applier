@@ -1,175 +1,11 @@
 package prplanner
 
 import (
-	"reflect"
 	"testing"
 
 	"github.com/utilitywarehouse/terraform-applier/api/v1beta1"
 	"k8s.io/apimachinery/pkg/types"
 )
-
-func Test_getPostedRunOutputInfo(t *testing.T) {
-	type args struct {
-		comment string
-	}
-	tests := []struct {
-		name       string
-		args       args
-		wantModule types.NamespacedName
-		wantCommit string
-	}{
-		{
-			name:       "NamespaceName + Commit ID",
-			args:       args{comment: outputBody("foo/one", "foo/one", &v1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy."})},
-			wantModule: types.NamespacedName{Namespace: "foo", Name: "one"},
-			wantCommit: "hash2",
-		},
-		{
-			name:       "NamespaceName only",
-			args:       args{comment: outputBody("one", "foo/one", &v1beta1.Run{Summary: "Plan: x to add, x to change, x to destroy."})},
-			wantModule: types.NamespacedName{},
-			wantCommit: "",
-		},
-		{
-			name:       "missing name",
-			args:       args{comment: outputBody("", "foo/one", &v1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy."})},
-			wantModule: types.NamespacedName{},
-			wantCommit: "",
-		},
-		{
-			name:       "Name + Commit ID",
-			args:       args{comment: outputBody("one", "foo/one", &v1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy."})},
-			wantModule: types.NamespacedName{Name: "one"},
-			wantCommit: "hash2",
-		},
-		{
-			name:       "@terraform-applier plan only",
-			args:       args{comment: "@terraform-applier plan"},
-			wantModule: types.NamespacedName{},
-			wantCommit: "",
-		},
-		{
-			name:       "Empty string",
-			args:       args{comment: ""},
-			wantModule: types.NamespacedName{},
-			wantCommit: "",
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			gotModule, gotCommit := getPostedRunOutputInfo(tt.args.comment)
-			if !reflect.DeepEqual(gotModule, tt.wantModule) {
-				t.Errorf("getPostedRunOutputInfo() gotModule = %v, want %v", gotModule, tt.wantModule)
-			}
-			if gotCommit != tt.wantCommit {
-				t.Errorf("getPostedRunOutputInfo() gotCommit = %v, want %v", gotCommit, tt.wantCommit)
-			}
-		})
-	}
-}
-
-func Test_getRunRequestFromComment(t *testing.T) {
-	type args struct {
-		commentBody string
-	}
-	tests := []struct {
-		name string
-		args args
-		want types.NamespacedName
-	}{
-		{
-			name: "Namespace and Name",
-			args: args{commentBody: "@terraform-applier plan foo/one"},
-			want: types.NamespacedName{Namespace: "foo", Name: "one"},
-		},
-		{
-			name: "Namespace and Name",
-			args: args{commentBody: "@terraform-applier plan foo/two\n@terraform-applier plan foo/one"},
-			want: types.NamespacedName{Namespace: "foo", Name: "two"},
-		},
-		{
-			name: "Name only",
-			args: args{commentBody: "@terraform-applier plan one"},
-			want: types.NamespacedName{Name: "one"},
-		},
-		{
-			name: "Empty string",
-			args: args{commentBody: ""},
-			want: types.NamespacedName{},
-		},
-		{
-			name: "Multiple slashes",
-			args: args{commentBody: "foo/one/extra"},
-			want: types.NamespacedName{},
-		},
-		{
-			name: "Leading slash",
-			args: args{commentBody: "/one"},
-			want: types.NamespacedName{},
-		},
-		{
-			name: "Trailing slash",
-			args: args{commentBody: "foo/"},
-			want: types.NamespacedName{},
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := getRunRequestFromComment(tt.args.commentBody); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("getRunRequestFromComment() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func Test_parseNamespaceName(t *testing.T) {
-	type args struct {
-		str string
-	}
-	tests := []struct {
-		name string
-		args args
-		want types.NamespacedName
-	}{
-		{
-			name: "NamespacedName",
-			args: args{str: "foo/one"},
-			want: types.NamespacedName{Namespace: "foo", Name: "one"},
-		},
-		{
-			name: "Namespace only",
-			args: args{str: "foo/"},
-			want: types.NamespacedName{Namespace: "foo"},
-		},
-		{
-			name: "Name only",
-			args: args{str: "one"},
-			want: types.NamespacedName{Name: "one"},
-		},
-		{
-			name: "Empty string",
-			args: args{str: ""},
-			want: types.NamespacedName{},
-		},
-		{
-			name: "Multiple slashes",
-			args: args{str: "foo/one/extra"},
-			want: types.NamespacedName{},
-		},
-		{
-			name: "Leading slash",
-			args: args{str: "/one"},
-			want: types.NamespacedName{Name: "one"},
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := parseNamespaceName(tt.args.str); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("parseNamespaceName() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
 
 func Test_isPlanOutputPostedForCommit(t *testing.T) {
 	type args struct {
@@ -191,7 +27,7 @@ func Test_isPlanOutputPostedForCommit(t *testing.T) {
 				}{Nodes: []prComment{
 					{
 						DatabaseID: 01234567,
-						Body:       outputBody("foo/one", "foo/one", &v1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy."}),
+						Body:       runOutputMsg("foo/one", "foo/one", &v1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy."}),
 					},
 				}}},
 				commitID: "hash2",
@@ -207,7 +43,7 @@ func Test_isPlanOutputPostedForCommit(t *testing.T) {
 				}{Nodes: []prComment{
 					{
 						DatabaseID: 01234567,
-						Body:       outputBody("one", "foo/one", &v1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy."}),
+						Body:       runOutputMsg("one", "foo/one", &v1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy."}),
 					},
 				}}},
 				commitID: "hash2",

@@ -102,7 +102,7 @@ func TestCheckPRCommits(t *testing.T) {
 		testGithub.EXPECT().postComment(gomock.Any(), 0, 123, gomock.Any()).
 			DoAndReturn(func(repo *mirror.GitURL, commentID, prNumber int, commentBody prComment) (int, error) {
 				// validate comment message
-				if !requestAcknowledgedRegex.Match([]byte(commentBody.Body)) {
+				if !requestAcknowledgedMsgRegex.Match([]byte(commentBody.Body)) {
 					return 0, fmt.Errorf("comment body doesn't match requestAcknowledgedRegex")
 				}
 				return 111, nil
@@ -157,7 +157,7 @@ func TestCheckPRCommits(t *testing.T) {
 		testGithub.EXPECT().postComment(gomock.Any(), 0, 123, gomock.Any()).
 			DoAndReturn(func(repo *mirror.GitURL, commentID, prNumber int, commentBody prComment) (int, error) {
 				// validate comment message
-				if !requestAcknowledgedRegex.Match([]byte(commentBody.Body)) {
+				if !requestAcknowledgedMsgRegex.Match([]byte(commentBody.Body)) {
 					return 0, fmt.Errorf("comment body doesn't match requestAcknowledgedRegex")
 				}
 				return 111, nil
@@ -224,7 +224,7 @@ func TestCheckPRCommits(t *testing.T) {
 
 		p := generateMockPR(123, "ref1",
 			[]string{"hash1", "hash2", "hash3"},
-			[]string{"random comment", outputBody("foo/two", "foo/two", &v1beta1.Run{CommitHash: "hash3", Summary: "Plan: x to add, x to change, x to destroy.", Output: "some output"}), "random comment"},
+			[]string{"random comment", runOutputMsg("foo/two", "foo/two", &v1beta1.Run{CommitHash: "hash3", Summary: "Plan: x to add, x to change, x to destroy.", Output: "some output"}), "random comment"},
 
 			nil,
 		)
@@ -279,7 +279,7 @@ func TestCheckPRCommits(t *testing.T) {
 		testGithub.EXPECT().postComment(gomock.Any(), 0, 123, gomock.Any()).
 			DoAndReturn(func(repo *mirror.GitURL, commentID, prNumber int, commentBody prComment) (int, error) {
 				// validate comment message
-				if !requestAcknowledgedRegex.Match([]byte(commentBody.Body)) {
+				if !requestAcknowledgedMsgRegex.Match([]byte(commentBody.Body)) {
 					return 0, fmt.Errorf("comment body doesn't match requestAcknowledgedRegex")
 				}
 				return 111, nil
