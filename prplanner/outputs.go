@@ -74,7 +74,7 @@ func outputBody(module, path string, run *v1beta1.Run) string {
 	runes := []rune(runOutput)
 
 	if len(runes) > characterLimit {
-		runOutput = "Plan output has reached the max character limit of" + string(characterLimit) + " characters. " +
+		runOutput = "Plan output has reached the max character limit of " + fmt.Sprintf("%d", characterLimit) + " characters. " +
 			"The output is truncated from the top.\n" + string(runes[characterLimit:])
 	}
 
