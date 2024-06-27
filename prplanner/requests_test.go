@@ -83,6 +83,11 @@ func Test_getRunRequestFromComment(t *testing.T) {
 			want: types.NamespacedName{Namespace: "foo", Name: "one"},
 		},
 		{
+			name: "Namespace and Name",
+			args: args{commentBody: "@terraform-applier plan foo/two\n@terraform-applier plan foo/one"},
+			want: types.NamespacedName{Namespace: "foo", Name: "two"},
+		},
+		{
 			name: "Name only",
 			args: args{commentBody: "@terraform-applier plan one"},
 			want: types.NamespacedName{Name: "one"},
