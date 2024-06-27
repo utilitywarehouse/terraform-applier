@@ -68,10 +68,15 @@ func requestAcknowledgedCommentInfo(commentBody string) (types.NamespacedName, s
 }
 
 func outputBody(module, path string, run *v1beta1.Run) string {
-	// TODO: max character limit needs to be set for run.Output
 	// https://github.com/orgs/community/discussions/27190
-	return fmt.Sprintf(
-		outputBodyTml,
-		module, path, run.CommitHash, run.Summary, run.Output,
-	)
+	characterLimit := 65000
+	runOutput := run.Output
+	runes := []rune(runOutput)
+
+	if len(runes) > characterLimit {
+		runOutput = "Plan output has reached the max character limit of" + string(characterLimit) + " characters. " +
+			"The output is truncated from the top.\n" + string(runes[characterLimit:])
+	}
+
+	return fmt.Sprintf(outputBodyTml, module, path, run.CommitHash, run.Summary, runOutput)
 }
