@@ -34,6 +34,10 @@ query ($owner: String!,$repoName: String! ) {
       nodes {
         number
         headRefName
+        isDraft
+        author {
+          login
+        }
         commits(last: 20) {
           nodes {
             commit {
@@ -45,6 +49,9 @@ query ($owner: String!,$repoName: String! ) {
           nodes {
             databaseId
             body
+            author {
+              login
+            }
           }
         }
         files(first: 100) {
@@ -78,6 +85,8 @@ type gitPRResponse struct {
 type pr struct {
 	Number      int    `json:"number"`
 	HeadRefName string `json:"headRefName"`
+	IsDraft     bool   `json:"isDraft"`
+	Author      author `json:"author"`
 	Commits     struct {
 		Nodes []prCommit `json:"nodes"`
 	} `json:"commits"`
@@ -89,6 +98,10 @@ type pr struct {
 	} `json:"files"`
 }
 
+type author struct {
+	Login string `json:"login"`
+}
+
 type prCommit struct {
 	Commit struct {
 		Oid string `json:"oid"`
@@ -97,6 +110,7 @@ type prCommit struct {
 
 type prComment struct {
 	DatabaseID int    `json:"databaseId"`
+	Author     author `json:"author"`
 	Body       string `json:"body"`
 }
 

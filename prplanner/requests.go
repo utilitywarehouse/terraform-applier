@@ -67,8 +67,6 @@ func (p *Planner) ensurePlanRequests(ctx context.Context, repo *mirror.GitURL, p
 				p.Log.Error("failed to request plan job", "error", err)
 				continue
 			}
-
-			p.Log.Info("requested terraform plan for the PR", "module", module.NamespacedName(), "requestID", req.ID, "pr", pr.Number)
 		}
 	}
 }
@@ -120,7 +118,8 @@ func (p *Planner) checkPRCommits(ctx context.Context, repo *mirror.GitURL, pr *p
 		}
 
 		// 4. request run
-		return p.addNewRequest(module, pr, repo, commit.Oid)
+		p.Log.Info("triggering plan due to new commit", "module", module.NamespacedName(), "pr", pr.Number, "author", pr.Author.Login)
+		return p.addNewRequest(module, pr, repo)
 	}
 
 	return nil, nil
@@ -163,12 +162,8 @@ func (p *Planner) checkPRCommentsForPlanRequests(pr *pr, repo *mirror.GitURL, mo
 			continue
 		}
 
-		p.Log.Debug("new plan request received. creating new plan request", "namespace", module.ObjectMeta.Namespace, "module", module.Name)
-		moduleLatestCommitHash, err := p.Repos.Hash(context.Background(), module.Spec.RepoURL, pr.HeadRefName, module.Spec.Path)
-		if err != nil {
-			return nil, err
-		}
-		return p.addNewRequest(module, pr, repo, moduleLatestCommitHash)
+		p.Log.Info("triggering plan requested via comment", "module", module.NamespacedName(), "pr", pr.Number, "author", comment.Author.Login)
+		return p.addNewRequest(module, pr, repo)
 	}
 
 	return nil, nil
@@ -222,7 +217,7 @@ func parseNamespaceName(str string) types.NamespacedName {
 	return types.NamespacedName{}
 }
 
-func (p *Planner) addNewRequest(module tfaplv1beta1.Module, pr *pr, repo *mirror.GitURL, commitID string) (*tfaplv1beta1.Request, error) {
+func (p *Planner) addNewRequest(module tfaplv1beta1.Module, pr *pr, repo *mirror.GitURL) (*tfaplv1beta1.Request, error) {
 	req := module.NewRunRequest(tfaplv1beta1.PRPlan)
 
 	commentBody := prComment{
@@ -235,10 +230,9 @@ func (p *Planner) addNewRequest(module tfaplv1beta1.Module, pr *pr, repo *mirror
 	}
 
 	req.PR = &tfaplv1beta1.PullRequest{
-		Number:        pr.Number,
-		HeadBranch:    pr.HeadRefName,
-		CommentID:     commentID,
-		GitCommitHash: commitID,
+		Number:     pr.Number,
+		HeadBranch: pr.HeadRefName,
+		CommentID:  commentID,
 	}
 
 	return req, nil

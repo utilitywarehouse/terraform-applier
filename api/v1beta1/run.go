@@ -32,6 +32,7 @@ type Run struct {
 	Applied      bool          `json:"applied,omitempty"`
 	InitOutput   string        `json:"initOutput,omitempty"`
 	Output       string        `json:"output,omitempty"`
+	Summary      string        `json:"summary,omitempty"`
 }
 
 func NewRun(module *Module, req *Request) Run {
@@ -57,10 +58,9 @@ type Request struct {
 }
 
 type PullRequest struct {
-	Number        int    `json:"num,omitempty"`
-	HeadBranch    string `json:"headBranch,omitempty"`
-	CommentID     int    `json:"commentID,omitempty"`
-	GitCommitHash string `json:"GitCommitHash,omitempty"`
+	Number     int    `json:"num,omitempty"`
+	HeadBranch string `json:"headBranch,omitempty"`
+	CommentID  int    `json:"commentID,omitempty"`
 }
 
 func (req *Request) Validate() error {

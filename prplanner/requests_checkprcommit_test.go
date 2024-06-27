@@ -31,7 +31,7 @@ func generateMockPR(num int, ref string, hash, comments, paths []string) *pr {
 		p.Commits.Nodes = append(p.Commits.Nodes, pc)
 	}
 	for _, v := range comments {
-		p.Comments.Nodes = append(p.Comments.Nodes, prComment{1, v})
+		p.Comments.Nodes = append(p.Comments.Nodes, prComment{1, author{}, v})
 	}
 	for _, v := range paths {
 		p.Files.Nodes = append(p.Files.Nodes, prFiles{v})
@@ -116,10 +116,9 @@ func TestCheckPRCommits(t *testing.T) {
 		wantReq := &tfaplv1beta1.Request{
 			Type: "PullRequestPlan",
 			PR: &tfaplv1beta1.PullRequest{
-				Number:        123,
-				HeadBranch:    "ref1",
-				CommentID:     111,
-				GitCommitHash: "hash1",
+				Number:     123,
+				HeadBranch: "ref1",
+				CommentID:  111,
 			},
 		}
 
@@ -172,10 +171,9 @@ func TestCheckPRCommits(t *testing.T) {
 		wantReq := &tfaplv1beta1.Request{
 			Type: "PullRequestPlan",
 			PR: &tfaplv1beta1.PullRequest{
-				Number:        123,
-				HeadBranch:    "ref1",
-				CommentID:     111,
-				GitCommitHash: "hash3",
+				Number:     123,
+				HeadBranch: "ref1",
+				CommentID:  111,
 			},
 		}
 
@@ -294,10 +292,9 @@ func TestCheckPRCommits(t *testing.T) {
 		wantReq := &tfaplv1beta1.Request{
 			Type: "PullRequestPlan",
 			PR: &tfaplv1beta1.PullRequest{
-				Number:        123,
-				HeadBranch:    "ref1",
-				CommentID:     111,
-				GitCommitHash: "hash3",
+				Number:     123,
+				HeadBranch: "ref1",
+				CommentID:  111,
 			},
 		}
 
