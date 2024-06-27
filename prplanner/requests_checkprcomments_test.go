@@ -9,7 +9,6 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/google/go-cmp/cmp"
 	"github.com/utilitywarehouse/git-mirror/pkg/mirror"
-	"github.com/utilitywarehouse/terraform-applier/api/v1beta1"
 	tfaplv1beta1 "github.com/utilitywarehouse/terraform-applier/api/v1beta1"
 	"github.com/utilitywarehouse/terraform-applier/git"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -69,8 +68,8 @@ func Test_checkPRCommentsForPlanRequests(t *testing.T) {
 		pr := generateMockPR(123, "ref1",
 			[]string{"hash1", "hash2", "hash3"},
 			[]string{
-				runOutputMsg("foo/two", "module/path/is/going/to/be/here", &v1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy.", Output: "tf plan output"}),
-				runOutputMsg("foo/three", "module/path/is/going/to/be/here", &v1beta1.Run{CommitHash: "hash3", Summary: "Plan: x to add, x to change, x to destroy.", Output: "tf plan output"}),
+				runOutputMsg("foo/two", "module/path/is/going/to/be/here", &tfaplv1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy.", Output: "tf plan output"}),
+				runOutputMsg("foo/three", "module/path/is/going/to/be/here", &tfaplv1beta1.Run{CommitHash: "hash3", Summary: "Plan: x to add, x to change, x to destroy.", Output: "tf plan output"}),
 			},
 			nil,
 		)
@@ -89,9 +88,9 @@ func Test_checkPRCommentsForPlanRequests(t *testing.T) {
 		pr := generateMockPR(123, "ref1",
 			[]string{"hash1", "hash2", "hash3"},
 			[]string{
-				fmt.Sprintf("@terraform-applier plan one"),
-				fmt.Sprintf("@terraform-applier plan foo/one"),
-				fmt.Sprintf("@terraform-applier plan foo/three"),
+				"@terraform-applier plan one",
+				"@terraform-applier plan foo/one",
+				"@terraform-applier plan foo/three",
 			},
 			nil,
 		)
@@ -113,9 +112,9 @@ func Test_checkPRCommentsForPlanRequests(t *testing.T) {
 		p := generateMockPR(123, "ref1",
 			[]string{"hash1", "hash2", "hash3"},
 			[]string{
-				fmt.Sprintf("@terraform-applier plan foo/one"),
-				fmt.Sprintf("@terraform-applier plan foo/two"),
-				fmt.Sprintf("@terraform-applier plan foo/three"),
+				"@terraform-applier plan foo/one",
+				"@terraform-applier plan foo/two",
+				"@terraform-applier plan foo/three",
 			},
 			nil,
 		)
@@ -172,9 +171,9 @@ func Test_checkPRCommentsForPlanRequests(t *testing.T) {
 		p := generateMockPR(123, "ref1",
 			[]string{"hash1", "hash2", "hash3"},
 			[]string{
-				fmt.Sprintf("@terraform-applier plan foo/one"),
-				fmt.Sprintf("@terraform-applier plan two"),
-				fmt.Sprintf("@terraform-applier plan three"),
+				"@terraform-applier plan foo/one",
+				"@terraform-applier plan two",
+				"@terraform-applier plan three",
 			},
 			nil,
 		)
@@ -213,9 +212,9 @@ func Test_checkPRCommentsForPlanRequests(t *testing.T) {
 		p := generateMockPR(123, "ref1",
 			[]string{"hash1", "hash2", "hash3"},
 			[]string{
-				fmt.Sprintf("@terraform-applier plan foo/one"),
-				fmt.Sprintf("@terraform-applier plan bar/two"),
-				fmt.Sprintf("@terraform-applier plan foo/three"),
+				"@terraform-applier plan foo/one",
+				"@terraform-applier plan bar/two",
+				"@terraform-applier plan foo/three",
 			},
 			nil,
 		)
@@ -238,9 +237,9 @@ func Test_checkPRCommentsForPlanRequests(t *testing.T) {
 		p := generateMockPR(123, "ref1",
 			[]string{"hash1", "hash2", "hash3"},
 			[]string{
-				fmt.Sprintf("@terraform-applier plan foo/one"),
-				fmt.Sprintf("@terraform-applier plan two please"),
-				fmt.Sprintf("@terraform-applier plan three"),
+				"@terraform-applier plan foo/one",
+				"@terraform-applier plan two please",
+				"@terraform-applier plan three",
 			},
 			nil,
 		)
