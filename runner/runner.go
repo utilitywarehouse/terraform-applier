@@ -328,6 +328,7 @@ func (r *Runner) runTF(
 	planStatus := rePlanStatus.FindString(planOut)
 
 	log.Info("planned", "status", planStatus)
+	run.Summary = planStatus
 
 	// get saved plan to update status
 	run.Output, err = te.showPlanFileRaw(ctx)
@@ -381,6 +382,7 @@ func (r *Runner) runTF(
 	applyStatus := reApplyStatus.FindString(applyOut)
 
 	log.Info("applied", "status", applyStatus)
+	run.Summary = applyStatus
 
 	if err = r.SetRunFinishedStatus(run, module, tfaplv1beta1.ReasonApplied, applyStatus, r.Clock.Now()); err != nil {
 		log.Error("unable to set finished status", "err", err)

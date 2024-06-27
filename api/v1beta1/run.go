@@ -32,6 +32,7 @@ type Run struct {
 	Applied      bool          `json:"applied,omitempty"`
 	InitOutput   string        `json:"initOutput,omitempty"`
 	Output       string        `json:"output,omitempty"`
+	Summary      string        `json:"summary,omitempty"`
 }
 
 func NewRun(module *Module, req *Request) Run {
