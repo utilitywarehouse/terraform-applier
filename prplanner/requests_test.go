@@ -1,6 +1,7 @@
 package prplanner
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 
@@ -19,26 +20,26 @@ func Test_getPostedRunOutputInfo(t *testing.T) {
 	}{
 		{
 			name:       "NamespaceName + Commit ID",
-			args:       args{comment: "Terraform plan output for module `terraform/my-module` Commit ID: `e3c7d4a60b8c9b4c9211a7b4e1a837e9e9c3b5f7`"},
-			wantModule: types.NamespacedName{Namespace: "terraform", Name: "my-module"},
+			args:       args{comment: fmt.Sprintf(outputBodyTml, "foo/one", "foo/one", "e3c7d4a60b8c9b4c9211a7b4e1a837e9e9c3b5f7")},
+			wantModule: types.NamespacedName{Namespace: "foo", Name: "one"},
 			wantCommit: "e3c7d4a60b8c9b4c9211a7b4e1a837e9e9c3b5f7",
 		},
 		{
 			name:       "NamespaceName only",
-			args:       args{comment: "Terraform plan output for module `terraform/my-module` Commit ID: ``"},
+			args:       args{comment: fmt.Sprintf(outputBodyTml, "one", "foo/one", "")},
 			wantModule: types.NamespacedName{},
 			wantCommit: "",
 		},
 		{
 			name:       "Commit ID only",
-			args:       args{comment: "Terraform plan output for module `` Commit ID: `e3c7d4a60b8c9b4c9211a7b4e1a837e9e9c3b5f7`"},
+			args:       args{comment: fmt.Sprintf(outputBodyTml, "", "foo/one", "e3c7d4a60b8c9b4c9211a7b4e1a837e9e9c3b5f7")},
 			wantModule: types.NamespacedName{},
 			wantCommit: "",
 		},
 		{
 			name:       "Name + Commit ID",
-			args:       args{comment: "Terraform plan output for module `my-module` Commit ID: `e3c7d4a60b8c9b4c9211a7b4e1a837e9e9c3b5f7`"},
-			wantModule: types.NamespacedName{Name: "my-module"},
+			args:       args{comment: fmt.Sprintf(outputBodyTml, "one", "foo/one", "e3c7d4a60b8c9b4c9211a7b4e1a837e9e9c3b5f7")},
+			wantModule: types.NamespacedName{Name: "one"},
 			wantCommit: "e3c7d4a60b8c9b4c9211a7b4e1a837e9e9c3b5f7",
 		},
 		{
@@ -185,7 +186,7 @@ func Test_isPlanOutputPostedForCommit(t *testing.T) {
 				}{Nodes: []prComment{
 					{
 						DatabaseID: 01234567,
-						Body:       "Terraform plan output for module `foo/one` Commit ID: `e3c7d4a60b8c9b4c9211a7b4e1a837e9e9c3b5f7`",
+						Body:       fmt.Sprintf(outputBodyTml, "foo/one", "foo/one", "e3c7d4a60b8c9b4c9211a7b4e1a837e9e9c3b5f7"),
 					},
 				}}},
 				commitID: "e3c7d4a60b8c9b4c9211a7b4e1a837e9e9c3b5f7",
@@ -201,7 +202,7 @@ func Test_isPlanOutputPostedForCommit(t *testing.T) {
 				}{Nodes: []prComment{
 					{
 						DatabaseID: 01234567,
-						Body:       "Terraform plan output for module `one` Commit ID: `e3c7d4a60b8c9b4c9211a7b4e1a837e9e9c3b5f7`",
+						Body:       fmt.Sprintf(outputBodyTml, "one", "foo/one", "e3c7d4a60b8c9b4c9211a7b4e1a837e9e9c3b5f7"),
 					},
 				}}},
 				commitID: "e3c7d4a60b8c9b4c9211a7b4e1a837e9e9c3b5f7",

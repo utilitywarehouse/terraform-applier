@@ -23,6 +23,7 @@ func mustParseTime(str string) *time.Time {
 	}
 	return &at
 }
+
 func mustParseMetaTime(str string) *metav1.Time {
 	at, err := time.Parse(time.RFC3339, str)
 	if err != nil {
@@ -48,27 +49,28 @@ func Test_requestAcknowledgedCommentInfo(t *testing.T) {
 			wantReqAt:  nil,
 		},
 		{
-			name:       "NamespacedName + Requested At",
-			args:       args{commentBody: "Received terraform plan request. Module: `foo/one` Requested At: `2006-01-02T15:04:05+07:00`"},
+			name: "NamespacedName + Requested At",
+			args: args{commentBody: fmt.Sprintf(requestAcknowledgedTml, "foo/one", "foo/one", "2006-01-02T15:04:05+07:00")},
+
 			wantModule: types.NamespacedName{Namespace: "foo", Name: "one"},
 			wantReqAt:  mustParseTime("2006-01-02T15:04:05+07:00"),
 		},
 		{
 			name:       "NamespacedName + Requested At UTC",
-			args:       args{commentBody: "Received terraform plan request. Module: `foo/one` Requested At: `2023-04-02T15:04:05Z`"},
+			args:       args{commentBody: fmt.Sprintf(requestAcknowledgedTml, "foo/one", "foo/one", "2023-04-02T15:04:05Z")},
 			wantModule: types.NamespacedName{Namespace: "foo", Name: "one"},
 			wantReqAt:  mustParseTime("2023-04-02T15:04:05Z"),
 		},
 		{
 			name:       "Name + Requested At",
-			args:       args{commentBody: "Received terraform plan request. Module: `one` Requested At: `2023-04-02T15:04:05Z`"},
+			args:       args{commentBody: fmt.Sprintf(requestAcknowledgedTml, "one", "foo/one", "2023-04-02T15:04:05Z")},
 			wantModule: types.NamespacedName{Name: "one"},
 			wantReqAt:  mustParseTime("2023-04-02T15:04:05Z"),
 		},
 		{
 			name:       "missing Requested At",
-			args:       args{commentBody: "Received terraform plan request. Module: `foo/one` Requested At: ``"},
-			wantModule: types.NamespacedName{Namespace: "foo", Name: "one"},
+			args:       args{commentBody: fmt.Sprintf(requestAcknowledgedTml, "foo/one", "foo/one", "")},
+			wantModule: types.NamespacedName{},
 			wantReqAt:  nil,
 		},
 		{
@@ -191,17 +193,24 @@ func Test_checkPRCommentForOutputRequests(t *testing.T) {
 
 	t.Run("plan output ready in redis", func(t *testing.T) {
 		comment := prComment{
-			Body:       fmt.Sprintf(requestAcknowledgedTml, "foo/two", "2023-04-02T15:01:05Z"),
+			Body:       fmt.Sprintf(requestAcknowledgedTml, "foo/two", "module/path/is/going/to/be/here", "2023-04-02T15:04:05Z"),
 			DatabaseID: 111,
 		}
 
+		// testRedis.EXPECT().Runs(gomock.Any(), gomock.Any()).
+		// 	// TODO: Sorry, can't figure out this thing :D
+		// 	Return([]*v1beta1.Run{{CommitHash: "hash1", Output: "terraform plan output"}}, nil)
 		gotOut, gotOk := planner.checkPRCommentForOutputRequests(ctx, comment)
 
-		wantOut := prComment{Body: fmt.Sprintf(
-			outputBodyTml, types.NamespacedName{Namespace: "foo", Name: "two"},
-			"hash1", "terraform plan output"),
+		wantOut := prComment{
+			Body: fmt.Sprintf(
+				outputBodyTml, types.NamespacedName{Namespace: "foo", Name: "two"}, "module/path/is/going/to/be/here",
+				"hash1", "terraform plan output"),
 		}
 		wantOk := true
+
+		fmt.Println("§§§ wantOut:", wantOut)
+		fmt.Println("§§§ gotOut: ", gotOut)
 
 		if diff := cmp.Diff(wantOut, gotOut, cmpIgnoreRandFields); diff != "" {
 			t.Errorf("checkPRCommentForOutputRequests() mismatch (-want +got):\n%s", diff)
