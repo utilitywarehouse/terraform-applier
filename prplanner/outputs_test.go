@@ -197,9 +197,6 @@ func Test_processRedisKeySetMsg(t *testing.T) {
 	t.Run("valid PR key updated", func(t *testing.T) {
 		key := "foo:admins:PR:4:d91f6ff"
 
-		testRedis.EXPECT().ParsePRRunsKey(key).
-			Return(types.NamespacedName{Namespace: "foo", Name: "admins"}, 4, "d91f6ff", nil)
-
 		testRedis.EXPECT().PRRun(gomock.Any(), types.NamespacedName{Namespace: "foo", Name: "admins"}, 4, "d91f6ff").
 			Return(&v1beta1.Run{Request: &v1beta1.Request{PR: &v1beta1.PullRequest{CommentID: 123}}, CommitHash: "hash1", Output: "terraform plan output"}, nil)
 
@@ -219,9 +216,6 @@ func Test_processRedisKeySetMsg(t *testing.T) {
 
 	t.Run("valid PR key updated module2", func(t *testing.T) {
 		key := "foo:users:PR:4:d91f6ff"
-
-		testRedis.EXPECT().ParsePRRunsKey(key).
-			Return(types.NamespacedName{Namespace: "foo", Name: "users"}, 4, "d91f6ff", nil)
 
 		testRedis.EXPECT().PRRun(gomock.Any(), types.NamespacedName{Namespace: "foo", Name: "users"}, 4, "d91f6ff").
 			Return(&v1beta1.Run{Request: &v1beta1.Request{PR: &v1beta1.PullRequest{CommentID: 123}}, CommitHash: "hash1", Output: "terraform plan output"}, nil)
@@ -258,9 +252,6 @@ func Test_processRedisKeySetMsg(t *testing.T) {
 
 	t.Run("empty output", func(t *testing.T) {
 		key := "foo:admins:PR:4:d91f6ff"
-
-		testRedis.EXPECT().ParsePRRunsKey(key).
-			Return(types.NamespacedName{Namespace: "foo", Name: "admins"}, 4, "d91f6ff", nil)
 
 		testRedis.EXPECT().PRRun(gomock.Any(), types.NamespacedName{Namespace: "foo", Name: "admins"}, 4, "d91f6ff").
 			Return(&v1beta1.Run{Request: &v1beta1.Request{PR: &v1beta1.PullRequest{CommentID: 123}}, CommitHash: "hash1", Output: ""}, nil)

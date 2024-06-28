@@ -23,8 +23,6 @@ var (
 
 // RedisInterface allows for mocking out the functionality of DB when testing
 type RedisInterface interface {
-	ParsePRRunsKey(str string) (module types.NamespacedName, pr int, hash string, err error)
-
 	DefaultLastRun(ctx context.Context, module types.NamespacedName) (*tfaplv1beta1.Run, error)
 	DefaultApply(ctx context.Context, module types.NamespacedName) (*tfaplv1beta1.Run, error)
 	PRRun(ctx context.Context, module types.NamespacedName, pr int, hash string) (*tfaplv1beta1.Run, error)
@@ -56,7 +54,7 @@ func DefaultPRLastRunsKey(module types.NamespacedName, pr int, hash string) stri
 	return fmt.Sprintf("%sPR:%d:%s", keyPrefix(module), pr, hash)
 }
 
-func (r Redis) ParsePRRunsKey(str string) (module types.NamespacedName, pr int, hash string, err error) {
+func ParsePRRunsKey(str string) (module types.NamespacedName, pr int, hash string, err error) {
 	sections := strings.Split(str, ":")
 	if len(sections) != 5 {
 		err = fmt.Errorf("invalid pr run key")

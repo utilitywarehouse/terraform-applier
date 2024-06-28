@@ -7,6 +7,7 @@ import (
 	"github.com/redis/go-redis/v9"
 	"github.com/utilitywarehouse/git-mirror/pkg/mirror"
 	tfaplv1beta1 "github.com/utilitywarehouse/terraform-applier/api/v1beta1"
+	"github.com/utilitywarehouse/terraform-applier/sysutil"
 )
 
 func (p *Planner) uploadRequestOutput(ctx context.Context, repo *mirror.GitURL, pr *pr) {
@@ -63,7 +64,7 @@ func (p *Planner) processRedisKeySetMsg(ctx context.Context, ch <-chan *redis.Me
 		}
 
 		// make sure updated key is PR run output
-		moduleName, pr, hash, err := p.RedisClient.ParsePRRunsKey(msg.Payload)
+		moduleName, pr, hash, err := sysutil.ParsePRRunsKey(msg.Payload)
 		if err != nil {
 			continue
 		}

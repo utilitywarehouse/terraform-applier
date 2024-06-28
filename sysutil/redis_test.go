@@ -8,9 +8,6 @@ import (
 )
 
 func TestRedis_ParsePRRunsKey(t *testing.T) {
-	r := Redis{
-		Client: nil,
-	}
 	type args struct {
 		str string
 	}
@@ -30,7 +27,7 @@ func TestRedis_ParsePRRunsKey(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gotModule, gotPr, gotHash, err := r.ParsePRRunsKey(tt.args.str)
+			gotModule, gotPr, gotHash, err := ParsePRRunsKey(tt.args.str)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Redis.ParsePRRunsKey() error = %v, wantErr %v", err, tt.wantErr)
 				return
