@@ -96,6 +96,23 @@ func (mr *MockRedisInterfaceMockRecorder) PRRun(arg0, arg1, arg2, arg3 interface
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PRRun", reflect.TypeOf((*MockRedisInterface)(nil).PRRun), arg0, arg1, arg2, arg3)
 }
 
+// ParsePRRunsKey mocks base method.
+func (m *MockRedisInterface) ParsePRRunsKey(arg0 string) (types.NamespacedName, int, string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ParsePRRunsKey", arg0)
+	ret0, _ := ret[0].(types.NamespacedName)
+	ret1, _ := ret[1].(int)
+	ret2, _ := ret[2].(string)
+	ret3, _ := ret[3].(error)
+	return ret0, ret1, ret2, ret3
+}
+
+// ParsePRRunsKey indicates an expected call of ParsePRRunsKey.
+func (mr *MockRedisInterfaceMockRecorder) ParsePRRunsKey(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ParsePRRunsKey", reflect.TypeOf((*MockRedisInterface)(nil).ParsePRRunsKey), arg0)
+}
+
 // Runs mocks base method.
 func (m *MockRedisInterface) Runs(arg0 context.Context, arg1 types.NamespacedName) ([]*v1beta1.Run, error) {
 	m.ctrl.T.Helper()

@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/redis/go-redis/v9"
 	"github.com/utilitywarehouse/git-mirror/pkg/mirror"
 	tfaplv1beta1 "github.com/utilitywarehouse/terraform-applier/api/v1beta1"
 	"github.com/utilitywarehouse/terraform-applier/git"
@@ -26,7 +27,7 @@ type Planner struct {
 	Log         *slog.Logger
 }
 
-func (p *Planner) Init(token string) {
+func (p *Planner) Init(ctx context.Context, token string, ch <-chan *redis.Message) error {
 	p.github = &gitHubClient{
 		rootURL: "https://api.github.com",
 		http: &http.Client{
@@ -34,6 +35,11 @@ func (p *Planner) Init(token string) {
 		},
 		token: token,
 	}
+
+	if ch != nil {
+		go p.processRedisKeySetMsg(ctx, ch)
+	}
+	return nil
 }
 
 func (p *Planner) Start(ctx context.Context) {
