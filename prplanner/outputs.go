@@ -2,8 +2,12 @@ package prplanner
 
 import (
 	"context"
+	"strings"
 
+	"github.com/redis/go-redis/v9"
 	"github.com/utilitywarehouse/git-mirror/pkg/mirror"
+	tfaplv1beta1 "github.com/utilitywarehouse/terraform-applier/api/v1beta1"
+	"github.com/utilitywarehouse/terraform-applier/sysutil"
 )
 
 func (p *Planner) uploadRequestOutput(ctx context.Context, repo *mirror.GitURL, pr *pr) {
@@ -47,4 +51,57 @@ func (p *Planner) checkPRCommentForOutputRequests(ctx context.Context, comment p
 	}
 
 	return prComment{}, false
+}
+
+func (p *Planner) processRedisKeySetMsg(ctx context.Context, ch <-chan *redis.Message) {
+	p.Log.Info("starting redis update watcher")
+	defer p.Log.Info("stopping redis update watcher")
+
+	for msg := range ch {
+		// make sure we only process `set` keyevent
+		if msg.Channel != "__keyevent@0__:set" {
+			continue
+		}
+
+		// make sure updated key is PR run output
+		moduleName, pr, hash, err := sysutil.ParsePRRunsKey(msg.Payload)
+		if err != nil {
+			continue
+		}
+
+		run, err := p.RedisClient.PRRun(ctx, moduleName, pr, hash)
+		if err != nil {
+			p.Log.Error("unable to get run output", "key", msg.Payload, "err", err)
+			continue
+		}
+
+		if run.Output == "" {
+			continue
+		}
+
+		var module tfaplv1beta1.Module
+		err = p.ClusterClt.Get(ctx, moduleName, &module)
+		if err != nil {
+			p.Log.Error("unable to get module", "module", moduleName, "error", err)
+			continue
+		}
+
+		comment := prComment{
+			Body: runOutputMsg(moduleName.String(), module.Spec.Path, run),
+		}
+
+		repo, err := mirror.ParseGitURL(module.Spec.RepoURL)
+		if err != nil {
+			p.Log.Error("unable to parse repo url", "module", moduleName, "error", err)
+			continue
+		}
+		repo.Repo = strings.TrimPrefix(repo.Repo, ".git")
+
+		_, err = p.github.postComment(repo, run.Request.PR.CommentID, pr, comment)
+		if err != nil {
+			p.Log.Error("error posting PR comment:", "error", err)
+			continue
+		}
+		p.Log.Info("run output posted", "module", moduleName, "pr", pr)
+	}
 }
