@@ -40,9 +40,13 @@ func (p *Planner) Init(ctx context.Context, token string, ch <-chan *redis.Messa
 		go p.processRedisKeySetMsg(ctx, ch)
 	}
 	return nil
+
+	// go func StartWebhook()
+
+	// p.StartPollLoop()
 }
 
-func (p *Planner) Start(ctx context.Context) {
+func (p *Planner) StartPollLoop(ctx context.Context) {
 	ticker := time.NewTicker(p.Interval)
 	defer ticker.Stop()
 
@@ -75,37 +79,41 @@ func (p *Planner) Start(ctx context.Context) {
 
 				// Loop through all open PRs
 				for _, pr := range prs {
-					// skip Draft PRs
-					if pr.IsDraft {
-						continue
-					}
-
-					// 1. Verify if pr belongs to module based on files changed
-					prModules, err := p.getPRModuleList(pr, kubeModuleList)
-					if err != nil {
-						p.Log.Error("error getting a list of modules in PR", "error", err)
-					}
-
-					if len(prModules) == 0 {
-						// no modules are affected by this PR
-						continue
-					}
-
-					// 2. compare PR and local repos last commit hashes
-					if !p.isLocalRepoUpToDate(ctx, repoConf.Remote, pr) {
-						// skip as local repo isn't yet in sync with the remote
-						continue
-					}
-
-					// 1. ensure plan requests
-					p.ensurePlanRequests(ctx, repo, pr, prModules)
-
-					// 2. look for pending output updates
-					p.uploadRequestOutput(ctx, repo, pr)
+					p.processPullRequest(ctx, repo, repoConf.Remote, pr, kubeModuleList)
 				}
 			}
 		}
 	}
+}
+
+func (p *Planner) processPullRequest(ctx context.Context, repo *mirror.GitURL, repoString string, pr *pr, kubeModuleList *tfaplv1beta1.ModuleList) {
+	// skip Draft PRs
+	if pr.IsDraft {
+		return
+	}
+
+	// 1. Verify if pr belongs to module based on files changed
+	prModules, err := p.getPRModuleList(pr, kubeModuleList)
+	if err != nil {
+		p.Log.Error("error getting a list of modules in PR", "error", err)
+	}
+
+	if len(prModules) == 0 {
+		// no modules are affected by this PR
+		return
+	}
+
+	// 2. compare PR and local repos last commit hashes
+	if !p.isLocalRepoUpToDate(ctx, repoString, pr) {
+		// skip as local repo isn't yet in sync with the remote
+		return
+	}
+
+	// 1. ensure plan requests
+	p.ensurePlanRequests(ctx, repo, pr, prModules)
+
+	// 2. look for pending output updates
+	p.uploadRequestOutput(ctx, repo, pr)
 }
 
 func (p *Planner) isLocalRepoUpToDate(ctx context.Context, repo string, pr *pr) bool {
