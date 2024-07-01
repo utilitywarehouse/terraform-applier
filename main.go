@@ -272,6 +272,11 @@ var (
 			Usage:   "PR poll interval in seconds",
 		},
 		&cli.StringFlag{
+			Name:  "pr-planner-webhook-port",
+			Value: ":8083",
+			Usage: "port used to receive Github webhooks",
+		},
+		&cli.StringFlag{
 			Name:    "github-token",
 			EnvVars: []string{"GITHUB_TOKEN"},
 			Usage:   "provide GH API token with write to PR access",
@@ -316,7 +321,6 @@ func validate(c *cli.Context) {
 	logger.Info("config", "selectorLabel", fmt.Sprintf("%s:%s", labelSelectorKey, labelSelectorValue))
 	logger.Info("config", "minIntervalBetweenRunsDuration", c.Int("min-interval-between-runs"))
 	logger.Info("config", "terminationGracePeriodDuration", c.Int("termination-grace-period"))
-
 }
 
 // findTerraformExecPath will find the terraform binary to use based on the
@@ -399,7 +403,6 @@ func generateElectionID(salt, labelSelectorKey, labelSelectorValue string, watch
 }
 
 func setupGlobalEnv(c *cli.Context) {
-
 	globalRunEnv = make(map[string]string)
 
 	// terraform depends on git for pulling remote modules
@@ -448,7 +451,6 @@ preferences: {}
 		logger.Error("unable to create custom in cluster config file", "err", err)
 		os.Exit(1)
 	}
-
 }
 
 // since /tmp will be mounted on PV we need to do manual clean up
@@ -724,12 +726,13 @@ func run(c *cli.Context) {
 
 	if !c.Bool("disable-pr-planner") {
 		prPlanner := &prplanner.Planner{
-			GitMirror:   conf.GitMirror,
-			Interval:    time.Duration(c.Int("pr-planner-interval")) * time.Second,
-			ClusterClt:  mgr.GetClient(),
-			Repos:       repos,
-			RedisClient: sysutil.Redis{Client: rdb},
-			Log:         logger.With("logger", "pr-planner"),
+			ListenAddress: c.String("pr-planner-webhook-port"),
+			GitMirror:     conf.GitMirror,
+			Interval:      time.Duration(c.Int("pr-planner-interval")) * time.Second,
+			ClusterClt:    mgr.GetClient(),
+			Repos:         repos,
+			RedisClient:   sysutil.Redis{Client: rdb},
+			Log:           logger.With("logger", "pr-planner"),
 		}
 
 		// setup  Key event notifications for 'String' commands
@@ -754,8 +757,6 @@ func run(c *cli.Context) {
 		if err != nil {
 			logger.Error("unable to init pr planner", "err", err)
 		}
-
-		go prPlanner.Start(ctx)
 	}
 
 	logger.Info("starting manager")
