@@ -2,6 +2,7 @@ package prplanner
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -18,13 +19,14 @@ import (
 )
 
 type Planner struct {
-	GitMirror   mirror.RepoPoolConfig
-	ClusterClt  client.Client
-	Repos       git.Repositories
-	RedisClient sysutil.RedisInterface
-	github      GithubInterface
-	Interval    time.Duration
-	Log         *slog.Logger
+	ListenAddress string
+	GitMirror     mirror.RepoPoolConfig
+	ClusterClt    client.Client
+	Repos         git.Repositories
+	RedisClient   sysutil.RedisInterface
+	github        GithubInterface
+	Interval      time.Duration
+	Log           *slog.Logger
 }
 
 func (p *Planner) Init(ctx context.Context, token string, ch <-chan *redis.Message) error {
@@ -39,60 +41,19 @@ func (p *Planner) Init(ctx context.Context, token string, ch <-chan *redis.Messa
 	if ch != nil {
 		go p.processRedisKeySetMsg(ctx, ch)
 	}
+
+	go p.startWebhook()
+
 	return nil
-
-	// go func StartWebhook()
-
-	// p.StartPollLoop()
-}
-
-func (p *Planner) StartPollLoop(ctx context.Context) {
-	ticker := time.NewTicker(p.Interval)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-
-			kubeModuleList := &tfaplv1beta1.ModuleList{}
-			if err := p.ClusterClt.List(ctx, kubeModuleList); err != nil {
-				p.Log.Error("error retrieving list of modules", "error", err)
-				return
-			}
-
-			for _, repoConf := range p.GitMirror.Repositories {
-
-				repo, err := mirror.ParseGitURL(repoConf.Remote)
-				if err != nil {
-					p.Log.Error("unable to parse repo url", "error", err)
-					return
-				}
-
-				// Make a GraphQL query to fetch all open Pull Requests from Github
-				prs, err := p.github.openPRs(ctx, repo)
-				if err != nil {
-					p.Log.Error("error making GraphQL request:", "error", err)
-					return
-				}
-
-				// Loop through all open PRs
-				for _, pr := range prs {
-					p.processPullRequest(ctx, repo, repoConf.Remote, pr, kubeModuleList)
-				}
-			}
-		}
-	}
 }
 
 func (p *Planner) processPullRequest(ctx context.Context, repo *mirror.GitURL, repoString string, pr *pr, kubeModuleList *tfaplv1beta1.ModuleList) {
-	// skip Draft PRs
+	// skip draft PRs
 	if pr.IsDraft {
 		return
 	}
 
-	// 1. Verify if pr belongs to module based on files changed
+	// 1. verify if PR belongs to module based on files changed
 	prModules, err := p.getPRModuleList(pr, kubeModuleList)
 	if err != nil {
 		p.Log.Error("error getting a list of modules in PR", "error", err)
@@ -104,7 +65,7 @@ func (p *Planner) processPullRequest(ctx context.Context, repo *mirror.GitURL, r
 	}
 
 	// 2. compare PR and local repos last commit hashes
-	if !p.isLocalRepoUpToDate(ctx, repoString, pr) {
+	if !p.isLocalRepoUpToDate(ctx, repo, pr) {
 		// skip as local repo isn't yet in sync with the remote
 		return
 	}
@@ -113,16 +74,17 @@ func (p *Planner) processPullRequest(ctx context.Context, repo *mirror.GitURL, r
 	p.ensurePlanRequests(ctx, repo, pr, prModules)
 
 	// 2. look for pending output updates
-	p.uploadRequestOutput(ctx, repo, pr)
+	// p.uploadRequestOutput(ctx, repo, pr)
 }
 
-func (p *Planner) isLocalRepoUpToDate(ctx context.Context, repo string, pr *pr) bool {
+func (p *Planner) isLocalRepoUpToDate(ctx context.Context, repo *mirror.GitURL, pr *pr) bool {
 	if len(pr.Commits.Nodes) == 0 {
 		return false
 	}
 
 	latestCommit := pr.Commits.Nodes[len(pr.Commits.Nodes)-1].Commit.Oid
-	err := p.Repos.ObjectExists(ctx, repo, latestCommit)
+	repoString := fmt.Sprintf("%s://%s/%s/%s", repo.Scheme, repo.Host, repo.Path, repo.Repo)
+	err := p.Repos.ObjectExists(ctx, repoString, latestCommit)
 	return err == nil
 }
 
