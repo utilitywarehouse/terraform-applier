@@ -54,7 +54,7 @@ func (p *Planner) processPullRequest(ctx context.Context, repo *mirror.GitURL, r
 	}
 
 	// 1. verify if PR belongs to module based on files changed
-	prModules, err := p.getPRModuleList(pr, kubeModuleList)
+	prModules, err := p.getPRModuleList(repo, pr, kubeModuleList)
 	if err != nil {
 		p.Log.Error("error getting a list of modules in PR", "error", err)
 	}
@@ -85,7 +85,7 @@ func (p *Planner) isLocalRepoUpToDate(ctx context.Context, repo *mirror.GitURL, 
 	return err == nil
 }
 
-func (p *Planner) getPRModuleList(pr *pr, kubeModules *tfaplv1beta1.ModuleList) ([]types.NamespacedName, error) {
+func (p *Planner) getPRModuleList(repo *mirror.GitURL, pr *pr, kubeModules *tfaplv1beta1.ModuleList) ([]types.NamespacedName, error) {
 	var pathList []string
 
 	for _, file := range pr.Files.Nodes {
@@ -95,8 +95,13 @@ func (p *Planner) getPRModuleList(pr *pr, kubeModules *tfaplv1beta1.ModuleList) 
 	var modulesUpdated []types.NamespacedName
 
 	for _, kubeModule := range kubeModules.Items {
-		// TODO: we should also match repo URL
+		// match on repo URL
+		repoURL := fmt.Sprintf("git@github.com:%s/%s", repo.Path, repo.Repo)
+		if kubeModule.Spec.RepoURL != repoURL {
+			continue
+		}
 
+		// match on file paths
 		if pathBelongsToModule(pathList, kubeModule) {
 			modulesUpdated = append(modulesUpdated, kubeModule.NamespacedName())
 		}
