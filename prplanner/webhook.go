@@ -50,7 +50,7 @@ func (p *Planner) handleWebhook(w http.ResponseWriter, r *http.Request) {
 		p.Log.Error("error", err)
 		return
 	}
-	repoFullName := payload.Repository.FullName
+	// repoFullName := payload.Repository.FullName
 
 	// Respond with 200 OK
 	w.WriteHeader(http.StatusOK)
@@ -70,6 +70,6 @@ func (p *Planner) handleWebhook(w http.ResponseWriter, r *http.Request) {
 
 	// Loop through all open PRs
 	for _, pr := range prs {
-		p.processPullRequest(ctx, repo, repoFullName, pr, kubeModuleList)
+		p.processPullRequest(ctx, pr, kubeModuleList)
 	}
 }

@@ -2,7 +2,6 @@ package prplanner
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -48,14 +47,14 @@ func (p *Planner) Init(ctx context.Context, token string, ch <-chan *redis.Messa
 	return nil
 }
 
-func (p *Planner) processPullRequest(ctx context.Context, repo *giturl.URL, repoString string, pr *pr, kubeModuleList *tfaplv1beta1.ModuleList) {
+func (p *Planner) processPullRequest(ctx context.Context, pr *pr, kubeModuleList *tfaplv1beta1.ModuleList) {
 	// skip draft PRs
 	if pr.IsDraft {
 		return
 	}
 
 	// 1. verify if PR belongs to module based on files changed
-	prModules, err := p.getPRModuleList(repo, pr, kubeModuleList)
+	prModules, err := p.getPRModuleList(pr, kubeModuleList)
 	if err != nil {
 		p.Log.Error("error getting a list of modules in PR", "error", err)
 	}
@@ -66,7 +65,7 @@ func (p *Planner) processPullRequest(ctx context.Context, repo *giturl.URL, repo
 	}
 
 	// 2. compare PR and local repos last commit hashes
-	if !p.isLocalRepoUpToDate(ctx, repo, pr) {
+	if !p.isLocalRepoUpToDate(ctx, pr) {
 		// skip as local repo isn't yet in sync with the remote
 		return
 	}
@@ -75,18 +74,16 @@ func (p *Planner) processPullRequest(ctx context.Context, repo *giturl.URL, repo
 	p.ensurePlanRequests(ctx, pr, prModules)
 }
 
-func (p *Planner) isLocalRepoUpToDate(ctx context.Context, repo *giturl.URL, pr *pr) bool {
+func (p *Planner) isLocalRepoUpToDate(ctx context.Context, pr *pr) bool {
 	if len(pr.Commits.Nodes) == 0 {
 		return false
 	}
-
 	latestCommit := pr.Commits.Nodes[len(pr.Commits.Nodes)-1].Commit.Oid
-	repoString := fmt.Sprintf("%s://%s/%s/%s", repo.Scheme, repo.Host, repo.Path, repo.Repo)
-	err := p.Repos.ObjectExists(ctx, repoString, latestCommit)
+	err := p.Repos.ObjectExists(ctx, pr.BaseRepository.URL, latestCommit)
 	return err == nil
 }
 
-func (p *Planner) getPRModuleList(repo *giturl.URL, pr *pr, kubeModules *tfaplv1beta1.ModuleList) ([]types.NamespacedName, error) {
+func (p *Planner) getPRModuleList(pr *pr, kubeModules *tfaplv1beta1.ModuleList) ([]types.NamespacedName, error) {
 	var pathList []string
 
 	for _, file := range pr.Files.Nodes {
