@@ -5,18 +5,18 @@ import (
 	"strings"
 
 	"github.com/redis/go-redis/v9"
-	"github.com/utilitywarehouse/git-mirror/pkg/mirror"
+	"github.com/utilitywarehouse/git-mirror/pkg/giturl"
 	tfaplv1beta1 "github.com/utilitywarehouse/terraform-applier/api/v1beta1"
 	"github.com/utilitywarehouse/terraform-applier/sysutil"
 )
 
-func (p *Planner) uploadRequestOutput(ctx context.Context, repo *mirror.GitURL, pr *pr) {
+func (p *Planner) uploadRequestOutput(ctx context.Context, pr *pr) {
 	// Go through PR comments in reverse order
 	for i := len(pr.Comments.Nodes) - 1; i >= 0; i-- {
 		comment := pr.Comments.Nodes[i]
 		commentBody, ok := p.checkPRCommentForOutputRequests(ctx, comment)
 		if ok {
-			_, err := p.github.postComment(repo, comment.DatabaseID, pr.Number, commentBody)
+			_, err := p.github.postComment(pr.BaseRepository.Owner.Login, pr.BaseRepository.Name, comment.DatabaseID, pr.Number, commentBody)
 			if err != nil {
 				p.Log.Error("error posting PR comment:", "error", err)
 				continue
@@ -90,14 +90,13 @@ func (p *Planner) processRedisKeySetMsg(ctx context.Context, ch <-chan *redis.Me
 			Body: runOutputMsg(moduleName.String(), module.Spec.Path, run),
 		}
 
-		repo, err := mirror.ParseGitURL(module.Spec.RepoURL)
+		repo, err := giturl.Parse(module.Spec.RepoURL)
 		if err != nil {
 			p.Log.Error("unable to parse repo url", "module", moduleName, "error", err)
 			continue
 		}
-		repo.Repo = strings.TrimPrefix(repo.Repo, ".git")
 
-		_, err = p.github.postComment(repo, run.Request.PR.CommentID, pr, comment)
+		_, err = p.github.postComment(repo.Path, strings.TrimSuffix(repo.Repo, ".git"), run.Request.PR.CommentID, pr, comment)
 		if err != nil {
 			p.Log.Error("error posting PR comment:", "error", err)
 			continue

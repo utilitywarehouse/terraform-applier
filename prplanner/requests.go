@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/utilitywarehouse/git-mirror/pkg/mirror"
 	tfaplv1beta1 "github.com/utilitywarehouse/terraform-applier/api/v1beta1"
 	"github.com/utilitywarehouse/terraform-applier/sysutil"
 	"k8s.io/apimachinery/pkg/types"
@@ -33,7 +32,7 @@ import (
 //     if yes:
 
 // 2. request run
-func (p *Planner) ensurePlanRequests(ctx context.Context, repo *mirror.GitURL, pr *pr, prModules []types.NamespacedName) {
+func (p *Planner) ensurePlanRequests(ctx context.Context, pr *pr, prModules []types.NamespacedName) {
 	var skipCommitRun bool
 	if len(prModules) > 5 {
 		skipCommitRun = true
@@ -53,7 +52,7 @@ func (p *Planner) ensurePlanRequests(ctx context.Context, repo *mirror.GitURL, p
 			continue
 		}
 
-		req, err := p.ensurePlanRequest(ctx, repo, pr, module, skipCommitRun)
+		req, err := p.ensurePlanRequest(ctx, pr, module, skipCommitRun)
 		if err != nil {
 			p.Log.Error("unable to generate new plan request", "module", moduleName, "error", err)
 			continue
@@ -68,10 +67,10 @@ func (p *Planner) ensurePlanRequests(ctx context.Context, repo *mirror.GitURL, p
 	}
 }
 
-func (p *Planner) ensurePlanRequest(ctx context.Context, repo *mirror.GitURL, pr *pr, module tfaplv1beta1.Module, skipCommitRun bool) (*tfaplv1beta1.Request, error) {
+func (p *Planner) ensurePlanRequest(ctx context.Context, pr *pr, module tfaplv1beta1.Module, skipCommitRun bool) (*tfaplv1beta1.Request, error) {
 	if !skipCommitRun {
 		// 1. loop through commits from latest to oldest
-		req, err := p.checkPRCommits(ctx, repo, pr, module)
+		req, err := p.checkPRCommits(ctx, pr, module)
 		if err != nil {
 			return req, err
 		}
@@ -81,10 +80,10 @@ func (p *Planner) ensurePlanRequest(ctx context.Context, repo *mirror.GitURL, pr
 	}
 
 	// 2. loop through comments
-	return p.checkPRCommentsForPlanRequests(pr, repo, module)
+	return p.checkPRCommentsForPlanRequests(pr, module)
 }
 
-func (p *Planner) checkPRCommits(ctx context.Context, repo *mirror.GitURL, pr *pr, module tfaplv1beta1.Module) (*tfaplv1beta1.Request, error) {
+func (p *Planner) checkPRCommits(ctx context.Context, pr *pr, module tfaplv1beta1.Module) (*tfaplv1beta1.Request, error) {
 	// loop through commits to check if module path is updated
 	for i := len(pr.Commits.Nodes) - 1; i >= 0; i-- {
 		commit := pr.Commits.Nodes[i].Commit
@@ -116,7 +115,7 @@ func (p *Planner) checkPRCommits(ctx context.Context, repo *mirror.GitURL, pr *p
 
 		// 4. request run
 		p.Log.Info("triggering plan due to new commit", "module", module.NamespacedName(), "pr", pr.Number, "author", pr.Author.Login)
-		return p.addNewRequest(module, pr, repo)
+		return p.addNewRequest(module, pr)
 	}
 
 	return nil, nil
@@ -131,7 +130,7 @@ func (p *Planner) isModuleUpdated(ctx context.Context, commitHash string, module
 	return pathBelongsToModule(filesChangedInCommit, module), nil
 }
 
-func (p *Planner) checkPRCommentsForPlanRequests(pr *pr, repo *mirror.GitURL, module tfaplv1beta1.Module) (*tfaplv1beta1.Request, error) {
+func (p *Planner) checkPRCommentsForPlanRequests(pr *pr, module tfaplv1beta1.Module) (*tfaplv1beta1.Request, error) {
 	// Go through PR comments in reverse order
 	for i := len(pr.Comments.Nodes) - 1; i >= 0; i-- {
 		comment := pr.Comments.Nodes[i]
@@ -160,7 +159,7 @@ func (p *Planner) checkPRCommentsForPlanRequests(pr *pr, repo *mirror.GitURL, mo
 		}
 
 		p.Log.Info("triggering plan requested via comment", "module", module.NamespacedName(), "pr", pr.Number, "author", comment.Author.Login)
-		return p.addNewRequest(module, pr, repo)
+		return p.addNewRequest(module, pr)
 	}
 
 	return nil, nil
@@ -181,14 +180,14 @@ func isPlanOutputPostedForCommit(pr *pr, commitID string, module types.Namespace
 	return false
 }
 
-func (p *Planner) addNewRequest(module tfaplv1beta1.Module, pr *pr, repo *mirror.GitURL) (*tfaplv1beta1.Request, error) {
+func (p *Planner) addNewRequest(module tfaplv1beta1.Module, pr *pr) (*tfaplv1beta1.Request, error) {
 	req := module.NewRunRequest(tfaplv1beta1.PRPlan)
 
 	commentBody := prComment{
 		Body: requestAcknowledgedMsg(module.NamespacedName().String(), module.Spec.Path, req.RequestedAt),
 	}
 
-	commentID, err := p.github.postComment(repo, 0, pr.Number, commentBody)
+	commentID, err := p.github.postComment(pr.BaseRepository.Owner.Login, pr.BaseRepository.Name, 0, pr.Number, commentBody)
 	if err != nil {
 		return req, fmt.Errorf("unable to post pending request comment: %w", err)
 	}

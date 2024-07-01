@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/redis/go-redis/v9"
+	"github.com/utilitywarehouse/git-mirror/pkg/giturl"
 	"github.com/utilitywarehouse/git-mirror/pkg/mirror"
 	tfaplv1beta1 "github.com/utilitywarehouse/terraform-applier/api/v1beta1"
 	"github.com/utilitywarehouse/terraform-applier/git"
@@ -60,14 +61,14 @@ func (p *Planner) Start(ctx context.Context) {
 
 			for _, repoConf := range p.GitMirror.Repositories {
 
-				repo, err := mirror.ParseGitURL(repoConf.Remote)
+				repo, err := giturl.Parse(repoConf.Remote)
 				if err != nil {
 					p.Log.Error("unable to parse repo url", "error", err)
 					return
 				}
 
 				// Make a GraphQL query to fetch all open Pull Requests from Github
-				prs, err := p.github.openPRs(ctx, repo)
+				prs, err := p.github.openPRs(ctx, repo.Path, repo.Repo)
 				if err != nil {
 					p.Log.Error("error making GraphQL request:", "error", err)
 					return
@@ -98,10 +99,10 @@ func (p *Planner) Start(ctx context.Context) {
 					}
 
 					// 1. ensure plan requests
-					p.ensurePlanRequests(ctx, repo, pr, prModules)
+					p.ensurePlanRequests(ctx, pr, prModules)
 
 					// 2. look for pending output updates
-					p.uploadRequestOutput(ctx, repo, pr)
+					p.uploadRequestOutput(ctx, pr)
 				}
 			}
 		}
@@ -128,11 +129,21 @@ func (p *Planner) getPRModuleList(pr *pr, kubeModules *tfaplv1beta1.ModuleList) 
 	var modulesUpdated []types.NamespacedName
 
 	for _, kubeModule := range kubeModules.Items {
-		// TODO: we should also match repo URL
-
-		if pathBelongsToModule(pathList, kubeModule) {
-			modulesUpdated = append(modulesUpdated, kubeModule.NamespacedName())
+		if ok, _ := giturl.SameRawURL(kubeModule.Spec.RepoURL, pr.BaseRepository.URL); !ok {
+			continue
 		}
+
+		if !pathBelongsToModule(pathList, kubeModule) {
+			continue
+		}
+
+		// default value of RepoRef is 'HEAD', which is normally a master branch
+		if kubeModule.Spec.RepoRef != pr.BaseRefName &&
+			pr.BaseRefName != "master" && pr.BaseRefName != "main" {
+			continue
+		}
+
+		modulesUpdated = append(modulesUpdated, kubeModule.NamespacedName())
 	}
 
 	return modulesUpdated, nil

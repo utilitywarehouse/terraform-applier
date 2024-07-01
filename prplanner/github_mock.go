@@ -9,7 +9,6 @@ import (
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
-	mirror "github.com/utilitywarehouse/git-mirror/pkg/mirror"
 )
 
 // MockGithubInterface is a mock of GithubInterface interface.
@@ -36,31 +35,31 @@ func (m *MockGithubInterface) EXPECT() *MockGithubInterfaceMockRecorder {
 }
 
 // openPRs mocks base method.
-func (m *MockGithubInterface) openPRs(arg0 context.Context, arg1 *mirror.GitURL) ([]*pr, error) {
+func (m *MockGithubInterface) openPRs(arg0 context.Context, arg1, arg2 string) ([]*pr, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "openPRs", arg0, arg1)
+	ret := m.ctrl.Call(m, "openPRs", arg0, arg1, arg2)
 	ret0, _ := ret[0].([]*pr)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // openPRs indicates an expected call of openPRs.
-func (mr *MockGithubInterfaceMockRecorder) openPRs(arg0, arg1 interface{}) *gomock.Call {
+func (mr *MockGithubInterfaceMockRecorder) openPRs(arg0, arg1, arg2 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "openPRs", reflect.TypeOf((*MockGithubInterface)(nil).openPRs), arg0, arg1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "openPRs", reflect.TypeOf((*MockGithubInterface)(nil).openPRs), arg0, arg1, arg2)
 }
 
 // postComment mocks base method.
-func (m *MockGithubInterface) postComment(arg0 *mirror.GitURL, arg1, arg2 int, arg3 prComment) (int, error) {
+func (m *MockGithubInterface) postComment(arg0, arg1 string, arg2, arg3 int, arg4 prComment) (int, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "postComment", arg0, arg1, arg2, arg3)
+	ret := m.ctrl.Call(m, "postComment", arg0, arg1, arg2, arg3, arg4)
 	ret0, _ := ret[0].(int)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // postComment indicates an expected call of postComment.
-func (mr *MockGithubInterfaceMockRecorder) postComment(arg0, arg1, arg2, arg3 interface{}) *gomock.Call {
+func (mr *MockGithubInterfaceMockRecorder) postComment(arg0, arg1, arg2, arg3, arg4 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "postComment", reflect.TypeOf((*MockGithubInterface)(nil).postComment), arg0, arg1, arg2, arg3)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "postComment", reflect.TypeOf((*MockGithubInterface)(nil).postComment), arg0, arg1, arg2, arg3, arg4)
 }
