@@ -72,9 +72,6 @@ func (p *Planner) processPullRequest(ctx context.Context, repo *mirror.GitURL, r
 
 	// 1. ensure plan requests
 	p.ensurePlanRequests(ctx, repo, pr, prModules)
-
-	// 2. look for pending output updates
-	// p.uploadRequestOutput(ctx, repo, pr)
 }
 
 func (p *Planner) isLocalRepoUpToDate(ctx context.Context, repo *mirror.GitURL, pr *pr) bool {
