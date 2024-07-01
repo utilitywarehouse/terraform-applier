@@ -5,6 +5,11 @@ query ($owner: String!,$repoName: String! ) {
   repository(owner: $owner, name: $repoName) {
     pullRequests(states: OPEN, last: 20) {
       nodes {
+	  	baseRefName
+        baseRepository {
+          name
+          url
+        }
         number
         headRefName
         isDraft
@@ -56,11 +61,13 @@ type gitPRResponse struct {
 }
 
 type pr struct {
-	Number      int    `json:"number"`
-	HeadRefName string `json:"headRefName"`
-	IsDraft     bool   `json:"isDraft"`
-	Author      author `json:"author"`
-	Commits     struct {
+	Number         int    `json:"number"`
+	BaseRefName    string `json:"baseRefName"`
+	BaseRepository prRepo `json:"baseRepository"`
+	HeadRefName    string `json:"headRefName"`
+	IsDraft        bool   `json:"isDraft"`
+	Author         author `json:"author"`
+	Commits        struct {
 		Nodes []prCommit `json:"nodes"`
 	} `json:"commits"`
 	Comments struct {
@@ -75,6 +82,13 @@ type author struct {
 	Login string `json:"login"`
 }
 
+type prRepo struct {
+	Name  string `json:"name"`
+	URL   string `json:"url"`
+	Owner struct {
+		Login string `json:"login"`
+	} `json:"owner"`
+}
 type prCommit struct {
 	Commit struct {
 		Oid string `json:"oid"`

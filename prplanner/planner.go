@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/redis/go-redis/v9"
+	"github.com/utilitywarehouse/git-mirror/pkg/giturl"
 	"github.com/utilitywarehouse/git-mirror/pkg/mirror"
 	tfaplv1beta1 "github.com/utilitywarehouse/terraform-applier/api/v1beta1"
 	"github.com/utilitywarehouse/terraform-applier/git"
@@ -95,16 +96,21 @@ func (p *Planner) getPRModuleList(repo *mirror.GitURL, pr *pr, kubeModules *tfap
 	var modulesUpdated []types.NamespacedName
 
 	for _, kubeModule := range kubeModules.Items {
-		// match on repo URL
-		repoURL := fmt.Sprintf("git@github.com:%s/%s", repo.Path, repo.Repo)
-		if kubeModule.Spec.RepoURL != repoURL {
+		if ok, _ := giturl.SameRawURL(kubeModule.Spec.RepoURL, pr.BaseRepository.URL); !ok {
 			continue
 		}
 
-		// match on file paths
-		if pathBelongsToModule(pathList, kubeModule) {
-			modulesUpdated = append(modulesUpdated, kubeModule.NamespacedName())
+		if !pathBelongsToModule(pathList, kubeModule) {
+			continue
 		}
+
+		// default value of RepoRef is 'HEAD', which is normally a master branch
+		if kubeModule.Spec.RepoRef != pr.BaseRefName &&
+			pr.BaseRefName != "master" && pr.BaseRefName != "main" {
+			continue
+		}
+
+		modulesUpdated = append(modulesUpdated, kubeModule.NamespacedName())
 	}
 
 	return modulesUpdated, nil

@@ -6,17 +6,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"strings"
-
-	"github.com/utilitywarehouse/git-mirror/pkg/mirror"
 )
 
 //go:generate go run github.com/golang/mock/mockgen -package prplanner -destination github_mock.go github.com/utilitywarehouse/terraform-applier/prplanner GithubInterface
 
 // GithubInterface allows for mocking out the functionality of GitHub API Calls
 type GithubInterface interface {
-	openPRs(ctx context.Context, repo *mirror.GitURL) ([]*pr, error)
-	postComment(repo *mirror.GitURL, commentID, prNumber int, commentBody prComment) (int, error)
+	openPRs(ctx context.Context, repoOwner, repoName string) ([]*pr, error)
+	postComment(repoOwner, repoName string, commentID, prNumber int, commentBody prComment) (int, error)
 }
 
 type gitHubClient struct {
@@ -25,11 +22,9 @@ type gitHubClient struct {
 	token   string
 }
 
-func (gc *gitHubClient) openPRs(ctx context.Context, repo *mirror.GitURL) ([]*pr, error) {
-	repoName := strings.TrimSuffix(repo.Repo, ".git")
-
+func (gc *gitHubClient) openPRs(ctx context.Context, repoOwner, repoName string) ([]*pr, error) {
 	q := gitPRRequest{Query: queryRepoPRs}
-	q.Variables.Owner = repo.Path
+	q.Variables.Owner = repoOwner
 	q.Variables.RepoName = repoName
 
 	payload, err := json.Marshal(q)
@@ -69,16 +64,14 @@ func (gc *gitHubClient) openPRs(ctx context.Context, repo *mirror.GitURL) ([]*pr
 	return result.Data.Repository.PullRequests.Nodes, nil
 }
 
-func (gc *gitHubClient) postComment(repo *mirror.GitURL, commentID, prNumber int, commentBody prComment) (int, error) {
-	repoName := strings.TrimSuffix(repo.Repo, ".git")
-
+func (gc *gitHubClient) postComment(repoOwner, repoName string, commentID, prNumber int, commentBody prComment) (int, error) {
 	method := "POST"
-	reqURL := fmt.Sprintf("%s/repos/%s/%s/issues/%d/comments", gc.rootURL, repo.Path, repoName, prNumber)
+	reqURL := fmt.Sprintf("%s/repos/%s/%s/issues/%d/comments", gc.rootURL, repoOwner, repoName, prNumber)
 
 	// if comment ID provided update same comment
 	if commentID != 0 {
 		method = "PATCH"
-		reqURL = fmt.Sprintf("%s/repos/%s/%s/issues/comments/%d", gc.rootURL, repo.Path, repoName, commentID)
+		reqURL = fmt.Sprintf("%s/repos/%s/%s/issues/comments/%d", gc.rootURL, repoOwner, repoName, commentID)
 	}
 
 	payload, err := json.Marshal(commentBody)

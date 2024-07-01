@@ -8,7 +8,6 @@ import (
 
 	"github.com/golang/mock/gomock"
 	"github.com/google/go-cmp/cmp"
-	"github.com/utilitywarehouse/git-mirror/pkg/mirror"
 	tfaplv1beta1 "github.com/utilitywarehouse/terraform-applier/api/v1beta1"
 	"github.com/utilitywarehouse/terraform-applier/git"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -25,11 +24,6 @@ func Test_checkPRCommentsForPlanRequests(t *testing.T) {
 	}
 
 	slog.SetLogLoggerLevel(slog.LevelDebug)
-
-	repoURL := &mirror.GitURL{
-		Path: "owner-a",
-		Repo: "repo-a",
-	}
 
 	module := tfaplv1beta1.Module{
 		ObjectMeta: metav1.ObjectMeta{Namespace: "foo", Name: "two"},
@@ -54,7 +48,7 @@ func Test_checkPRCommentsForPlanRequests(t *testing.T) {
 			nil,
 		)
 
-		gotReq, err := planner.checkPRCommentsForPlanRequests(pr, repoURL, module)
+		gotReq, err := planner.checkPRCommentsForPlanRequests(pr, module)
 		if err != nil {
 			t.Fatalf("unexpected error: %s", err)
 		}
@@ -74,7 +68,7 @@ func Test_checkPRCommentsForPlanRequests(t *testing.T) {
 			nil,
 		)
 
-		gotReq, err := planner.checkPRCommentsForPlanRequests(pr, repoURL, module)
+		gotReq, err := planner.checkPRCommentsForPlanRequests(pr, module)
 		if err != nil {
 			t.Fatalf("unexpected error: %s", err)
 		}
@@ -95,7 +89,7 @@ func Test_checkPRCommentsForPlanRequests(t *testing.T) {
 			nil,
 		)
 
-		gotReq, err := planner.checkPRCommentsForPlanRequests(pr, repoURL, module)
+		gotReq, err := planner.checkPRCommentsForPlanRequests(pr, module)
 		if err != nil {
 			t.Fatalf("unexpected error: %s", err)
 		}
@@ -135,8 +129,8 @@ func Test_checkPRCommentsForPlanRequests(t *testing.T) {
 			}).AnyTimes()
 
 		// mock github API Call adding new request info
-		testGithub.EXPECT().postComment(gomock.Any(), 0, 123, gomock.Any()).
-			DoAndReturn(func(repo *mirror.GitURL, commentID, prNumber int, commentBody prComment) (int, error) {
+		testGithub.EXPECT().postComment(gomock.Any(), gomock.Any(), 0, 123, gomock.Any()).
+			DoAndReturn(func(repoOwner, repoName string, commentID, prNumber int, commentBody prComment) (int, error) {
 				// validate comment message
 				if !requestAcknowledgedMsgRegex.Match([]byte(commentBody.Body)) {
 					return 0, fmt.Errorf("comment body doesn't match requestAcknowledgedRegex")
@@ -145,7 +139,7 @@ func Test_checkPRCommentsForPlanRequests(t *testing.T) {
 			})
 
 		// Call Test function
-		gotReq, err := planner.checkPRCommentsForPlanRequests(p, repoURL, module)
+		gotReq, err := planner.checkPRCommentsForPlanRequests(p, module)
 		if err != nil {
 			t.Fatalf("unexpected error: %s", err)
 		}
@@ -179,8 +173,8 @@ func Test_checkPRCommentsForPlanRequests(t *testing.T) {
 		)
 
 		// mock github API Call adding new request info
-		testGithub.EXPECT().postComment(gomock.Any(), 0, 123, gomock.Any()).
-			DoAndReturn(func(repo *mirror.GitURL, commentID, prNumber int, commentBody prComment) (int, error) {
+		testGithub.EXPECT().postComment(gomock.Any(), gomock.Any(), 0, 123, gomock.Any()).
+			DoAndReturn(func(repoOwner, repoName string, commentID, prNumber int, commentBody prComment) (int, error) {
 				// validate comment message
 				if !requestAcknowledgedMsgRegex.Match([]byte(commentBody.Body)) {
 					return 0, fmt.Errorf("comment body doesn't match requestAcknowledgedRegex")
@@ -189,7 +183,7 @@ func Test_checkPRCommentsForPlanRequests(t *testing.T) {
 			})
 
 		// Call Test function
-		gotReq, err := planner.checkPRCommentsForPlanRequests(p, repoURL, module)
+		gotReq, err := planner.checkPRCommentsForPlanRequests(p, module)
 		if err != nil {
 			t.Fatalf("unexpected error: %s", err)
 		}
@@ -220,7 +214,7 @@ func Test_checkPRCommentsForPlanRequests(t *testing.T) {
 		)
 
 		// Call Test function
-		gotReq, err := planner.checkPRCommentsForPlanRequests(p, repoURL, module)
+		gotReq, err := planner.checkPRCommentsForPlanRequests(p, module)
 		if err != nil {
 			t.Fatalf("unexpected error: %s", err)
 		}
@@ -245,8 +239,8 @@ func Test_checkPRCommentsForPlanRequests(t *testing.T) {
 		)
 
 		// mock github API Call adding new request info
-		testGithub.EXPECT().postComment(gomock.Any(), 0, 123, gomock.Any()).
-			DoAndReturn(func(repo *mirror.GitURL, commentID, prNumber int, commentBody prComment) (int, error) {
+		testGithub.EXPECT().postComment(gomock.Any(), gomock.Any(), 0, 123, gomock.Any()).
+			DoAndReturn(func(repoOwner, repoName string, commentID, prNumber int, commentBody prComment) (int, error) {
 				// validate comment message
 				if !requestAcknowledgedMsgRegex.Match([]byte(commentBody.Body)) {
 					return 0, fmt.Errorf("comment body doesn't match requestAcknowledgedRegex")
@@ -255,7 +249,7 @@ func Test_checkPRCommentsForPlanRequests(t *testing.T) {
 			})
 
 		// Call Test function
-		gotReq, err := planner.checkPRCommentsForPlanRequests(p, repoURL, module)
+		gotReq, err := planner.checkPRCommentsForPlanRequests(p, module)
 		if err != nil {
 			t.Fatalf("unexpected error: %s", err)
 		}

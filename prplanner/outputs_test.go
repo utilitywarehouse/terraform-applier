@@ -10,7 +10,6 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/google/go-cmp/cmp"
 	"github.com/redis/go-redis/v9"
-	"github.com/utilitywarehouse/git-mirror/pkg/mirror"
 	"github.com/utilitywarehouse/terraform-applier/api/v1beta1"
 	"github.com/utilitywarehouse/terraform-applier/sysutil"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -201,14 +200,8 @@ func Test_processRedisKeySetMsg(t *testing.T) {
 			Return(&v1beta1.Run{Request: &v1beta1.Request{PR: &v1beta1.PullRequest{CommentID: 123}}, CommitHash: "hash1", Output: "terraform plan output"}, nil)
 
 		// mock github API Call adding new request info
-		testGithub.EXPECT().postComment(gomock.Any(), 123, 4, gomock.Any()).
-			DoAndReturn(func(repo *mirror.GitURL, commentID, prNumber int, commentBody prComment) (int, error) {
-				if repo.Path != "utilitywarehouse" &&
-					repo.Repo != "terraform-applier" {
-					t.Fatalf("repo name is not matching: %s", repo)
-				}
-				return 123, nil
-			})
+		testGithub.EXPECT().postComment("utilitywarehouse", "terraform-applier", 123, 4, gomock.Any()).
+			Return(123, nil)
 
 		ch <- &redis.Message{Channel: "__keyevent@0__:set", Payload: key}
 		time.Sleep(2 * time.Second)
@@ -221,14 +214,8 @@ func Test_processRedisKeySetMsg(t *testing.T) {
 			Return(&v1beta1.Run{Request: &v1beta1.Request{PR: &v1beta1.PullRequest{CommentID: 123}}, CommitHash: "hash1", Output: "terraform plan output"}, nil)
 
 		// mock github API Call adding new request info
-		testGithub.EXPECT().postComment(gomock.Any(), 123, 4, gomock.Any()).
-			DoAndReturn(func(repo *mirror.GitURL, commentID, prNumber int, commentBody prComment) (int, error) {
-				if repo.Path != "utilitywarehouse" &&
-					repo.Repo != "terraform-applier" {
-					t.Fatalf("repo name is not matching: %s", repo)
-				}
-				return 123, nil
-			})
+		testGithub.EXPECT().postComment("utilitywarehouse", "terraform-applier", 123, 4, gomock.Any()).
+			Return(123, nil)
 
 		ch <- &redis.Message{Channel: "__keyevent@0__:set", Payload: key}
 		time.Sleep(2 * time.Second)

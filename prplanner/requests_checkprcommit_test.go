@@ -9,7 +9,6 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
-	"github.com/utilitywarehouse/git-mirror/pkg/mirror"
 	tfaplv1beta1 "github.com/utilitywarehouse/terraform-applier/api/v1beta1"
 	"github.com/utilitywarehouse/terraform-applier/git"
 	"github.com/utilitywarehouse/terraform-applier/sysutil"
@@ -52,11 +51,6 @@ func TestCheckPRCommits(t *testing.T) {
 
 	slog.SetLogLoggerLevel(slog.LevelDebug)
 
-	repoURL := &mirror.GitURL{
-		Path: "owner-a",
-		Repo: "repo-a",
-	}
-
 	// Mock Repo calls with files changed
 	testGit.EXPECT().ChangedFiles(gomock.Any(), gomock.Any(), gomock.Any()).
 		DoAndReturn(func(_ context.Context, _, hash string) ([]string, error) {
@@ -98,8 +92,8 @@ func TestCheckPRCommits(t *testing.T) {
 			Return(nil, sysutil.ErrKeyNotFound)
 
 		// mock github API Call adding new request info
-		testGithub.EXPECT().postComment(gomock.Any(), 0, 123, gomock.Any()).
-			DoAndReturn(func(repo *mirror.GitURL, commentID, prNumber int, commentBody prComment) (int, error) {
+		testGithub.EXPECT().postComment(gomock.Any(), gomock.Any(), 0, 123, gomock.Any()).
+			DoAndReturn(func(repoOwner, repoName string, commentID, prNumber int, commentBody prComment) (int, error) {
 				// validate comment message
 				if !requestAcknowledgedMsgRegex.Match([]byte(commentBody.Body)) {
 					return 0, fmt.Errorf("comment body doesn't match requestAcknowledgedRegex")
@@ -108,7 +102,7 @@ func TestCheckPRCommits(t *testing.T) {
 			})
 
 		// Call Test function
-		gotReq, err := planner.checkPRCommits(ctx, repoURL, p, module)
+		gotReq, err := planner.checkPRCommits(ctx, p, module)
 		if err != nil {
 			t.Fatalf("unexpected error: %s", err)
 		}
@@ -153,8 +147,8 @@ func TestCheckPRCommits(t *testing.T) {
 			Return(nil, sysutil.ErrKeyNotFound)
 
 		// mock github API Call adding new request info
-		testGithub.EXPECT().postComment(gomock.Any(), 0, 123, gomock.Any()).
-			DoAndReturn(func(repo *mirror.GitURL, commentID, prNumber int, commentBody prComment) (int, error) {
+		testGithub.EXPECT().postComment(gomock.Any(), gomock.Any(), 0, 123, gomock.Any()).
+			DoAndReturn(func(repoOwner, repoName string, commentID, prNumber int, commentBody prComment) (int, error) {
 				// validate comment message
 				if !requestAcknowledgedMsgRegex.Match([]byte(commentBody.Body)) {
 					return 0, fmt.Errorf("comment body doesn't match requestAcknowledgedRegex")
@@ -163,7 +157,7 @@ func TestCheckPRCommits(t *testing.T) {
 			})
 
 		// Call Test function
-		gotReq, err := planner.checkPRCommits(ctx, repoURL, p, module)
+		gotReq, err := planner.checkPRCommits(ctx, p, module)
 		if err != nil {
 			t.Fatalf("unexpected error: %s", err)
 		}
@@ -203,7 +197,7 @@ func TestCheckPRCommits(t *testing.T) {
 		}
 
 		// Call Test function
-		gotReq, err := planner.checkPRCommits(ctx, repoURL, p, module)
+		gotReq, err := planner.checkPRCommits(ctx, p, module)
 		if err != nil {
 			t.Fatalf("unexpected error: %s", err)
 		}
@@ -237,7 +231,7 @@ func TestCheckPRCommits(t *testing.T) {
 		}
 
 		// Call Test function
-		gotReq, err := planner.checkPRCommits(ctx, repoURL, p, module)
+		gotReq, err := planner.checkPRCommits(ctx, p, module)
 		if err != nil {
 			t.Fatalf("unexpected error: %s", err)
 		}
@@ -275,8 +269,8 @@ func TestCheckPRCommits(t *testing.T) {
 			Return(nil, sysutil.ErrKeyNotFound)
 
 		// mock github API Call adding new request info
-		testGithub.EXPECT().postComment(gomock.Any(), 0, 123, gomock.Any()).
-			DoAndReturn(func(repo *mirror.GitURL, commentID, prNumber int, commentBody prComment) (int, error) {
+		testGithub.EXPECT().postComment(gomock.Any(), gomock.Any(), 0, 123, gomock.Any()).
+			DoAndReturn(func(repoOwner, repoName string, commentID, prNumber int, commentBody prComment) (int, error) {
 				// validate comment message
 				if !requestAcknowledgedMsgRegex.Match([]byte(commentBody.Body)) {
 					return 0, fmt.Errorf("comment body doesn't match requestAcknowledgedRegex")
@@ -285,7 +279,7 @@ func TestCheckPRCommits(t *testing.T) {
 			})
 
 		// Call Test function
-		gotReq, err := planner.checkPRCommits(ctx, repoURL, p, module)
+		gotReq, err := planner.checkPRCommits(ctx, p, module)
 		if err != nil {
 			t.Fatalf("unexpected error: %s", err)
 		}
@@ -330,7 +324,7 @@ func TestCheckPRCommits(t *testing.T) {
 			Return(&tfaplv1beta1.Run{CommitHash: "hash3"}, nil)
 
 		// Call Test function
-		gotReq, err := planner.checkPRCommits(ctx, repoURL, p, module)
+		gotReq, err := planner.checkPRCommits(ctx, p, module)
 		if err != nil {
 			t.Fatalf("unexpected error: %s", err)
 		}
