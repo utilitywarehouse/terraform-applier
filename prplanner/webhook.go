@@ -5,12 +5,11 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/utilitywarehouse/git-mirror/pkg/giturl"
 	tfaplv1beta1 "github.com/utilitywarehouse/terraform-applier/api/v1beta1"
 )
 
 func (p *Planner) startWebhook() {
-	http.HandleFunc("/events", p.handleWebhook)
+	http.HandleFunc("/github-events", p.handleWebhook)
 	http.ListenAndServe(p.ListenAddress, nil)
 }
 
@@ -20,6 +19,8 @@ func (p *Planner) handleWebhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// TODO: handle authentication
+
 	// Get the X-GitHub-Event header
 	event := r.Header.Get("X-GitHub-Event")
 
@@ -27,49 +28,57 @@ func (p *Planner) handleWebhook(w http.ResponseWriter, r *http.Request) {
 	var payload GitHubWebhook
 	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
 		http.Error(w, "Failed to decode JSON payload", http.StatusBadRequest)
+		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
-	var prNumber int
 	if (event == "pull_request" && payload.Action == "opened") ||
 		(event == "pull_request" && payload.Action == "synchronize") ||
 		(event == "pull_request" && payload.Action == "reopened") {
-		prNumber = payload.Number
+
+		go p.processPRWebHookEvent(payload, payload.Number)
+		w.WriteHeader(http.StatusOK)
+		return
 	}
+
 	if event == "issue_comment" && payload.Action == "created" {
-		prNumber = payload.Issue.Number
-	}
-
-	if prNumber == 0 {
+		// we know the body we still need to know the module user is
+		// requesting belongs to this PR hence we need to do full reconcile of PR
+		go p.processPRWebHookEvent(payload, payload.Issue.Number)
+		w.WriteHeader(http.StatusOK)
 		return
 	}
 
+	w.WriteHeader(http.StatusBadRequest)
+}
+
+func (p *Planner) processPRWebHookEvent(payload GitHubWebhook, prNumber int) {
 	ctx := context.Background()
-	repo, err := giturl.Parse(payload.Repository.GitURL)
+
+	mirrorRepo, err := p.Repos.Repository(payload.Repository.URL)
 	if err != nil {
-		p.Log.Error("error", err)
+		p.Log.Error("unable to get repository from url", "url", payload.Repository.URL, "pr", prNumber, "err", err)
 		return
 	}
-	// repoFullName := payload.Repository.FullName
 
-	// Respond with 200 OK
-	w.WriteHeader(http.StatusOK)
+	// trigger mirror
+	err = mirrorRepo.Mirror(ctx)
+	if err != nil {
+		p.Log.Error("unable to mirror repository", "err", err)
+		return
+	}
+
+	pr, err := p.github.PR(ctx, payload.Repository.Owner.Login, payload.Repository.Name, prNumber)
+	if err != nil {
+		p.Log.Error("unable to get PR info", "pr", prNumber, "err", err)
+		return
+	}
 
 	kubeModuleList := &tfaplv1beta1.ModuleList{}
 	if err := p.ClusterClt.List(ctx, kubeModuleList); err != nil {
-		p.Log.Error("error retrieving list of modules", "error", err)
+		p.Log.Error("error retrieving list of modules", "pr", prNumber, "error", err)
 		return
 	}
 
-	// Make a GraphQL query to fetch all open Pull Requests from Github
-	prs, err := p.github.openPRs(ctx, repo.Path, repo.Repo)
-	if err != nil {
-		p.Log.Error("error making GraphQL request:", "error", err)
-		return
-	}
-
-	// Loop through all open PRs
-	for _, pr := range prs {
-		p.processPullRequest(ctx, pr, kubeModuleList)
-	}
+	p.processPullRequest(ctx, pr, kubeModuleList)
 }

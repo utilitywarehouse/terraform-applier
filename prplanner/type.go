@@ -23,7 +23,7 @@ query ($owner: String!,$repoName: String! ) {
             }
           }
         }
-        comments(last:20) {
+        comments(last:50) {
           nodes {
             databaseId
             body
@@ -42,20 +42,69 @@ query ($owner: String!,$repoName: String! ) {
   }
 }`
 
+const queryRepoPR = `
+query ($owner: String!,$repoName: String!, $prNumber: Int! ) {
+  repository(owner: $owner, name: $repoName ) {
+    pullRequest(number: $prNumber) {
+	  baseRefName
+      baseRepository {
+        name
+        url
+      }
+      number
+      headRefName
+      isDraft
+      author {
+        login
+      }
+      commits(last: 20) {
+        nodes {
+          commit {
+            oid
+          }
+        }
+      }
+      comments(last:50) {
+        nodes {
+          databaseId
+          body
+          author {
+            login
+          }
+        }
+      }
+      files(first: 100) {
+        nodes {
+          path
+        }
+      }
+      }
+  }
+}`
+
 type gitPRRequest struct {
 	Query     string `json:"query,omitempty"`
 	Variables struct {
 		Owner    string `json:"owner"`
 		RepoName string `json:"repoName"`
+		PRNumber int    `json:"prNumber"`
 	} `json:"variables,omitempty"`
 }
 
-type gitPRResponse struct {
+type gitPRsResponse struct {
 	Data struct {
 		Repository struct {
 			PullRequests struct {
 				Nodes []*pr `json:"nodes"`
 			} `json:"pullRequests"`
+		} `json:"repository"`
+	} `json:"data"`
+}
+
+type gitPRResponse struct {
+	Data struct {
+		Repository struct {
+			PullRequest *pr `json:"pullRequest"`
 		} `json:"repository"`
 	} `json:"data"`
 }
@@ -112,7 +161,18 @@ type GitHubWebhook struct {
 		Number int `json:"number"`
 	} `json:"issue"`
 	Repository struct {
-		FullName string `json:"full_name"`
-		GitURL   string `json:"clone_url"`
+		Name  string `json:"name"`
+		Owner struct {
+			Login string `json:"login"`
+		} `json:"owner"`
+		URL string `json:"html_url"`
 	} `json:"repository"`
+
+	// only for comments
+	Comment struct {
+		User struct {
+			Login string `json:"login"`
+		} `json:"user"`
+		Body string `json:"body"`
+	} `json:"comment"`
 }
