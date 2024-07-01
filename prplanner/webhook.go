@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/utilitywarehouse/git-mirror/pkg/mirror"
+	"github.com/utilitywarehouse/git-mirror/pkg/giturl"
 	tfaplv1beta1 "github.com/utilitywarehouse/terraform-applier/api/v1beta1"
 )
 
@@ -45,7 +45,7 @@ func (p *Planner) handleWebhook(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ctx := context.Background()
-	repoURL, err := mirror.ParseGitURL(payload.Repository.GitURL)
+	repo, err := giturl.Parse(payload.Repository.GitURL)
 	if err != nil {
 		p.Log.Error("error", err)
 		return
@@ -62,7 +62,7 @@ func (p *Planner) handleWebhook(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Make a GraphQL query to fetch all open Pull Requests from Github
-	prs, err := p.github.openPRs(ctx, repoURL)
+	prs, err := p.github.openPRs(ctx, repo.Path, repo.Repo)
 	if err != nil {
 		p.Log.Error("error making GraphQL request:", "error", err)
 		return
@@ -70,6 +70,6 @@ func (p *Planner) handleWebhook(w http.ResponseWriter, r *http.Request) {
 
 	// Loop through all open PRs
 	for _, pr := range prs {
-		p.processPullRequest(ctx, repoURL, repoFullName, pr, kubeModuleList)
+		p.processPullRequest(ctx, repo, repoFullName, pr, kubeModuleList)
 	}
 }
