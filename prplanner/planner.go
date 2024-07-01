@@ -48,7 +48,7 @@ func (p *Planner) Init(ctx context.Context, token string, ch <-chan *redis.Messa
 	return nil
 }
 
-func (p *Planner) processPullRequest(ctx context.Context, repo *mirror.GitURL, repoString string, pr *pr, kubeModuleList *tfaplv1beta1.ModuleList) {
+func (p *Planner) processPullRequest(ctx context.Context, repo *giturl.URL, repoString string, pr *pr, kubeModuleList *tfaplv1beta1.ModuleList) {
 	// skip draft PRs
 	if pr.IsDraft {
 		return
@@ -72,10 +72,10 @@ func (p *Planner) processPullRequest(ctx context.Context, repo *mirror.GitURL, r
 	}
 
 	// 1. ensure plan requests
-	p.ensurePlanRequests(ctx, repo, pr, prModules)
+	p.ensurePlanRequests(ctx, pr, prModules)
 }
 
-func (p *Planner) isLocalRepoUpToDate(ctx context.Context, repo *mirror.GitURL, pr *pr) bool {
+func (p *Planner) isLocalRepoUpToDate(ctx context.Context, repo *giturl.URL, pr *pr) bool {
 	if len(pr.Commits.Nodes) == 0 {
 		return false
 	}
@@ -86,7 +86,7 @@ func (p *Planner) isLocalRepoUpToDate(ctx context.Context, repo *mirror.GitURL, 
 	return err == nil
 }
 
-func (p *Planner) getPRModuleList(repo *mirror.GitURL, pr *pr, kubeModules *tfaplv1beta1.ModuleList) ([]types.NamespacedName, error) {
+func (p *Planner) getPRModuleList(repo *giturl.URL, pr *pr, kubeModules *tfaplv1beta1.ModuleList) ([]types.NamespacedName, error) {
 	var pathList []string
 
 	for _, file := range pr.Files.Nodes {
