@@ -104,3 +104,15 @@ type prComment struct {
 type prFiles struct {
 	Path string `json:"path"`
 }
+
+type GitHubWebhook struct {
+	Action string `json:"action"`
+	Number int    `json:"number"`
+	Issue  struct {
+		Number int `json:"number"`
+	} `json:"issue"`
+	Repository struct {
+		FullName string `json:"full_name"`
+		GitURL   string `json:"clone_url"`
+	} `json:"repository"`
+}
