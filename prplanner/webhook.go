@@ -10,11 +10,13 @@ import (
 )
 
 func (p *Planner) startWebhook() {
-	http.HandleFunc("/events", p.handleWebhook)
+	http.HandleFunc("/github-events", p.handleWebhook)
 	http.ListenAndServe(p.ListenAddress, nil)
 }
 
 func (p *Planner) handleWebhook(w http.ResponseWriter, r *http.Request) {
+	// TODO: Check secret here
+
 	if r.Method != http.MethodPost {
 		http.Error(w, "Only POST method is allowed", http.StatusMethodNotAllowed)
 		return
@@ -55,11 +57,17 @@ func (p *Planner) handleWebhook(w http.ResponseWriter, r *http.Request) {
 	// Respond with 200 OK
 	w.WriteHeader(http.StatusOK)
 
+	// TODO: Return response, then proceed with the request
+
 	kubeModuleList := &tfaplv1beta1.ModuleList{}
 	if err := p.ClusterClt.List(ctx, kubeModuleList); err != nil {
 		p.Log.Error("error retrieving list of modules", "error", err)
 		return
 	}
+
+	// TODO: Trigger git mirror
+
+	// TODO: Get one PR info
 
 	// Make a GraphQL query to fetch all open Pull Requests from Github
 	prs, err := p.github.openPRs(ctx, repo.Path, repo.Repo)
