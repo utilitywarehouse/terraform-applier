@@ -199,7 +199,7 @@ func (r *Runner) process(run *tfaplv1beta1.Run, cancelChan <-chan struct{}, envs
 	if isChannelClosed(cancelChan) {
 		msg := "terraform run interrupted as runner is shutting down"
 		log.Error(msg)
-		r.setFailedStatus(run, module, tfaplv1beta1.ReasonControllerShutdown, msg, r.Clock.Now())
+		r.setFailedStatus(run, module, tfaplv1beta1.ReasonControllerShutdown, msg)
 		return false
 	}
 
@@ -214,7 +214,7 @@ func (r *Runner) process(run *tfaplv1beta1.Run, cancelChan <-chan struct{}, envs
 	if err != nil {
 		msg := fmt.Sprintf("unable to get service account token: err:%s", err)
 		log.Error(msg)
-		r.setFailedStatus(run, module, tfaplv1beta1.ReasonDelegationFailed, msg, r.Clock.Now())
+		r.setFailedStatus(run, module, tfaplv1beta1.ReasonDelegationFailed, msg)
 		return false
 	}
 
@@ -222,7 +222,7 @@ func (r *Runner) process(run *tfaplv1beta1.Run, cancelChan <-chan struct{}, envs
 	if err != nil {
 		msg := fmt.Sprintf("unable to create kube client: err:%s", err)
 		log.Error(msg)
-		r.setFailedStatus(run, module, tfaplv1beta1.ReasonDelegationFailed, msg, r.Clock.Now())
+		r.setFailedStatus(run, module, tfaplv1beta1.ReasonDelegationFailed, msg)
 		return false
 	}
 
@@ -230,7 +230,7 @@ func (r *Runner) process(run *tfaplv1beta1.Run, cancelChan <-chan struct{}, envs
 	if err != nil {
 		msg := fmt.Sprintf("unable to get backend config: err:%s", err)
 		log.Error(msg)
-		r.setFailedStatus(run, module, tfaplv1beta1.ReasonRunPreparationFailed, msg, r.Clock.Now())
+		r.setFailedStatus(run, module, tfaplv1beta1.ReasonRunPreparationFailed, msg)
 		return false
 	}
 
@@ -238,7 +238,7 @@ func (r *Runner) process(run *tfaplv1beta1.Run, cancelChan <-chan struct{}, envs
 	if err != nil {
 		msg := fmt.Sprintf("unable to get envs: err:%s", err)
 		log.Error(msg)
-		r.setFailedStatus(run, module, tfaplv1beta1.ReasonRunPreparationFailed, msg, r.Clock.Now())
+		r.setFailedStatus(run, module, tfaplv1beta1.ReasonRunPreparationFailed, msg)
 		return false
 	}
 
@@ -249,7 +249,7 @@ func (r *Runner) process(run *tfaplv1beta1.Run, cancelChan <-chan struct{}, envs
 	if err != nil {
 		msg := fmt.Sprintf("unable to get vars: err:%s", err)
 		log.Error(msg)
-		r.setFailedStatus(run, module, tfaplv1beta1.ReasonRunPreparationFailed, msg, r.Clock.Now())
+		r.setFailedStatus(run, module, tfaplv1beta1.ReasonRunPreparationFailed, msg)
 		return false
 	}
 
@@ -259,7 +259,7 @@ func (r *Runner) process(run *tfaplv1beta1.Run, cancelChan <-chan struct{}, envs
 			if err != nil {
 				msg := fmt.Sprintf("unable to generate vault aws secrets: err:%s", err)
 				log.Error(msg)
-				r.setFailedStatus(run, module, tfaplv1beta1.ReasonRunPreparationFailed, msg, r.Clock.Now())
+				r.setFailedStatus(run, module, tfaplv1beta1.ReasonRunPreparationFailed, msg)
 				return false
 			}
 		}
@@ -269,7 +269,7 @@ func (r *Runner) process(run *tfaplv1beta1.Run, cancelChan <-chan struct{}, envs
 	if err != nil {
 		msg := fmt.Sprintf("unable to create terraform executer: err:%s", err)
 		log.Error(msg)
-		r.setFailedStatus(run, module, tfaplv1beta1.ReasonRunPreparationFailed, msg, r.Clock.Now())
+		r.setFailedStatus(run, module, tfaplv1beta1.ReasonRunPreparationFailed, msg)
 		return false
 	}
 	defer te.cleanUp()
@@ -296,7 +296,7 @@ func (r *Runner) runTF(
 	if err != nil {
 		// tf err contains new lines not suitable logging
 		log.Error("unable to init module", "err", fmt.Sprintf("%q", err))
-		r.setFailedStatus(run, module, tfaplv1beta1.ReasonInitialiseFailed, "unable to init module", r.Clock.Now())
+		r.setFailedStatus(run, module, tfaplv1beta1.ReasonInitialiseFailed, "unable to init module")
 		return false
 	}
 	log.Info("Initialised successfully")
@@ -306,7 +306,7 @@ func (r *Runner) runTF(
 	if isChannelClosed(cancelChan) {
 		msg := "unable to plan module: terraform run interrupted as runner is shutting down"
 		log.Error(msg)
-		r.setFailedStatus(run, module, tfaplv1beta1.ReasonControllerShutdown, msg, r.Clock.Now())
+		r.setFailedStatus(run, module, tfaplv1beta1.ReasonControllerShutdown, msg)
 		return false
 	}
 
@@ -315,7 +315,7 @@ func (r *Runner) runTF(
 		run.Output = planOut
 		// tf err contains new lines not suitable logging
 		log.Error("unable to plan module", "err", fmt.Sprintf("%q", err))
-		r.setFailedStatus(run, module, tfaplv1beta1.ReasonPlanFailed, "unable to plan module", r.Clock.Now())
+		r.setFailedStatus(run, module, tfaplv1beta1.ReasonPlanFailed, "unable to plan module")
 		return false
 	}
 
@@ -335,7 +335,7 @@ func (r *Runner) runTF(
 	if err != nil {
 		// tf err contains new lines not suitable logging
 		log.Error("unable to get saved plan", "err", fmt.Sprintf("%q", err))
-		r.setFailedStatus(run, module, tfaplv1beta1.ReasonPlanFailed, "unable to get saved plan", r.Clock.Now())
+		r.setFailedStatus(run, module, tfaplv1beta1.ReasonPlanFailed, "unable to get saved plan")
 		return false
 	}
 
@@ -361,7 +361,7 @@ func (r *Runner) runTF(
 	if isChannelClosed(cancelChan) {
 		msg := "unable to apply module: terraform run interrupted as runner is shutting down"
 		log.Error(msg)
-		r.setFailedStatus(run, module, tfaplv1beta1.ReasonControllerShutdown, msg, r.Clock.Now())
+		r.setFailedStatus(run, module, tfaplv1beta1.ReasonControllerShutdown, msg)
 		return false
 	}
 
@@ -370,7 +370,7 @@ func (r *Runner) runTF(
 	if err != nil {
 		// tf err contains new lines not suitable logging
 		log.Error("unable to apply module", "err", fmt.Sprintf("%q", err))
-		r.setFailedStatus(run, module, tfaplv1beta1.ReasonApplyFailed, "unable to apply module", r.Clock.Now())
+		r.setFailedStatus(run, module, tfaplv1beta1.ReasonApplyFailed, "unable to apply module")
 		return false
 	}
 	run.Applied = true
@@ -397,6 +397,12 @@ func (r *Runner) SetRunStartedStatus(run *tfaplv1beta1.Run, m *tfaplv1beta1.Modu
 	run.CommitHash = commitHash
 	run.CommitMsg = commitMsg
 
+	r.Recorder.Eventf(m, corev1.EventTypeNormal, tfaplv1beta1.ReasonRunTriggered, "%s: type:%s, commit:%s", msg, run.Request.Type, commitHash)
+
+	if run.Request.SkipStatusUpdate() {
+		return nil
+	}
+
 	m.Status.CurrentState = string(tfaplv1beta1.StatusRunning)
 	m.Status.LastRunType = run.Request.Type
 	m.Status.LastDefaultRunStartedAt = &metav1.Time{Time: now}
@@ -404,36 +410,42 @@ func (r *Runner) SetRunStartedStatus(run *tfaplv1beta1.Run, m *tfaplv1beta1.Modu
 	m.Status.LastDefaultRunCommitHash = commitHash
 	m.Status.StateReason = tfaplv1beta1.ReasonRunTriggered
 
-	r.Recorder.Eventf(m, corev1.EventTypeNormal, tfaplv1beta1.ReasonRunTriggered, "%s: type:%s, commit:%s", msg, run.Request.Type, commitHash)
-
 	return sysutil.PatchModuleStatus(context.Background(), r.ClusterClt, run.Module, m.Status)
 }
 
 func (r *Runner) SetRunFinishedStatus(run *tfaplv1beta1.Run, m *tfaplv1beta1.Module, reason, msg string, now time.Time) error {
 	run.Status = tfaplv1beta1.StatusOk
 	run.Duration = time.Since(run.StartedAt.Time)
+
+	r.Recorder.Event(m, corev1.EventTypeNormal, reason, msg)
+
+	if run.Request.SkipStatusUpdate() {
+		return nil
+	}
+
 	m.Status.StateReason = reason
 	m.Status.CurrentState = string(tfaplv1beta1.StatusOk)
-
 	if reason == tfaplv1beta1.ReasonDriftDetected {
 		m.Status.CurrentState = string(tfaplv1beta1.StatusDriftDetected)
 	}
 
-	r.Recorder.Event(m, corev1.EventTypeNormal, reason, msg)
-
 	return sysutil.PatchModuleStatus(context.Background(), r.ClusterClt, m.NamespacedName(), m.Status)
 }
 
-func (r *Runner) setFailedStatus(run *tfaplv1beta1.Run, module *tfaplv1beta1.Module, reason, msg string, now time.Time) {
+func (r *Runner) setFailedStatus(run *tfaplv1beta1.Run, module *tfaplv1beta1.Module, reason, msg string) {
 	run.Status = tfaplv1beta1.StatusErrored
 	run.Duration = time.Since(run.StartedAt.Time)
 	// msg in this case is an error message
 	run.Output = msg + "\n" + run.Output
 
+	r.Recorder.Event(module, corev1.EventTypeWarning, reason, msg)
+
+	if run.Request.SkipStatusUpdate() {
+		return
+	}
+
 	module.Status.CurrentState = string(tfaplv1beta1.StatusErrored)
 	module.Status.StateReason = reason
-
-	r.Recorder.Event(module, corev1.EventTypeWarning, reason, msg)
 
 	if err := sysutil.PatchModuleStatus(context.Background(), r.ClusterClt, run.Module, module.Status); err != nil {
 		r.Log.With("module", run).Error("unable to set failed status", "err", err)
