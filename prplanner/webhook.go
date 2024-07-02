@@ -14,6 +14,8 @@ func (p *Planner) startWebhook() {
 }
 
 func (p *Planner) handleWebhook(w http.ResponseWriter, r *http.Request) {
+	// TODO: Check secret here
+
 	if r.Method != http.MethodPost {
 		http.Error(w, "Only POST method is allowed", http.StatusMethodNotAllowed)
 		return

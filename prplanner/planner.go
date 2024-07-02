@@ -49,6 +49,7 @@ func (p *Planner) Init(ctx context.Context, token string, ch <-chan *redis.Messa
 	return nil
 }
 
+
 func (p *Planner) StartPRPoll(ctx context.Context) {
 	ticker := time.NewTicker(p.Interval)
 	defer ticker.Stop()
@@ -57,7 +58,6 @@ func (p *Planner) StartPRPoll(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-
 			kubeModuleList := &tfaplv1beta1.ModuleList{}
 			if err := p.ClusterClt.List(ctx, kubeModuleList); err != nil {
 				p.Log.Error("error retrieving list of modules", "error", err)
