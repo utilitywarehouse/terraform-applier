@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 
@@ -18,7 +19,13 @@ func (p *Planner) startWebhook() {
 }
 
 func (p *Planner) handleWebhook(w http.ResponseWriter, r *http.Request) {
-	if !p.isValidSignature(r, p.WebhookSecret) {
+	body, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		p.Log.Error("cannot read request body", err)
+		return
+	}
+
+	if !p.isValidSignature(r, body, p.WebhookSecret) {
 		http.Error(w, "Wrong signature", http.StatusUnauthorized)
 		return
 	}
@@ -33,9 +40,8 @@ func (p *Planner) handleWebhook(w http.ResponseWriter, r *http.Request) {
 
 	// Parse the JSON payload
 	var payload GitHubWebhook
-	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
-		http.Error(w, "Failed to decode JSON payload", http.StatusBadRequest)
-		return
+	if err := json.Unmarshal(body, &payload); err != nil {
+		fmt.Println("§§§ cannot unmarshal json payload", err)
 	}
 
 	// Verify event and action
@@ -70,6 +76,8 @@ func (p *Planner) handleWebhook(w http.ResponseWriter, r *http.Request) {
 func (p *Planner) processPRWebHookEvent(payload GitHubWebhook, prNumber int) {
 	ctx := context.Background()
 
+	fmt.Println("§§§ payload repo url:", payload.Repository.URL)
+
 	mirrorRepo, err := p.Repos.Repository(payload.Repository.URL)
 	if err != nil {
 		p.Log.Error("unable to get repository from url", "url", payload.Repository.URL, "pr", prNumber, "err", err)
@@ -98,17 +106,11 @@ func (p *Planner) processPRWebHookEvent(payload GitHubWebhook, prNumber int) {
 	p.processPullRequest(ctx, pr, kubeModuleList)
 }
 
-func (p *Planner) isValidSignature(r *http.Request, key string) bool {
+func (p *Planner) isValidSignature(r *http.Request, body []byte, key string) bool {
 	gotSignature := r.Header.Get("X-Hub-Signature-256")
 
-	b, err := ioutil.ReadAll(r.Body)
-	if err != nil {
-		p.Log.Error("cannot read request body", err)
-		return false
-	}
-
 	hash := hmac.New(sha256.New, []byte(key))
-	if _, err := hash.Write(b); err != nil {
+	if _, err := hash.Write(body); err != nil {
 		p.Log.Error("cannot comput hmac for request", err)
 		return false
 	}
