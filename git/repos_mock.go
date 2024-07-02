@@ -9,6 +9,7 @@ import (
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
+	mirror "github.com/utilitywarehouse/git-mirror/pkg/mirror"
 )
 
 // MockRepositories is a mock of Repositories interface.
@@ -106,6 +107,21 @@ func (m *MockRepositories) ObjectExists(arg0 context.Context, arg1, arg2 string)
 func (mr *MockRepositoriesMockRecorder) ObjectExists(arg0, arg1, arg2 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ObjectExists", reflect.TypeOf((*MockRepositories)(nil).ObjectExists), arg0, arg1, arg2)
+}
+
+// Repository mocks base method.
+func (m *MockRepositories) Repository(arg0 string) (*mirror.Repository, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Repository", arg0)
+	ret0, _ := ret[0].(*mirror.Repository)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Repository indicates an expected call of Repository.
+func (mr *MockRepositoriesMockRecorder) Repository(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Repository", reflect.TypeOf((*MockRepositories)(nil).Repository), arg0)
 }
 
 // Subject mocks base method.

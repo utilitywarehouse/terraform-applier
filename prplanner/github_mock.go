@@ -34,6 +34,21 @@ func (m *MockGithubInterface) EXPECT() *MockGithubInterfaceMockRecorder {
 	return m.recorder
 }
 
+// PR mocks base method.
+func (m *MockGithubInterface) PR(arg0 context.Context, arg1, arg2 string, arg3 int) (*pr, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "PR", arg0, arg1, arg2, arg3)
+	ret0, _ := ret[0].(*pr)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// PR indicates an expected call of PR.
+func (mr *MockGithubInterfaceMockRecorder) PR(arg0, arg1, arg2, arg3 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PR", reflect.TypeOf((*MockGithubInterface)(nil).PR), arg0, arg1, arg2, arg3)
+}
+
 // openPRs mocks base method.
 func (m *MockGithubInterface) openPRs(arg0 context.Context, arg1, arg2 string) ([]*pr, error) {
 	m.ctrl.T.Helper()

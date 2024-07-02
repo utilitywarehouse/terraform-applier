@@ -44,12 +44,13 @@ func (p *Planner) Init(ctx context.Context, token string, ch <-chan *redis.Messa
 
 	go p.startWebhook()
 
-	go p.Start(ctx)
+	go p.StartPRPoll(ctx)
 
 	return nil
 }
 
-func (p *Planner) Start(ctx context.Context) {
+
+func (p *Planner) StartPRPoll(ctx context.Context) {
 	ticker := time.NewTicker(p.Interval)
 	defer ticker.Stop()
 	for {
@@ -64,7 +65,6 @@ func (p *Planner) Start(ctx context.Context) {
 			}
 
 			for _, repoConf := range p.GitMirror.Repositories {
-
 				repo, err := giturl.Parse(repoConf.Remote)
 				if err != nil {
 					p.Log.Error("unable to parse repo url", "error", err)
