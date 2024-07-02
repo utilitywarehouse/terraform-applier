@@ -41,7 +41,15 @@ func (p *Planner) handleWebhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if event == "issue_comment" && payload.Action == "created" {
+	// ??
+	// edited
+
+	if event == "pull_request" && payload.Action == "closed" {
+		// TODO:clean-up
+	}
+
+	if event == "issue_comment" && payload.Action == "created" ||
+		event == "issue_comment" && payload.Action == "edited" {
 		// we know the body we still need to know the module user is
 		// requesting belongs to this PR hence we need to do full reconcile of PR
 		go p.processPRWebHookEvent(payload, payload.Issue.Number)
