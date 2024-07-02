@@ -281,6 +281,11 @@ var (
 			EnvVars: []string{"GITHUB_TOKEN"},
 			Usage:   "provide GH API token with write to PR access",
 		},
+		&cli.StringFlag{
+			Name:    "github-webhook-secret",
+			EnvVars: []string{"GITHUB_WEBHOOK_SECRET"},
+			Usage:   "provide GH API token with write to PR access",
+		},
 	}
 )
 
@@ -727,6 +732,7 @@ func run(c *cli.Context) {
 	if !c.Bool("disable-pr-planner") {
 		prPlanner := &prplanner.Planner{
 			ListenAddress: c.String("pr-planner-webhook-port"),
+			WebhookSecret: c.String("github-webhook-secret"),
 			GitMirror:     conf.GitMirror,
 			Interval:      time.Duration(c.Int("pr-planner-interval")) * time.Second,
 			ClusterClt:    mgr.GetClient(),

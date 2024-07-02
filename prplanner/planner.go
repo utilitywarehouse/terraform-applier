@@ -20,6 +20,7 @@ import (
 
 type Planner struct {
 	ListenAddress string
+	WebhookSecret string
 	GitMirror     mirror.RepoPoolConfig
 	ClusterClt    client.Client
 	Repos         git.Repositories
@@ -49,7 +50,6 @@ func (p *Planner) Init(ctx context.Context, token string, ch <-chan *redis.Messa
 	return nil
 }
 
-
 func (p *Planner) StartPRPoll(ctx context.Context) {
 	ticker := time.NewTicker(p.Interval)
 	defer ticker.Stop()
@@ -77,6 +77,7 @@ func (p *Planner) StartPRPoll(ctx context.Context) {
 					p.Log.Error("error making GraphQL request:", "error", err)
 					return
 				}
+
 				// Loop through all open PRs
 				for _, pr := range prs {
 					p.processPullRequest(ctx, pr, kubeModuleList)

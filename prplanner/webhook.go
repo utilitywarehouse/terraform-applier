@@ -2,7 +2,11 @@ package prplanner
 
 import (
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
+	"io/ioutil"
 	"net/http"
 
 	tfaplv1beta1 "github.com/utilitywarehouse/terraform-applier/api/v1beta1"
@@ -14,14 +18,15 @@ func (p *Planner) startWebhook() {
 }
 
 func (p *Planner) handleWebhook(w http.ResponseWriter, r *http.Request) {
-	// TODO: Check secret here
+	if !p.isValidSignature(r, p.WebhookSecret) {
+		http.Error(w, "Wrong signature", http.StatusUnauthorized)
+		return
+	}
 
 	if r.Method != http.MethodPost {
 		http.Error(w, "Only POST method is allowed", http.StatusMethodNotAllowed)
 		return
 	}
-
-	// TODO: handle authentication
 
 	// Get the X-GitHub-Event header
 	event := r.Header.Get("X-GitHub-Event")
@@ -30,10 +35,10 @@ func (p *Planner) handleWebhook(w http.ResponseWriter, r *http.Request) {
 	var payload GitHubWebhook
 	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
 		http.Error(w, "Failed to decode JSON payload", http.StatusBadRequest)
-		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
+	// Verify event and action
 	if (event == "pull_request" && payload.Action == "opened") ||
 		(event == "pull_request" && payload.Action == "synchronize") ||
 		(event == "pull_request" && payload.Action == "reopened") {
@@ -47,13 +52,13 @@ func (p *Planner) handleWebhook(w http.ResponseWriter, r *http.Request) {
 	// edited
 
 	if event == "pull_request" && payload.Action == "closed" {
-		// TODO:clean-up
+		// TODO:clean-up: remove run from Redis
 	}
 
 	if event == "issue_comment" && payload.Action == "created" ||
 		event == "issue_comment" && payload.Action == "edited" {
-		// we know the body we still need to know the module user is
-		// requesting belongs to this PR hence we need to do full reconcile of PR
+		// we know the body, but we still need to know the module user is requesting
+		// plan run for belongs to this PR hence we need to do full reconcile of PR
 		go p.processPRWebHookEvent(payload, payload.Issue.Number)
 		w.WriteHeader(http.StatusOK)
 		return
@@ -71,7 +76,7 @@ func (p *Planner) processPRWebHookEvent(payload GitHubWebhook, prNumber int) {
 		return
 	}
 
-	// trigger mirror
+	// trigger mirror and proceed when it's done
 	err = mirrorRepo.Mirror(ctx)
 	if err != nil {
 		p.Log.Error("unable to mirror repository", "err", err)
@@ -91,4 +96,24 @@ func (p *Planner) processPRWebHookEvent(payload GitHubWebhook, prNumber int) {
 	}
 
 	p.processPullRequest(ctx, pr, kubeModuleList)
+}
+
+func (p *Planner) isValidSignature(r *http.Request, key string) bool {
+	gotSignature := r.Header.Get("X-Hub-Signature-256")
+
+	b, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		p.Log.Error("cannot read request body", err)
+		return false
+	}
+
+	hash := hmac.New(sha256.New, []byte(key))
+	if _, err := hash.Write(b); err != nil {
+		p.Log.Error("cannot comput hmac for request", err)
+		return false
+	}
+
+	expSignature := "sha256=" + hex.EncodeToString(hash.Sum(nil))
+
+	return hmac.Equal([]byte(gotSignature), []byte(expSignature))
 }
