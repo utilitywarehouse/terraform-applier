@@ -115,6 +115,8 @@ func (p *Planner) processPullRequest(ctx context.Context, pr *pr, kubeModuleList
 
 	// 1. ensure plan requests
 	p.ensurePlanRequests(ctx, pr, prModules)
+
+	p.uploadRequestOutput(ctx, pr)
 }
 
 func (p *Planner) getPRModuleList(pr *pr, kubeModules *tfaplv1beta1.ModuleList) ([]types.NamespacedName, error) {
