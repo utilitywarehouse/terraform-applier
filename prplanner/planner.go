@@ -12,6 +12,7 @@ import (
 	"github.com/utilitywarehouse/git-mirror/pkg/mirror"
 	tfaplv1beta1 "github.com/utilitywarehouse/terraform-applier/api/v1beta1"
 	"github.com/utilitywarehouse/terraform-applier/git"
+	"github.com/utilitywarehouse/terraform-applier/runner"
 	"github.com/utilitywarehouse/terraform-applier/sysutil"
 	"k8s.io/apimachinery/pkg/types"
 
@@ -25,6 +26,7 @@ type Planner struct {
 	ClusterClt    client.Client
 	Repos         git.Repositories
 	RedisClient   sysutil.RedisInterface
+	Runner        runner.RunnerInterface
 	github        GithubInterface
 	Interval      time.Duration
 	Log           *slog.Logger
@@ -65,6 +67,13 @@ func (p *Planner) StartPRPoll(ctx context.Context) {
 			}
 
 			for _, repoConf := range p.GitMirror.Repositories {
+
+				err := p.Repos.Mirror(ctx, repoConf.Remote)
+				if err != nil {
+					p.Log.Error("unable to mirror repository", "url", repoConf.Remote, "err", err)
+					return
+				}
+
 				repo, err := giturl.Parse(repoConf.Remote)
 				if err != nil {
 					p.Log.Error("unable to parse repo url", "error", err)
@@ -104,23 +113,8 @@ func (p *Planner) processPullRequest(ctx context.Context, pr *pr, kubeModuleList
 		return
 	}
 
-	// 2. compare PR and local repos last commit hashes
-	if !p.isLocalRepoUpToDate(ctx, pr) {
-		// skip as local repo isn't yet in sync with the remote
-		return
-	}
-
 	// 1. ensure plan requests
 	p.ensurePlanRequests(ctx, pr, prModules)
-}
-
-func (p *Planner) isLocalRepoUpToDate(ctx context.Context, pr *pr) bool {
-	if len(pr.Commits.Nodes) == 0 {
-		return false
-	}
-	latestCommit := pr.Commits.Nodes[len(pr.Commits.Nodes)-1].Commit.Oid
-	err := p.Repos.ObjectExists(ctx, pr.BaseRepository.URL, latestCommit)
-	return err == nil
 }
 
 func (p *Planner) getPRModuleList(pr *pr, kubeModules *tfaplv1beta1.ModuleList) ([]types.NamespacedName, error) {
@@ -137,7 +131,7 @@ func (p *Planner) getPRModuleList(pr *pr, kubeModules *tfaplv1beta1.ModuleList) 
 			continue
 		}
 
-		if !pathBelongsToModule(pathList, kubeModule) {
+		if !pathBelongsToModule(pathList, &kubeModule) {
 			continue
 		}
 
@@ -153,7 +147,7 @@ func (p *Planner) getPRModuleList(pr *pr, kubeModules *tfaplv1beta1.ModuleList) 
 	return modulesUpdated, nil
 }
 
-func pathBelongsToModule(pathList []string, module tfaplv1beta1.Module) bool {
+func pathBelongsToModule(pathList []string, module *tfaplv1beta1.Module) bool {
 	for _, path := range pathList {
 		if strings.HasPrefix(path, module.Spec.Path) {
 			return true

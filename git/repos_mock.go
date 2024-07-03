@@ -95,6 +95,20 @@ func (mr *MockRepositoriesMockRecorder) LogMsg(arg0, arg1, arg2, arg3 interface{
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "LogMsg", reflect.TypeOf((*MockRepositories)(nil).LogMsg), arg0, arg1, arg2, arg3)
 }
 
+// Mirror mocks base method.
+func (m *MockRepositories) Mirror(arg0 context.Context, arg1 string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Mirror", arg0, arg1)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Mirror indicates an expected call of Mirror.
+func (mr *MockRepositoriesMockRecorder) Mirror(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Mirror", reflect.TypeOf((*MockRepositories)(nil).Mirror), arg0, arg1)
+}
+
 // ObjectExists mocks base method.
 func (m *MockRepositories) ObjectExists(arg0 context.Context, arg1, arg2 string) error {
 	m.ctrl.T.Helper()

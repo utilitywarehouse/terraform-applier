@@ -566,7 +566,7 @@ func run(c *cli.Context) {
 	// perform 1st mirror to ensure all repositories before starting controller
 	// initial mirror might take longer
 	timeout := 2 * conf.GitMirror.Defaults.MirrorTimeout
-	if err := repos.Mirror(ctx, timeout); err != nil {
+	if err := repos.MirrorAll(ctx, timeout); err != nil {
 		logger.Error("could not perform initial repositories mirror", "err", err)
 		os.Exit(1)
 	}
@@ -738,6 +738,7 @@ func run(c *cli.Context) {
 			ClusterClt:    mgr.GetClient(),
 			Repos:         repos,
 			RedisClient:   sysutil.Redis{Client: rdb},
+			Runner:        &runner,
 			Log:           logger.With("logger", "pr-planner"),
 		}
 

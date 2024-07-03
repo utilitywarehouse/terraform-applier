@@ -18,11 +18,12 @@ var (
 		"```\n" +
 		"Module: %s\n" +
 		"Path: %s\n" +
+		"Commit ID: %s\n" +
 		"Requested At: %s\n" +
 		"```\n" +
 		"Do not edit this comment"
 
-	requestAcknowledgedMsgRegex = regexp.MustCompile(`Received terraform plan request\n\x60{3}\nModule: (.+)\nPath: (.+)\nRequested At: (.+)`)
+	requestAcknowledgedMsgRegex = regexp.MustCompile(`Received terraform plan request\n\x60{3}\nModule: (.+)\nPath: (.+)\nCommit ID: (.+)\nRequested At: (.+)`)
 
 	runOutputMsgTml = "Terraform plan output for\n" +
 		"```\n" +
@@ -46,21 +47,21 @@ func parsePlanReqMsg(commentBody string) types.NamespacedName {
 	return types.NamespacedName{}
 }
 
-func requestAcknowledgedMsg(module, path string, reqAt *metav1.Time) string {
-	return fmt.Sprintf(requestAcknowledgedMsgTml, module, path, reqAt.Format(time.RFC3339))
+func requestAcknowledgedMsg(module, path, commitID string, reqAt *metav1.Time) string {
+	return fmt.Sprintf(requestAcknowledgedMsgTml, module, path, commitID, reqAt.Format(time.RFC3339))
 }
 
-func parseRequestAcknowledgedMsg(commentBody string) (types.NamespacedName, string, *time.Time) {
+func parseRequestAcknowledgedMsg(commentBody string) (types.NamespacedName, string, string, *time.Time) {
 	matches := requestAcknowledgedMsgRegex.FindStringSubmatch(commentBody)
-	if len(matches) == 4 {
-		t, err := time.Parse(time.RFC3339, matches[3])
+	if len(matches) == 5 {
+		t, err := time.Parse(time.RFC3339, matches[4])
 		if err == nil {
-			return parseNamespaceName(matches[1]), matches[2], &t
+			return parseNamespaceName(matches[1]), matches[2], matches[3], &t
 		}
-		return parseNamespaceName(matches[1]), matches[2], nil
+		return parseNamespaceName(matches[1]), matches[2], matches[3], nil
 	}
 
-	return types.NamespacedName{}, "", nil
+	return types.NamespacedName{}, "", "", nil
 }
 
 func parseRunOutputMsg(comment string) (module types.NamespacedName, commit string) {

@@ -93,7 +93,7 @@ func Test_checkPRCommentForOutputRequests(t *testing.T) {
 
 	t.Run("run not found in redis", func(t *testing.T) {
 		comment := prComment{
-			Body: requestAcknowledgedMsg("foo/two", "foo/two", mustParseMetaTime("2023-04-02T15:03:05Z")),
+			Body: requestAcknowledgedMsg("foo/two", "foo/two", "hash1", mustParseMetaTime("2023-04-02T15:03:05Z")),
 		}
 
 		gotOut, gotOk := planner.checkPRCommentForOutputRequests(ctx, comment)
@@ -111,7 +111,7 @@ func Test_checkPRCommentForOutputRequests(t *testing.T) {
 
 	t.Run("empty run output in redis", func(t *testing.T) {
 		comment := prComment{
-			Body: requestAcknowledgedMsg("foo/two", "foo/two", mustParseMetaTime("2023-04-02T15:02:05Z")),
+			Body: requestAcknowledgedMsg("foo/two", "foo/two", "hash1", mustParseMetaTime("2023-04-02T15:02:05Z")),
 		}
 
 		gotOut, gotOk := planner.checkPRCommentForOutputRequests(ctx, comment)
@@ -129,7 +129,7 @@ func Test_checkPRCommentForOutputRequests(t *testing.T) {
 
 	t.Run("plan output ready in redis", func(t *testing.T) {
 		comment := prComment{
-			Body:       requestAcknowledgedMsg("foo/two", "module/path/is/going/to/be/here", mustParseMetaTime("2023-04-02T15:04:05Z")),
+			Body:       requestAcknowledgedMsg("foo/two", "module/path/is/going/to/be/here", "hash1", mustParseMetaTime("2023-04-02T15:04:05Z")),
 			DatabaseID: 111,
 		}
 

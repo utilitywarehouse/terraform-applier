@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	tfaplv1beta1 "github.com/utilitywarehouse/terraform-applier/api/v1beta1"
 	"github.com/utilitywarehouse/terraform-applier/sysutil"
@@ -41,14 +42,10 @@ func (p *Planner) ensurePlanRequests(ctx context.Context, pr *pr, prModules []ty
 	for _, moduleName := range prModules {
 
 		// 1. Check if module has any pending plan request
-		var module tfaplv1beta1.Module
-		err := p.ClusterClt.Get(ctx, moduleName, &module)
+		var module *tfaplv1beta1.Module
+		err := p.ClusterClt.Get(ctx, moduleName, module)
 		if err != nil {
 			p.Log.Error("unable to get module", "module", moduleName, "error", err)
-			continue
-		}
-		_, ok := module.PendingRunRequest()
-		if ok {
 			continue
 		}
 
@@ -58,16 +55,14 @@ func (p *Planner) ensurePlanRequests(ctx context.Context, pr *pr, prModules []ty
 			continue
 		}
 		if req != nil {
-			err = sysutil.EnsureRequest(ctx, p.ClusterClt, module.NamespacedName(), req)
-			if err != nil {
-				p.Log.Error("failed to request plan job", "error", err)
-				continue
-			}
+			run := tfaplv1beta1.NewRun(module, req)
+			cancelChan := make(chan struct{})
+			go p.Runner.Start(&run, cancelChan)
 		}
 	}
 }
 
-func (p *Planner) ensurePlanRequest(ctx context.Context, pr *pr, module tfaplv1beta1.Module, skipCommitRun bool) (*tfaplv1beta1.Request, error) {
+func (p *Planner) ensurePlanRequest(ctx context.Context, pr *pr, module *tfaplv1beta1.Module, skipCommitRun bool) (*tfaplv1beta1.Request, error) {
 	if !skipCommitRun {
 		// 1. loop through commits from latest to oldest
 		req, err := p.checkPRCommits(ctx, pr, module)
@@ -83,7 +78,7 @@ func (p *Planner) ensurePlanRequest(ctx context.Context, pr *pr, module tfaplv1b
 	return p.checkPRCommentsForPlanRequests(pr, module)
 }
 
-func (p *Planner) checkPRCommits(ctx context.Context, pr *pr, module tfaplv1beta1.Module) (*tfaplv1beta1.Request, error) {
+func (p *Planner) checkPRCommits(ctx context.Context, pr *pr, module *tfaplv1beta1.Module) (*tfaplv1beta1.Request, error) {
 	// loop through commits to check if module path is updated
 	for i := len(pr.Commits.Nodes) - 1; i >= 0; i-- {
 		commit := pr.Commits.Nodes[i].Commit
@@ -98,8 +93,11 @@ func (p *Planner) checkPRCommits(ctx context.Context, pr *pr, module tfaplv1beta
 		}
 
 		// 2. check if we have already processed (uploaded output) this commit
-		outputPosted := isPlanOutputPostedForCommit(pr, commit.Oid, module.NamespacedName())
-		if outputPosted {
+		if isPlanOutputPostedForCommit(pr, commit.Oid, module.NamespacedName()) {
+			return nil, nil
+		}
+
+		if isPlanRequestAckPostedForCommit(pr, commit.Oid, module.NamespacedName()) {
 			return nil, nil
 		}
 
@@ -115,13 +113,13 @@ func (p *Planner) checkPRCommits(ctx context.Context, pr *pr, module tfaplv1beta
 
 		// 4. request run
 		p.Log.Info("triggering plan due to new commit", "module", module.NamespacedName(), "pr", pr.Number, "author", pr.Author.Login)
-		return p.addNewRequest(module, pr)
+		return p.addNewRequest(module, pr, commit.Oid)
 	}
 
 	return nil, nil
 }
 
-func (p *Planner) isModuleUpdated(ctx context.Context, commitHash string, module tfaplv1beta1.Module) (bool, error) {
+func (p *Planner) isModuleUpdated(ctx context.Context, commitHash string, module *tfaplv1beta1.Module) (bool, error) {
 	filesChangedInCommit, err := p.Repos.ChangedFiles(ctx, module.Spec.RepoURL, commitHash)
 	if err != nil {
 		return false, fmt.Errorf("error getting commit info: %w", err)
@@ -130,14 +128,15 @@ func (p *Planner) isModuleUpdated(ctx context.Context, commitHash string, module
 	return pathBelongsToModule(filesChangedInCommit, module), nil
 }
 
-func (p *Planner) checkPRCommentsForPlanRequests(pr *pr, module tfaplv1beta1.Module) (*tfaplv1beta1.Request, error) {
+func (p *Planner) checkPRCommentsForPlanRequests(pr *pr, module *tfaplv1beta1.Module) (*tfaplv1beta1.Request, error) {
 	// Go through PR comments in reverse order
 	for i := len(pr.Comments.Nodes) - 1; i >= 0; i-- {
 		comment := pr.Comments.Nodes[i]
 
 		// Skip if request already acknowledged for module
-		commentModule, _, _ := parseRequestAcknowledgedMsg(comment.Body)
-		if commentModule == module.NamespacedName() {
+		commentModule, _, _, reqAt := parseRequestAcknowledgedMsg(comment.Body)
+		if commentModule == module.NamespacedName() &&
+			reqAt != nil && time.Until(*reqAt) < 10*time.Minute {
 			return nil, nil
 		}
 
@@ -158,8 +157,13 @@ func (p *Planner) checkPRCommentsForPlanRequests(pr *pr, module tfaplv1beta1.Mod
 			continue
 		}
 
+		modulePathHash, err := p.Repos.Hash(context.Background(), module.Spec.RepoURL, pr.HeadRefName, module.Spec.Path)
+		if err != nil {
+			return nil, err
+		}
+
 		p.Log.Info("triggering plan requested via comment", "module", module.NamespacedName(), "pr", pr.Number, "author", comment.Author.Login)
-		return p.addNewRequest(module, pr)
+		return p.addNewRequest(module, pr, modulePathHash)
 	}
 
 	return nil, nil
@@ -180,11 +184,28 @@ func isPlanOutputPostedForCommit(pr *pr, commitID string, module types.Namespace
 	return false
 }
 
-func (p *Planner) addNewRequest(module tfaplv1beta1.Module, pr *pr) (*tfaplv1beta1.Request, error) {
+// isPlanRequestAckPostedForCommit loops through all the comments to check if given commit
+// ids plan request is already acknowledged
+func isPlanRequestAckPostedForCommit(pr *pr, commitID string, module types.NamespacedName) bool {
+	for i := len(pr.Comments.Nodes) - 1; i >= 0; i-- {
+		comment := pr.Comments.Nodes[i]
+
+		commentModule, _, commentCommitID, reqAt := parseRequestAcknowledgedMsg(comment.Body)
+		if commentModule == module &&
+			commentCommitID == commitID &&
+			reqAt != nil && time.Until(*reqAt) < 10*time.Minute {
+			return true
+		}
+	}
+
+	return false
+}
+
+func (p *Planner) addNewRequest(module *tfaplv1beta1.Module, pr *pr, commitID string) (*tfaplv1beta1.Request, error) {
 	req := module.NewRunRequest(tfaplv1beta1.PRPlan)
 
 	commentBody := prComment{
-		Body: requestAcknowledgedMsg(module.NamespacedName().String(), module.Spec.Path, req.RequestedAt),
+		Body: requestAcknowledgedMsg(module.NamespacedName().String(), module.Spec.Path, commitID, req.RequestedAt),
 	}
 
 	commentID, err := p.github.postComment(pr.BaseRepository.Owner.Login, pr.BaseRepository.Name, 0, pr.Number, commentBody)

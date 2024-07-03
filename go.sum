@@ -216,10 +216,8 @@ github.com/stretchr/testify v1.9.0 h1:HtqpIVDClZ4nwg75+f6Lvsy/wHu+3BoSGCbBAcpTsT
 github.com/stretchr/testify v1.9.0/go.mod h1:r2ic/lqez/lEtzL7wO/rwa5dbSLXVDPFyf8C91i36aY=
 github.com/urfave/cli/v2 v2.27.2 h1:6e0H+AkS+zDckwPCUrZkKX38mRaau4nL2uipkJpbkcI=
 github.com/urfave/cli/v2 v2.27.2/go.mod h1:g0+79LmHHATl7DAcHO99smiR/T7uGLw84w8Y42x+4eM=
-github.com/utilitywarehouse/git-mirror v0.1.1 h1:rol0e4bTT7ovmQO8H4KUD4gtdCYuW4paMzC4nek8JAk=
-github.com/utilitywarehouse/git-mirror v0.1.1/go.mod h1:ei/l/I03ywUdzGUJAIjV9NQr7Nxt0vC37RbNR7uJOaw=
-github.com/utilitywarehouse/git-mirror v0.2.0 h1:KL6+Tc03sOUsxPdIInHcXeOzCQbNEGSgKJ5FO5jMk7Q=
-github.com/utilitywarehouse/git-mirror v0.2.0/go.mod h1:ei/l/I03ywUdzGUJAIjV9NQr7Nxt0vC37RbNR7uJOaw=
+github.com/utilitywarehouse/git-mirror v0.2.1 h1:tfYHP1TI6DohSC4axoBHHs/QOsMjFlH3mR6+c6IGy6w=
+github.com/utilitywarehouse/git-mirror v0.2.1/go.mod h1:ei/l/I03ywUdzGUJAIjV9NQr7Nxt0vC37RbNR7uJOaw=
 github.com/utilitywarehouse/go-operational v0.0.0-20220413104526-79ce40a50281 h1:o2reBE9vn4ZXmq73rNDmipyJsH0GPqoS8A6CVeWZsGU=
 github.com/utilitywarehouse/go-operational v0.0.0-20220413104526-79ce40a50281/go.mod h1:NVEoiRSDBsLOEk9X+pwskLIPWL5YGmZMaGP0kXnpvhM=
 github.com/xanzy/ssh-agent v0.3.3 h1:+/15pJfg/RsTxqYcX6fHqOXZwwMP+2VyYWJeWM2qQFM=

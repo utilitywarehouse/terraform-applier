@@ -25,7 +25,7 @@ func Test_checkPRCommentsForPlanRequests(t *testing.T) {
 
 	slog.SetLogLoggerLevel(slog.LevelDebug)
 
-	module := tfaplv1beta1.Module{
+	module := &tfaplv1beta1.Module{
 		ObjectMeta: metav1.ObjectMeta{Namespace: "foo", Name: "two"},
 		Spec: tfaplv1beta1.ModuleSpec{
 			RepoURL: "https://github.com/owner-a/repo-a.git",
@@ -42,8 +42,8 @@ func Test_checkPRCommentsForPlanRequests(t *testing.T) {
 			[]string{"hash1", "hash2", "hash3"},
 			[]string{
 				"@terraform-applier plan foo/two",
-				fmt.Sprintf(requestAcknowledgedMsgTml, "foo/two", "reqID2", "hash2"),
-				fmt.Sprintf(requestAcknowledgedMsgTml, "foo/three", "reqID3", "hash3"),
+				requestAcknowledgedMsg("foo/two", "module/path/is/going/to/be/here", "hash2", mustParseMetaTime("2023-04-02T15:04:05Z")),
+				requestAcknowledgedMsg("foo/three", "module/path/is/going/to/be/here", "hash3", mustParseMetaTime("2023-04-02T15:04:05Z")),
 			},
 			nil,
 		)
@@ -128,6 +128,9 @@ func Test_checkPRCommentsForPlanRequests(t *testing.T) {
 				}
 			}).AnyTimes()
 
+		testGit.EXPECT().Hash(gomock.Any(), gomock.Any(), "ref1", "foo/two").
+			Return("hash1", nil)
+
 		// mock github API Call adding new request info
 		testGithub.EXPECT().postComment(gomock.Any(), gomock.Any(), 0, 123, gomock.Any()).
 			DoAndReturn(func(repoOwner, repoName string, commentID, prNumber int, commentBody prComment) (int, error) {
@@ -181,6 +184,9 @@ func Test_checkPRCommentsForPlanRequests(t *testing.T) {
 				}
 				return 111, nil
 			})
+
+		testGit.EXPECT().Hash(gomock.Any(), gomock.Any(), "ref1", "foo/two").
+			Return("hash1", nil)
 
 		// Call Test function
 		gotReq, err := planner.checkPRCommentsForPlanRequests(p, module)
@@ -247,6 +253,9 @@ func Test_checkPRCommentsForPlanRequests(t *testing.T) {
 				}
 				return 111, nil
 			})
+
+		testGit.EXPECT().Hash(gomock.Any(), gomock.Any(), "ref1", "foo/two").
+			Return("hash1", nil)
 
 		// Call Test function
 		gotReq, err := planner.checkPRCommentsForPlanRequests(p, module)

@@ -67,23 +67,16 @@ func (p *Planner) handleWebhook(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusBadRequest)
 }
 
-func (p *Planner) processPRWebHookEvent(payload GitHubWebhook, prNumber int) {
+func (p *Planner) processPRWebHookEvent(event GitHubWebhook, prNumber int) {
 	ctx := context.Background()
 
-	mirrorRepo, err := p.Repos.Repository(payload.Repository.URL)
+	err := p.Repos.Mirror(ctx, event.Repository.URL)
 	if err != nil {
-		p.Log.Error("unable to get repository from url", "url", payload.Repository.URL, "pr", prNumber, "err", err)
+		p.Log.Error("unable to mirror repository", "url", event.Repository.URL, "pr", prNumber, "err", err)
 		return
 	}
 
-	// trigger mirror and proceed when it's done
-	err = mirrorRepo.Mirror(ctx)
-	if err != nil {
-		p.Log.Error("unable to mirror repository", "err", err)
-		return
-	}
-
-	pr, err := p.github.PR(ctx, payload.Repository.Owner.Login, payload.Repository.Name, prNumber)
+	pr, err := p.github.PR(ctx, event.Repository.Owner.Login, event.Repository.Name, prNumber)
 	if err != nil {
 		p.Log.Error("unable to get PR info", "pr", prNumber, "err", err)
 		return

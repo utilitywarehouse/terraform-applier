@@ -26,7 +26,7 @@ func (p *Planner) uploadRequestOutput(ctx context.Context, pr *pr) {
 }
 
 func (p *Planner) checkPRCommentForOutputRequests(ctx context.Context, comment prComment) (prComment, bool) {
-	moduleNamespacedName, path, requestedAt := parseRequestAcknowledgedMsg(comment.Body)
+	moduleNamespacedName, path, _, requestedAt := parseRequestAcknowledgedMsg(comment.Body)
 	if requestedAt == nil {
 		return prComment{}, false
 	}
