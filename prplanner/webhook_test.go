@@ -1,10 +1,7 @@
 package prplanner
 
 import (
-	"crypto/hmac"
-	"crypto/sha256"
-	"encoding/hex"
-	"log/slog"
+	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
@@ -12,50 +9,130 @@ import (
 	"github.com/google/go-cmp/cmp"
 )
 
-func Test_isValidSignature(t *testing.T) {
+func TestValidSignature(t *testing.T) {
 	planner := &Planner{
-		Log: slog.Default(),
+		WebhookSecret: "a1b2c3d4e5",
 	}
 
-	slog.SetLogLoggerLevel(slog.LevelDebug)
+	body := []byte(`{"foo":"bar"}`)
 
-	t.Run("Github's example test", func(t *testing.T) {
+	expSig := planner.computeHMAC(body, planner.WebhookSecret)
 
-		secret := "It's a Secret to Everybody"
-		body := []byte("Hello, World!")
-		expSig := "sha256=757107ea0eb2509fc211221cce984b8a37570b6d7586c22c46f4379c8b043e17"
+	req := httptest.NewRequest("POST", "/github-events", strings.NewReader(string(body)))
+	req.Header.Set("X-Hub-Signature-256", expSig)
 
-		req := httptest.NewRequest("POST", "/events", strings.NewReader(string(body)))
-		req.Header.Set("X-Hub-Signature-256", expSig)
+	gotOk := planner.isValidSignature(req, body, planner.WebhookSecret)
 
-		gotOk := planner.isValidSignature(req, body, secret)
+	wantOk := true
 
-		wantOk := true
+	if diff := cmp.Diff(wantOk, gotOk, cmpIgnoreRandFields); diff != "" {
+		t.Errorf("isValidSignature() mismatch (-want +got):\n%s", diff)
+	}
+}
 
-		if diff := cmp.Diff(wantOk, gotOk, cmpIgnoreRandFields); diff != "" {
-			t.Errorf("checkPRCommentForOutputRequests() mismatch (-want +got):\n%s", diff)
-		}
-	})
+func TestInvalidSignature(t *testing.T) {
+	planner := &Planner{
+		WebhookSecret: "a1b2c3d4e5",
+	}
 
-	t.Run("Generate hash", func(t *testing.T) {
+	body := []byte(`{"foo":"bar"}`)
 
-		secret := "a1b2c3d4"
-		body := []byte(`{"foo":"bar"}`)
+	expSig := planner.computeHMAC(body, "invalidSignature")
 
-		hash := hmac.New(sha256.New, []byte(secret))
-		hash.Write(body)
-		expectedSignature := hex.EncodeToString(hash.Sum(nil))
-		expSig := "sha256=" + expectedSignature
+	req := httptest.NewRequest("POST", "/github-events", strings.NewReader(string(body)))
+	req.Header.Set("X-Hub-Signature-256", expSig)
 
-		req := httptest.NewRequest("POST", "/github-events", strings.NewReader(string(body)))
-		req.Header.Set("X-Hub-Signature-256", expSig)
+	gotOk := planner.isValidSignature(req, body, planner.WebhookSecret)
 
-		gotOk := planner.isValidSignature(req, body, secret)
+	wantOk := false
 
-		wantOk := true
+	if diff := cmp.Diff(wantOk, gotOk, cmpIgnoreRandFields); diff != "" {
+		t.Errorf("isValidSignature() mismatch (-want +got):\n%s", diff)
+	}
+}
 
-		if diff := cmp.Diff(wantOk, gotOk, cmpIgnoreRandFields); diff != "" {
-			t.Errorf("checkPRCommentForOutputRequests() mismatch (-want +got):\n%s", diff)
-		}
-	})
+func TestInvalidMethod(t *testing.T) {
+	planner := &Planner{
+		WebhookSecret: "a1b2c3d4e5",
+	}
+
+	body := []byte(`{"foo":"bar"}`)
+
+	expSig := planner.computeHMAC(body, planner.WebhookSecret)
+
+	server := httptest.NewServer(http.HandlerFunc(planner.handleWebhook))
+	defer server.Close()
+
+	req, err := http.NewRequest("GET", server.URL, strings.NewReader(string(body)))
+	if err != nil {
+		t.Fatalf("Failed to make a request: %v", err)
+	}
+	req.Header.Set("X-Hub-Signature-256", expSig)
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("Failed to send request: %v", err)
+	}
+
+	if resp.StatusCode != http.StatusMethodNotAllowed {
+		t.Errorf("Expected status %v, got %v", http.StatusMethodNotAllowed, resp.StatusCode)
+	}
+}
+
+func TestInvalidEvent(t *testing.T) {
+	planner := &Planner{
+		WebhookSecret: "a1b2c3d4e5",
+	}
+
+	body := []byte(`{"foo":"bar"}`)
+
+	expSig := planner.computeHMAC(body, planner.WebhookSecret)
+
+	server := httptest.NewServer(http.HandlerFunc(planner.handleWebhook))
+	defer server.Close()
+
+	req, err := http.NewRequest("POST", server.URL, strings.NewReader(string(body)))
+	if err != nil {
+		t.Fatalf("Failed to make a request: %v", err)
+	}
+	req.Header.Set("X-Hub-Signature-256", expSig)
+	req.Header.Set("X-GitHub-Event", "foo")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("Failed to send request: %v", err)
+	}
+
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Errorf("Expected status %v, got %v", http.StatusBadRequest, resp.StatusCode)
+	}
+}
+
+func TestInvalidAction(t *testing.T) {
+	planner := &Planner{
+		WebhookSecret: "a1b2c3d4e5",
+	}
+
+	body := []byte(`{"foo":"bar", "action", "foo"}`)
+
+	expSig := planner.computeHMAC(body, planner.WebhookSecret)
+
+	server := httptest.NewServer(http.HandlerFunc(planner.handleWebhook))
+	defer server.Close()
+
+	req, err := http.NewRequest("POST", server.URL, strings.NewReader(string(body)))
+	if err != nil {
+		t.Fatalf("Failed to make a request: %v", err)
+	}
+	req.Header.Set("X-Hub-Signature-256", expSig)
+	req.Header.Set("X-GitHub-Event", "pull_request")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("Failed to send request: %v", err)
+	}
+
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Errorf("Expected status %v, got %v", http.StatusBadRequest, resp.StatusCode)
+	}
 }

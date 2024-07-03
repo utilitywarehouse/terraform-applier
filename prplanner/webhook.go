@@ -7,7 +7,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 
 	tfaplv1beta1 "github.com/utilitywarehouse/terraform-applier/api/v1beta1"
@@ -19,7 +19,7 @@ func (p *Planner) startWebhook() {
 }
 
 func (p *Planner) handleWebhook(w http.ResponseWriter, r *http.Request) {
-	body, err := ioutil.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		p.Log.Error("cannot read request body", err)
 		return
@@ -41,7 +41,7 @@ func (p *Planner) handleWebhook(w http.ResponseWriter, r *http.Request) {
 	// Parse the JSON payload
 	var payload GitHubWebhook
 	if err := json.Unmarshal(body, &payload); err != nil {
-		fmt.Println("§§§ cannot unmarshal json payload", err)
+		fmt.Println("cannot unmarshal json payload", err)
 	}
 
 	// Verify event and action
@@ -53,9 +53,6 @@ func (p *Planner) handleWebhook(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		return
 	}
-
-	// ??
-	// edited
 
 	if event == "pull_request" && payload.Action == "closed" {
 		// TODO:clean-up: remove run from Redis
@@ -75,8 +72,6 @@ func (p *Planner) handleWebhook(w http.ResponseWriter, r *http.Request) {
 
 func (p *Planner) processPRWebHookEvent(payload GitHubWebhook, prNumber int) {
 	ctx := context.Background()
-
-	fmt.Println("§§§ payload repo url:", payload.Repository.URL)
 
 	mirrorRepo, err := p.Repos.Repository(payload.Repository.URL)
 	if err != nil {
@@ -106,16 +101,24 @@ func (p *Planner) processPRWebHookEvent(payload GitHubWebhook, prNumber int) {
 	p.processPullRequest(ctx, pr, kubeModuleList)
 }
 
-func (p *Planner) isValidSignature(r *http.Request, body []byte, key string) bool {
+func (p *Planner) isValidSignature(r *http.Request, message []byte, secret string) bool {
 	gotSignature := r.Header.Get("X-Hub-Signature-256")
 
-	hash := hmac.New(sha256.New, []byte(key))
-	if _, err := hash.Write(body); err != nil {
-		p.Log.Error("cannot comput hmac for request", err)
+	expSignature := p.computeHMAC(message, secret)
+	if expSignature == "" {
 		return false
 	}
 
-	expSignature := "sha256=" + hex.EncodeToString(hash.Sum(nil))
-
 	return hmac.Equal([]byte(gotSignature), []byte(expSignature))
+}
+
+func (p *Planner) computeHMAC(message []byte, secret string) string {
+	mac := hmac.New(sha256.New, []byte(secret))
+
+	if _, err := mac.Write(message); err != nil {
+		p.Log.Error("cannot compute hmac for request", err)
+		return ""
+	}
+
+	return "sha256=" + hex.EncodeToString(mac.Sum(nil))
 }
