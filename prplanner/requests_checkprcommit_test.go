@@ -78,7 +78,7 @@ func TestCheckPRCommits(t *testing.T) {
 			nil,
 		)
 
-		module := tfaplv1beta1.Module{
+		module := &tfaplv1beta1.Module{
 			ObjectMeta: metav1.ObjectMeta{Namespace: "foo", Name: "one"},
 			Spec: tfaplv1beta1.ModuleSpec{
 				RepoURL: "https://github.com/owner-a/repo-a.git",
@@ -133,7 +133,7 @@ func TestCheckPRCommits(t *testing.T) {
 			nil,
 		)
 
-		module := tfaplv1beta1.Module{
+		module := &tfaplv1beta1.Module{
 			ObjectMeta: metav1.ObjectMeta{Namespace: "foo", Name: "two"},
 			Spec: tfaplv1beta1.ModuleSpec{
 				RepoURL: "https://github.com/owner-a/repo-a.git",
@@ -188,7 +188,7 @@ func TestCheckPRCommits(t *testing.T) {
 			nil,
 		)
 
-		module := tfaplv1beta1.Module{
+		module := &tfaplv1beta1.Module{
 			ObjectMeta: metav1.ObjectMeta{Namespace: "foo", Name: "one"},
 			Spec: tfaplv1beta1.ModuleSpec{
 				RepoURL: "https://github.com/owner-a/repo-a.git",
@@ -222,7 +222,7 @@ func TestCheckPRCommits(t *testing.T) {
 			nil,
 		)
 
-		module := tfaplv1beta1.Module{
+		module := &tfaplv1beta1.Module{
 			ObjectMeta: metav1.ObjectMeta{Namespace: "foo", Name: "two"},
 			Spec: tfaplv1beta1.ModuleSpec{
 				RepoURL: "https://github.com/owner-a/repo-a.git",
@@ -255,7 +255,7 @@ func TestCheckPRCommits(t *testing.T) {
 			nil,
 		)
 
-		module := tfaplv1beta1.Module{
+		module := &tfaplv1beta1.Module{
 			ObjectMeta: metav1.ObjectMeta{Namespace: "foo", Name: "two"},
 			Spec: tfaplv1beta1.ModuleSpec{
 				RepoURL: "https://github.com/owner-a/repo-a.git",
@@ -310,7 +310,7 @@ func TestCheckPRCommits(t *testing.T) {
 			nil,
 		)
 
-		module := tfaplv1beta1.Module{
+		module := &tfaplv1beta1.Module{
 			ObjectMeta: metav1.ObjectMeta{Namespace: "foo", Name: "two"},
 			Spec: tfaplv1beta1.ModuleSpec{
 				RepoURL: "https://github.com/owner-a/repo-a.git",

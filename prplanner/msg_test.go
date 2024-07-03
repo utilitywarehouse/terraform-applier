@@ -74,6 +74,7 @@ func Test_parseRequestAcknowledgedMsg(t *testing.T) {
 		args       args
 		wantModule types.NamespacedName
 		wantPath   string
+		wantHash   string
 		wantReqAt  *time.Time
 	}{
 		{
@@ -84,23 +85,26 @@ func Test_parseRequestAcknowledgedMsg(t *testing.T) {
 		},
 		{
 			name:       "NamespacedName + Requested At",
-			args:       args{commentBody: requestAcknowledgedMsg("foo/one", "path/to/module/one", mustParseMetaTime("2006-01-02T15:04:05+07:00"))},
+			args:       args{commentBody: requestAcknowledgedMsg("foo/one", "path/to/module/one", "hash1", mustParseMetaTime("2006-01-02T15:04:05+07:00"))},
 			wantModule: types.NamespacedName{Namespace: "foo", Name: "one"},
 			wantPath:   "path/to/module/one",
+			wantHash:   "hash1",
 			wantReqAt:  mustParseTime("2006-01-02T15:04:05+07:00"),
 		},
 		{
 			name:       "NamespacedName + Requested At UTC",
-			args:       args{commentBody: requestAcknowledgedMsg("foo/one", "foo/one", mustParseMetaTime("2023-04-02T15:04:05Z"))},
+			args:       args{commentBody: requestAcknowledgedMsg("foo/one", "foo/one", "hash2", mustParseMetaTime("2023-04-02T15:04:05Z"))},
 			wantModule: types.NamespacedName{Namespace: "foo", Name: "one"},
 			wantPath:   "foo/one",
+			wantHash:   "hash2",
 			wantReqAt:  mustParseTime("2023-04-02T15:04:05Z"),
 		},
 		{
 			name:       "Name + Requested At",
-			args:       args{commentBody: requestAcknowledgedMsg("one", "foo/one", mustParseMetaTime("2023-04-02T15:04:05Z"))},
+			args:       args{commentBody: requestAcknowledgedMsg("one", "foo/one", "hash3", mustParseMetaTime("2023-04-02T15:04:05Z"))},
 			wantModule: types.NamespacedName{Name: "one"},
 			wantPath:   "foo/one",
+			wantHash:   "hash3",
 			wantReqAt:  mustParseTime("2023-04-02T15:04:05Z"),
 		},
 		{
@@ -127,11 +131,14 @@ func Test_parseRequestAcknowledgedMsg(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gotModule, gotPath, gotReqAt := parseRequestAcknowledgedMsg(tt.args.commentBody)
+			gotModule, gotPath, gotHash, gotReqAt := parseRequestAcknowledgedMsg(tt.args.commentBody)
 			if !reflect.DeepEqual(gotModule, tt.wantModule) {
 				t.Errorf("parseRequestAcknowledgedMsg() gotModule = %v, want %v", gotModule, tt.wantModule)
 			}
 			if diff := cmp.Diff(tt.wantPath, gotPath); diff != "" {
+				t.Errorf("parseRequestAcknowledgedMsg() mismatch (-want +got):\n%s", diff)
+			}
+			if diff := cmp.Diff(tt.wantHash, gotHash); diff != "" {
 				t.Errorf("parseRequestAcknowledgedMsg() mismatch (-want +got):\n%s", diff)
 			}
 			if diff := cmp.Diff(tt.wantReqAt, gotReqAt); diff != "" {

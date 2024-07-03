@@ -157,9 +157,11 @@ type prFiles struct {
 type GitHubWebhook struct {
 	Action string `json:"action"`
 	Number int    `json:"number"`
-	Issue  struct {
+
+	Issue struct {
 		Number int `json:"number"`
 	} `json:"issue"`
+
 	Repository struct {
 		Name  string `json:"name"`
 		Owner struct {
