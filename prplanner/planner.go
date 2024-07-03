@@ -53,6 +53,7 @@ func (p *Planner) Init(ctx context.Context, token string, ch <-chan *redis.Messa
 }
 
 func (p *Planner) StartPRPoll(ctx context.Context) {
+
 	ticker := time.NewTicker(p.Interval)
 	defer ticker.Stop()
 	for {
@@ -106,6 +107,7 @@ func (p *Planner) processPullRequest(ctx context.Context, pr *pr, kubeModuleList
 	prModules, err := p.getPRModuleList(pr, kubeModuleList)
 	if err != nil {
 		p.Log.Error("error getting a list of modules in PR", "error", err)
+		return
 	}
 
 	if len(prModules) == 0 {

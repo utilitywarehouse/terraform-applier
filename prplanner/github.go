@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 )
 
 //go:generate go run github.com/golang/mock/mockgen -package prplanner -destination github_mock.go github.com/utilitywarehouse/terraform-applier/prplanner GithubInterface
@@ -24,6 +25,7 @@ type gitHubClient struct {
 }
 
 func (gc *gitHubClient) openPRs(ctx context.Context, repoOwner, repoName string) ([]*pr, error) {
+	repoName = strings.TrimSuffix(repoName, ".git")
 	q := gitPRRequest{Query: queryRepoPRs}
 	q.Variables.Owner = repoOwner
 	q.Variables.RepoName = repoName
@@ -66,7 +68,8 @@ func (gc *gitHubClient) openPRs(ctx context.Context, repoOwner, repoName string)
 }
 
 func (gc *gitHubClient) PR(ctx context.Context, repoOwner, repoName string, prNumber int) (*pr, error) {
-	q := gitPRRequest{Query: queryRepoPRs}
+	repoName = strings.TrimSuffix(repoName, ".git")
+	q := gitPRRequest{Query: queryRepoPR}
 	q.Variables.Owner = repoOwner
 	q.Variables.RepoName = repoName
 	q.Variables.PRNumber = prNumber
@@ -109,6 +112,7 @@ func (gc *gitHubClient) PR(ctx context.Context, repoOwner, repoName string, prNu
 }
 
 func (gc *gitHubClient) postComment(repoOwner, repoName string, commentID, prNumber int, commentBody prComment) (int, error) {
+	repoName = strings.TrimSuffix(repoName, ".git")
 	method := "POST"
 	reqURL := fmt.Sprintf("%s/repos/%s/%s/issues/%d/comments", gc.rootURL, repoOwner, repoName, prNumber)
 

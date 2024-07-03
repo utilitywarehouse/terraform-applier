@@ -4,83 +4,53 @@ const queryRepoPRs = `
 query ($owner: String!,$repoName: String! ) {
   repository(owner: $owner, name: $repoName) {
     pullRequests(states: OPEN, last: 20) {
-      nodes {
-	  	baseRefName
-        baseRepository {
-          name
-          url
-        }
-        number
-        headRefName
-        isDraft
-        author {
-          login
-        }
-        commits(last: 20) {
-          nodes {
-            commit {
-              oid
-            }
-          }
-        }
-        comments(last:50) {
-          nodes {
-            databaseId
-            body
-            author {
-              login
-            }
-          }
-        }
-        files(first: 100) {
-          nodes {
-            path
-          }
-        }
-      }
-    }
-  }
-}`
+      nodes { ` + prFieldQuery + `
+}}}}`
 
 const queryRepoPR = `
 query ($owner: String!,$repoName: String!, $prNumber: Int! ) {
   repository(owner: $owner, name: $repoName ) {
     pullRequest(number: $prNumber) {
-	  baseRefName
-      baseRepository {
-        name
-        url
-      }
-      number
-      headRefName
-      isDraft
-      author {
-        login
-      }
-      commits(last: 20) {
-        nodes {
-          commit {
-            oid
-          }
-        }
-      }
-      comments(last:50) {
-        nodes {
-          databaseId
-          body
-          author {
-            login
-          }
-        }
-      }
-      files(first: 100) {
-        nodes {
-          path
-        }
-      }
-      }
+     ` + prFieldQuery + `
+}}}`
+
+const prFieldQuery = `
+baseRefName
+baseRepository {
+  name
+  owner {
+    login
   }
-}`
+  url
+}
+number
+headRefName
+isDraft
+author {
+  login
+}
+commits(last: 20) {
+  nodes {
+    commit {
+      oid
+    }
+  }
+}
+comments(last:50) {
+  nodes {
+    databaseId
+    body
+    author {
+      login
+    }
+  }
+}
+files(first: 100) {
+  nodes {
+    path
+  }
+}
+`
 
 type gitPRRequest struct {
 	Query     string `json:"query,omitempty"`
@@ -138,6 +108,7 @@ type prRepo struct {
 		Login string `json:"login"`
 	} `json:"owner"`
 }
+
 type prCommit struct {
 	Commit struct {
 		Oid string `json:"oid"`

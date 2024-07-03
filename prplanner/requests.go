@@ -42,8 +42,7 @@ func (p *Planner) ensurePlanRequests(ctx context.Context, pr *pr, prModules []ty
 	for _, moduleName := range prModules {
 
 		// 1. Check if module has any pending plan request
-		var module *tfaplv1beta1.Module
-		err := p.ClusterClt.Get(ctx, moduleName, module)
+		module, err := sysutil.GetModule(ctx, p.ClusterClt, moduleName)
 		if err != nil {
 			p.Log.Error("unable to get module", "module", moduleName, "error", err)
 			continue
