@@ -6,7 +6,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 
@@ -19,19 +18,21 @@ func (p *Planner) startWebhook() {
 }
 
 func (p *Planner) handleWebhook(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Only POST method is allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
-		p.Log.Error("cannot read request body", err)
+		p.Log.Error("cannot read request body", "error", err)
+		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
 	if !p.isValidSignature(r, body, p.WebhookSecret) {
+		p.Log.Error("invalid signature", "error", err)
 		http.Error(w, "Wrong signature", http.StatusUnauthorized)
-		return
-	}
-
-	if r.Method != http.MethodPost {
-		http.Error(w, "Only POST method is allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
@@ -41,7 +42,9 @@ func (p *Planner) handleWebhook(w http.ResponseWriter, r *http.Request) {
 	// Parse the JSON payload
 	var payload GitHubWebhook
 	if err := json.Unmarshal(body, &payload); err != nil {
-		fmt.Println("cannot unmarshal json payload", err)
+		p.Log.Error("cannot unmarshal json payload", "error", err)
+		w.WriteHeader(http.StatusBadRequest)
+		return
 	}
 
 	// Verify event and action
@@ -56,6 +59,8 @@ func (p *Planner) handleWebhook(w http.ResponseWriter, r *http.Request) {
 
 	if event == "pull_request" && payload.Action == "closed" {
 		// TODO:clean-up: remove run from Redis
+		w.WriteHeader(http.StatusOK)
+		return
 	}
 
 	if event == "issue_comment" && payload.Action == "created" ||
