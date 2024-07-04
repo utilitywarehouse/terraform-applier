@@ -19,7 +19,7 @@ func (p *Planner) startWebhook() {
 
 func (p *Planner) handleWebhook(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, "Only POST method is allowed", http.StatusMethodNotAllowed)
+		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
@@ -32,7 +32,7 @@ func (p *Planner) handleWebhook(w http.ResponseWriter, r *http.Request) {
 
 	if !p.isValidSignature(r, body, p.WebhookSecret) {
 		p.Log.Error("invalid signature", "error", err)
-		http.Error(w, "Wrong signature", http.StatusUnauthorized)
+		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
