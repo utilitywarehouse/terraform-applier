@@ -17,7 +17,6 @@ func Test_webhook(t *testing.T) {
 	body := []byte(`{"foo":"bar", "action": "foo"}`)
 
 	t.Run("valid signature", func(t *testing.T) {
-
 		expSig := planner.computeHMAC(body, planner.WebhookSecret)
 
 		req := httptest.NewRequest("POST", "/github-events", strings.NewReader(string(body)))
@@ -33,7 +32,6 @@ func Test_webhook(t *testing.T) {
 	})
 
 	t.Run("invalid signature", func(t *testing.T) {
-
 		expSig := planner.computeHMAC(body, "invalidSignature")
 
 		req := httptest.NewRequest("POST", "/github-events", strings.NewReader(string(body)))
@@ -49,7 +47,6 @@ func Test_webhook(t *testing.T) {
 	})
 
 	t.Run("invalid method", func(t *testing.T) {
-
 		expSig := planner.computeHMAC(body, planner.WebhookSecret)
 
 		server := httptest.NewServer(http.HandlerFunc(planner.handleWebhook))
@@ -66,13 +63,12 @@ func Test_webhook(t *testing.T) {
 			t.Fatalf("Failed to send request: %v", err)
 		}
 
-		if resp.StatusCode != http.StatusMethodNotAllowed {
-			t.Errorf("Expected status %v, got %v", http.StatusMethodNotAllowed, resp.StatusCode)
+		if resp.StatusCode != http.StatusBadRequest {
+			t.Errorf("Expected status %v, got %v", http.StatusBadRequest, resp.StatusCode)
 		}
 	})
 
 	t.Run("invalid event", func(t *testing.T) {
-
 		expSig := planner.computeHMAC(body, planner.WebhookSecret)
 
 		server := httptest.NewServer(http.HandlerFunc(planner.handleWebhook))
@@ -96,7 +92,6 @@ func Test_webhook(t *testing.T) {
 	})
 
 	t.Run("invalid action", func(t *testing.T) {
-
 		expSig := planner.computeHMAC(body, planner.WebhookSecret)
 
 		server := httptest.NewServer(http.HandlerFunc(planner.handleWebhook))

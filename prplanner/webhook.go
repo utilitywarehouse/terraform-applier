@@ -114,7 +114,7 @@ func (p *Planner) computeHMAC(message []byte, secret string) string {
 	mac := hmac.New(sha256.New, []byte(secret))
 
 	if _, err := mac.Write(message); err != nil {
-		p.Log.Error("cannot compute hmac for request", err)
+		p.Log.Error("cannot compute hmac for request", "error", err)
 		return ""
 	}
 
