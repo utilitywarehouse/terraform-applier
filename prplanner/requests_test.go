@@ -9,7 +9,6 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
-	"github.com/utilitywarehouse/terraform-applier/api/v1beta1"
 	tfaplv1beta1 "github.com/utilitywarehouse/terraform-applier/api/v1beta1"
 	"github.com/utilitywarehouse/terraform-applier/git"
 	"github.com/utilitywarehouse/terraform-applier/sysutil"
@@ -623,7 +622,7 @@ func Test_isPlanOutputPostedForCommit(t *testing.T) {
 				}{Nodes: []prComment{
 					{
 						DatabaseID: 01234567,
-						Body:       runOutputMsg("foo/one", "foo/one", &v1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy."}),
+						Body:       runOutputMsg("foo/one", "foo/one", &tfaplv1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy."}),
 					},
 				}}},
 				commitID: "hash2",
@@ -639,7 +638,7 @@ func Test_isPlanOutputPostedForCommit(t *testing.T) {
 				}{Nodes: []prComment{
 					{
 						DatabaseID: 01234567,
-						Body:       runOutputMsg("one", "foo/one", &v1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy."}),
+						Body:       runOutputMsg("one", "foo/one", &tfaplv1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy."}),
 					},
 				}}},
 				commitID: "hash2",
