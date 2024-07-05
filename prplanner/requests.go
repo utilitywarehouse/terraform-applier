@@ -231,10 +231,10 @@ func (p *Planner) addNewRequest(module *tfaplv1beta1.Module, pr *pr, commitID st
 func (p *Planner) isModuleLimitReachedCommentPosted(prComments []prComment) bool {
 	p.Log.Debug("isModulesLimitReacehdCommentPosted()")
 	for _, comment := range prComments {
-		p.Log.Debug("comment", comment)
 		matches := moduleLimitReachedRegex.FindStringSubmatch(comment.Body)
 		if len(matches) == 1 {
 			p.Log.Debug("len(matches) == 1")
+			p.Log.Debug("comment matched", "comment", comment.Body)
 			return true
 		}
 	}
