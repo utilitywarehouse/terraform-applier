@@ -53,6 +53,10 @@ func (p *Planner) ensurePlanRequests(ctx context.Context, pr *pr, prModules []ty
 			continue
 		}
 
+		if module.Spec.PlanOnPR != nil && !*module.Spec.PlanOnPR {
+			continue
+		}
+
 		req, err := p.ensurePlanRequest(ctx, pr, module, skipCommitRun)
 		if err != nil {
 			p.Log.Error("unable to generate new plan request", "module", moduleName, "error", err)
