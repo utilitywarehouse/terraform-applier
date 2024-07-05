@@ -48,6 +48,8 @@ func (p *Planner) ensurePlanRequests(ctx context.Context, pr *pr, prModules []ty
 		}
 	}
 
+	p.Log.Debug("skipCommitRun", "true?", skipCommitRun)
+
 	for _, moduleName := range prModules {
 
 		// 1. Check if module has any pending plan request
