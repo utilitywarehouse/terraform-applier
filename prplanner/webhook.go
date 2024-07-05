@@ -76,6 +76,7 @@ func (p *Planner) handleWebhook(w http.ResponseWriter, r *http.Request) {
 }
 
 func (p *Planner) processPRWebHookEvent(event GitHubWebhook, prNumber int) {
+	p.Log.Debug("processPRWebHookEvent()", "pr", prNumber)
 	ctx := context.Background()
 
 	err := p.Repos.Mirror(ctx, event.Repository.URL)
