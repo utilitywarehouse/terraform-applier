@@ -37,7 +37,7 @@ func (p *Planner) ensurePlanRequests(ctx context.Context, pr *pr, prModules []ty
 	var skipCommitRun bool
 	p.Log.Debug("length of modules", "len", len(prModules))
 	if len(prModules) > 5 {
-		if p.isModuleLimitReachedCommentPosted(pr.Comments.Nodes) {
+		if !p.isModuleLimitReachedCommentPosted(pr.Comments.Nodes) {
 			comment := prComment{
 				Body: fmt.Sprintf(moduleLimitReachedTml),
 			}
