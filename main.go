@@ -268,7 +268,7 @@ var (
 		&cli.IntFlag{
 			Name:    "pr-planner-interval",
 			EnvVars: []string{"PR_PLANNER_INTERVAL"},
-			Value:   30,
+			Value:   300,
 			Usage:   "PR poll interval in seconds",
 		},
 		&cli.StringFlag{

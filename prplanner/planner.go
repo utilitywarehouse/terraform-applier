@@ -114,8 +114,22 @@ func (p *Planner) processPullRequest(ctx context.Context, pr *pr, kubeModuleList
 		return
 	}
 
+	var skipCommitRun bool
+	if len(prModules) > 5 {
+		skipCommitRun = true
+
+		// add limit msg comment if not already added
+		if !isModuleLimitReachedCommentPosted(pr.Comments.Nodes) {
+			comment := prComment{Body: moduleLimitReachedTml}
+			_, err := p.github.postComment(pr.BaseRepository.Owner.Login, pr.BaseRepository.Name, 0, pr.Number, comment)
+			if err != nil {
+				p.Log.Error("unable to post limit reached msg", "err", err)
+			}
+		}
+	}
+
 	// 1. ensure plan requests
-	p.ensurePlanRequests(ctx, pr, prModules)
+	p.ensurePlanRequests(ctx, pr, prModules, skipCommitRun)
 
 	p.uploadRequestOutput(ctx, pr)
 }

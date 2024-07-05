@@ -33,19 +33,8 @@ import (
 //     if yes:
 
 // 2. request run
-func (p *Planner) ensurePlanRequests(ctx context.Context, pr *pr, prModules []types.NamespacedName) {
-	var skipCommitRun bool
-	if len(prModules) > 5 && !p.isModuleLimitReachedCommentPosted(pr.Comments.Nodes) {
-		comment := prComment{
-			Body: moduleLimitReachedTml,
-		}
-		p.github.postComment(pr.BaseRepository.Owner.Login, pr.BaseRepository.Name, 0, pr.Number, comment)
-
-		skipCommitRun = true
-	}
-
+func (p *Planner) ensurePlanRequests(ctx context.Context, pr *pr, prModules []types.NamespacedName, skipCommitRun bool) {
 	for _, moduleName := range prModules {
-
 		// 1. Check if module has any pending plan request
 		module, err := sysutil.GetModule(ctx, p.ClusterClt, moduleName)
 		if err != nil {
@@ -228,15 +217,4 @@ func (p *Planner) addNewRequest(module *tfaplv1beta1.Module, pr *pr, commitID st
 	}
 
 	return req, nil
-}
-
-func (p *Planner) isModuleLimitReachedCommentPosted(prComments []prComment) bool {
-	for _, comment := range prComments {
-		matches := moduleLimitReachedRegex.FindStringSubmatch(comment.Body)
-		if len(matches) == 1 {
-			return true
-		}
-	}
-
-	return false
 }
