@@ -37,7 +37,7 @@ func (p *Planner) ensurePlanRequests(ctx context.Context, pr *pr, prModules []ty
 	var skipCommitRun bool
 	if len(prModules) > 5 && !p.isModuleLimitReachedCommentPosted(pr.Comments.Nodes) {
 		comment := prComment{
-			Body: fmt.Sprintf(moduleLimitReachedTml),
+			Body: moduleLimitReachedTml,
 		}
 		p.github.postComment(pr.BaseRepository.Owner.Login, pr.BaseRepository.Name, 0, pr.Number, comment)
 

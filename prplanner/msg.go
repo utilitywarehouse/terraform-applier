@@ -14,8 +14,8 @@ import (
 var (
 	planReqMsgRegex = regexp.MustCompile(`@terraform-applier plan ([\w'-]+\/?[\w'-]+)`)
 
-	moduleLimitReachedTml = "A limit of 5 modules per PR has been reached.\n" +
-		"Please post `@terraform-applier plan <module_name>` if you want to request terraform plan run"
+	moduleLimitReachedTml = "A limit of 5 modules per PR has been reached, hence auto plan is disabled for this PR.\n" +
+		"Please post `@terraform-applier plan <module_name>` as comment if you want to request terraform plan for a particular module."
 
 	moduleLimitReachedRegex = regexp.MustCompile("A limit of 5 modules per PR has been reached")
 
