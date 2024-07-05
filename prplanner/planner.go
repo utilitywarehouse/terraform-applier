@@ -53,7 +53,6 @@ func (p *Planner) Init(ctx context.Context, token string, ch <-chan *redis.Messa
 }
 
 func (p *Planner) StartPRPoll(ctx context.Context) {
-
 	ticker := time.NewTicker(p.Interval)
 	defer ticker.Stop()
 	for {
@@ -71,7 +70,7 @@ func (p *Planner) StartPRPoll(ctx context.Context) {
 
 				err := p.Repos.Mirror(ctx, repoConf.Remote)
 				if err != nil {
-					p.Log.Error("unable to mirror repository", "url", repoConf.Remote, "err", err)
+					p.Log.Error("unable to mirror repository", "url", repoConf.Remote, "error", err)
 					return
 				}
 

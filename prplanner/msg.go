@@ -14,6 +14,11 @@ import (
 var (
 	planReqMsgRegex = regexp.MustCompile(`@terraform-applier plan ([\w'-]+\/?[\w'-]+)`)
 
+	moduleLimitReachedTml = "A limit of 5 modules per PR has been reached.\n" +
+		"Please post `@terraform-applier plan <module_name>` if you want to request terraform plan run"
+
+	moduleLimitReachedRegex = regexp.MustCompile("A limit of 5 modules per PR has been reached")
+
 	requestAcknowledgedMsgTml = "Received terraform plan request\n" +
 		"```\n" +
 		"Module: %s\n" +
@@ -21,7 +26,7 @@ var (
 		"Commit ID: %s\n" +
 		"Requested At: %s\n" +
 		"```\n" +
-		"Do not edit this comment"
+		"Do not edit this comment. This message will be updated once the plan run is completed."
 
 	requestAcknowledgedMsgRegex = regexp.MustCompile(`Received terraform plan request\n\x60{3}\nModule: (.+)\nPath: (.+)\nCommit ID: (.+)\nRequested At: (.+)`)
 

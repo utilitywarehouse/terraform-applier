@@ -36,7 +36,13 @@ import (
 func (p *Planner) ensurePlanRequests(ctx context.Context, pr *pr, prModules []types.NamespacedName) {
 	var skipCommitRun bool
 	if len(prModules) > 5 {
-		skipCommitRun = true
+		if p.isModuleLimitReachedCommentPosted(pr.Comments.Nodes) {
+			comment := prComment{
+				Body: fmt.Sprintf(moduleLimitReachedTml),
+			}
+			p.github.postComment(pr.BaseRepository.Owner.Login, pr.BaseRepository.Name, 0, pr.Number, comment)
+			skipCommitRun = true
+		}
 	}
 
 	for _, moduleName := range prModules {
@@ -219,4 +225,15 @@ func (p *Planner) addNewRequest(module *tfaplv1beta1.Module, pr *pr, commitID st
 	}
 
 	return req, nil
+}
+
+func (p *Planner) isModuleLimitReachedCommentPosted(prComments []prComment) bool {
+	for _, comment := range prComments {
+		matches := moduleLimitReachedRegex.FindStringSubmatch(comment.Body)
+		if len(matches) == 1 {
+			return true
+		}
+	}
+
+	return false
 }
