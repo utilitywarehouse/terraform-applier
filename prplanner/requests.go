@@ -35,20 +35,14 @@ import (
 // 2. request run
 func (p *Planner) ensurePlanRequests(ctx context.Context, pr *pr, prModules []types.NamespacedName) {
 	var skipCommitRun bool
-	p.Log.Debug("length of modules", "len", len(prModules), "pr", pr.Number)
-	if len(prModules) > 5 {
-		p.Log.Debug("len modules > 5")
-		if !p.isModuleLimitReachedCommentPosted(pr.Comments.Nodes) {
-			p.Log.Debug("posting limit reached comment")
-			comment := prComment{
-				Body: fmt.Sprintf(moduleLimitReachedTml),
-			}
-			p.github.postComment(pr.BaseRepository.Owner.Login, pr.BaseRepository.Name, 0, pr.Number, comment)
-			skipCommitRun = true
+	if len(prModules) > 5 && !p.isModuleLimitReachedCommentPosted(pr.Comments.Nodes) {
+		comment := prComment{
+			Body: fmt.Sprintf(moduleLimitReachedTml),
 		}
-	}
+		p.github.postComment(pr.BaseRepository.Owner.Login, pr.BaseRepository.Name, 0, pr.Number, comment)
 
-	p.Log.Debug("skipCommitRun", "true?", skipCommitRun)
+		skipCommitRun = true
+	}
 
 	for _, moduleName := range prModules {
 
@@ -233,12 +227,9 @@ func (p *Planner) addNewRequest(module *tfaplv1beta1.Module, pr *pr, commitID st
 }
 
 func (p *Planner) isModuleLimitReachedCommentPosted(prComments []prComment) bool {
-	p.Log.Debug("isModulesLimitReacehdCommentPosted()")
 	for _, comment := range prComments {
 		matches := moduleLimitReachedRegex.FindStringSubmatch(comment.Body)
 		if len(matches) == 1 {
-			p.Log.Debug("len(matches) == 1")
-			p.Log.Debug("comment matched", "comment", comment.Body)
 			return true
 		}
 	}
