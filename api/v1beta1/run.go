@@ -104,7 +104,8 @@ func (req *Request) IsPlanOnly(module *Module) bool {
 	return true
 }
 
-// IsPlanOnly will return is req is plan-only
+// SkipStatusUpdate will return if run info/stats needs to be added to CRD
+// and stored in etcd
 func (req *Request) SkipStatusUpdate() bool {
 	return req.Type == PRPlan
 }

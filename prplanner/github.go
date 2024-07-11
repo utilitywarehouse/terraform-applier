@@ -123,7 +123,10 @@ func (gc *gitHubClient) postComment(repoOwner, repoName string, commentID, prNum
 	if err != nil {
 		return 0, fmt.Errorf("error sending HTTP request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		io.Copy(io.Discard, resp.Body)
+		resp.Body.Close()
+	}()
 
 	// Check the response status
 	if resp.StatusCode != 200 && resp.StatusCode != 201 {
