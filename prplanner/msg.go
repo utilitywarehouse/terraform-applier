@@ -109,11 +109,9 @@ func parseNamespaceName(str string) types.NamespacedName {
 
 func isModuleLimitReachedCommentPosted(prComments []prComment) bool {
 	for _, comment := range prComments {
-		matches := moduleLimitReachedRegex.FindStringSubmatch(comment.Body)
-		if len(matches) == 1 {
+		if moduleLimitReachedRegex.MatchString(comment.Body) {
 			return true
 		}
 	}
-
 	return false
 }
