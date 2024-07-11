@@ -171,28 +171,12 @@ To enable that, terraform-applier does the following:
 
 1. Receives a webhook from Github notifying about a change in open Pull Requests e.g. new PR created, new commit pushed, new comment posted, etc.
 2. Requests more information from Github about the PR: list of commits, comments, files updated, etc.
-3. If plan run needs to be executed due to new commit or user request via comments (`@terraform-applier plan <module name>`, the request gets verified and forwarded to the Terraform Runner
+3. If plan run needs to be executed due to new commit or user request via comments e.g. `@terraform-applier plan <module name>`, the request gets verified and forwarded to the Terraform Runner
 4. The run output gets posted to the PR comments as soon as run is finished and stored in Redis
 
 Apart from listening to webhooks terraform-applier also runs polling jobs at a set interval (every 10 minutes by default). These jobs help making sure no webhooks were missed and there are no outstanding requests.
 
 PR Planner feature is enabled by default, but can be disabled either for a specific module by setting `planOnPR` to `false` in the module spec, or by setting `DISABLE_PR_PLANNER` env var to `false` to be disabled entirely across all modules.
-
-PR Planner config:
-
-- `--disable-pr-planner (DISABLE_PR_PLANNER)` - (default: `false`) Disable PR planner feature across all modules
-- `--pr-planner-interval (PR_PLANNER_INTERVAL)` - (default: `300`) The inverval at which terraform-applier polls Github for any open PRs.
-- `--pr-planner-webhook-port (PR_PLANNER_WEBHOOK_PORT)` - (default: `":8083"`) Port to listen to for incoming Github webhooks
-- `--github-token (GITHUB_TOKEN)` - (default: `""`) Github API personal access token that allows requesting information about open Pull Requests and post comments to these PRs.  
-  Example permissions: `Read` access to metadata and contents, `Read and Write` access to issues, and pull requests.
-- `--github-webhook-secret (GITHUB_WEBHOOK_SECRET)` - (default: `""`) User-defined secret that will be used to sign and authorise the incoming webhooks.  
-  Example Github webhook settings:
-  - Payload URL: `https://teerraform-applier.foo.bar/github-events`
-  - Content Type: `application/json`
-  - Secret: `<GITHUB_WEBHOOK_SECRET>`
-  - Enable SSL verification: `true`
-  - Events: `Issue comments`, `Pull requests`
-  - Active: `true`
 
 ### Controller config
 
@@ -215,6 +199,22 @@ PR Planner config:
 - `--git-verify-known-hosts (GIT_VERIFY_KNOWN_HOSTS)` - (default: `true`) The local path to the known hosts file used to setup GIT_SSH_COMMAND env.
 - `--controller-runtime-env (CONTROLLER_RUNTIME_ENV)` - (default: `""`) The comma separated list of ENVs which will be passed from controller to all terraform run process. The envs should be set on the controller.
 - `--cleanup-temp-dir` - (default: `false`) If set, the contents of the OS temporary directory and `/src` will be removed. This can help removing redundant terraform binaries and avoiding the directories growing in size with every restart.
+
+---
+
+- `--disable-pr-planner (DISABLE_PR_PLANNER)` - (default: `false`) Disable PR planner feature across all modules
+- `--pr-planner-interval (PR_PLANNER_INTERVAL)` - (default: `300`) The inverval at which terraform-applier polls Github for any open PRs.
+- `--pr-planner-webhook-port (PR_PLANNER_WEBHOOK_PORT)` - (default: `":8083"`) Port to listen to for incoming Github webhooks
+- `--github-token (GITHUB_TOKEN)` - (default: `""`) Github API personal access token that allows requesting information about open Pull Requests and post comments to these PRs.  
+  Example permissions: `Read` access to metadata and contents, `Read and Write` access to issues, and pull requests.
+- `--github-webhook-secret (GITHUB_WEBHOOK_SECRET)` - (default: `""`) User-defined secret that will be used to sign and authorise the incoming webhooks.  
+  Example Github webhook settings:
+  - Payload URL: `https://teerraform-applier.foo.bar/github-events`
+  - Content Type: `application/json`
+  - Secret: `<GITHUB_WEBHOOK_SECRET>`
+  - Enable SSL verification: `true`
+  - Events: `Issue comments`, `Pull requests`
+  - Active: `true`
 
 ---
 

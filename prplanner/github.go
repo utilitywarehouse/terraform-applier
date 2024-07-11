@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 )
@@ -60,7 +61,7 @@ func (gc *gitHubClient) PR(ctx context.Context, repoOwner, repoName string, prNu
 func (gc *gitHubClient) query(ctx context.Context, q gitPRRequest, result any) error {
 	payload, err := json.Marshal(q)
 	if err != nil {
-		return fmt.Errorf("error marshalling PR query err:%w", err)
+		return err
 	}
 
 	// Create a new HTTP request
@@ -78,7 +79,10 @@ func (gc *gitHubClient) query(ctx context.Context, q gitPRRequest, result any) e
 	if err != nil {
 		return fmt.Errorf("error sending HTTP request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		io.Copy(io.Discard, resp.Body)
+		resp.Body.Close()
+	}()
 
 	// Check the response status
 	if resp.StatusCode != 200 && resp.StatusCode != 201 {

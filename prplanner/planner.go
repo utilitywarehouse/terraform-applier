@@ -36,7 +36,7 @@ func (p *Planner) Init(ctx context.Context, token string, ch <-chan *redis.Messa
 	p.github = &gitHubClient{
 		rootURL: "https://api.github.com",
 		http: &http.Client{
-			Timeout: 3 * time.Minute,
+			Timeout: 15 * time.Second,
 		},
 		token: token,
 	}
