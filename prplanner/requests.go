@@ -20,7 +20,7 @@ func (p *Planner) ensurePlanRequests(ctx context.Context, pr *pr, prModules []ty
 			continue
 		}
 
-		if module.Spec.PlanOnPR == nil && !*module.Spec.PlanOnPR {
+		if module.Spec.PlanOnPR == nil || !*module.Spec.PlanOnPR {
 			continue
 		}
 
