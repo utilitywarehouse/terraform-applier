@@ -115,6 +115,11 @@ type ModuleSpec struct {
 	// +optional
 	PlanOnly *bool `json:"planOnly,omitempty"`
 
+	// if PlanOnPR is true, plan-on-pr feature will be enabled for this module
+	// +optional
+	// +kubebuilder:default=true
+	PlanOnPR *bool `json:"planOnPR,omitempty"`
+
 	// List of backend config attributes passed to the Terraform init
 	// for terraform backend configuration
 	// +optional

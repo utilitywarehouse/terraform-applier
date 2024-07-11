@@ -26,6 +26,7 @@ import (
 	"github.com/utilitywarehouse/git-mirror/pkg/mirror"
 	"github.com/utilitywarehouse/terraform-applier/git"
 	"github.com/utilitywarehouse/terraform-applier/metrics"
+	"github.com/utilitywarehouse/terraform-applier/prplanner"
 	"github.com/utilitywarehouse/terraform-applier/runner"
 	"github.com/utilitywarehouse/terraform-applier/sysutil"
 	"github.com/utilitywarehouse/terraform-applier/vault"
@@ -258,6 +259,34 @@ var (
 			Value:   false,
 			Usage:   "disable plugin cache created / reconciler",
 		},
+		&cli.BoolFlag{
+			Name:    "disable-pr-planner",
+			EnvVars: []string{"DISABLE_PR_PLANNER"},
+			Value:   false,
+			Usage:   "disable plan on PR feature",
+		},
+		&cli.IntFlag{
+			Name:    "pr-planner-interval",
+			EnvVars: []string{"PR_PLANNER_INTERVAL"},
+			Value:   300,
+			Usage:   "PR poll interval in seconds",
+		},
+		&cli.StringFlag{
+			Name:    "pr-planner-webhook-port",
+			EnvVars: []string{"PR_PLANNER_WEBHOOK_PORT"},
+			Value:   ":8083",
+			Usage:   "port used to receive Github webhooks",
+		},
+		&cli.StringFlag{
+			Name:    "github-token",
+			EnvVars: []string{"GITHUB_TOKEN"},
+			Usage:   "provide GH API token with write to PR access",
+		},
+		&cli.StringFlag{
+			Name:    "github-webhook-secret",
+			EnvVars: []string{"GITHUB_WEBHOOK_SECRET"},
+			Usage:   "used to sign and authorise GH webhooks",
+		},
 	}
 )
 
@@ -298,7 +327,6 @@ func validate(c *cli.Context) {
 	logger.Info("config", "selectorLabel", fmt.Sprintf("%s:%s", labelSelectorKey, labelSelectorValue))
 	logger.Info("config", "minIntervalBetweenRunsDuration", c.Int("min-interval-between-runs"))
 	logger.Info("config", "terminationGracePeriodDuration", c.Int("termination-grace-period"))
-
 }
 
 // findTerraformExecPath will find the terraform binary to use based on the
@@ -381,7 +409,6 @@ func generateElectionID(salt, labelSelectorKey, labelSelectorValue string, watch
 }
 
 func setupGlobalEnv(c *cli.Context) {
-
 	globalRunEnv = make(map[string]string)
 
 	// terraform depends on git for pulling remote modules
@@ -430,7 +457,6 @@ preferences: {}
 		logger.Error("unable to create custom in cluster config file", "err", err)
 		os.Exit(1)
 	}
-
 }
 
 // since /tmp will be mounted on PV we need to do manual clean up
@@ -541,7 +567,7 @@ func run(c *cli.Context) {
 	// perform 1st mirror to ensure all repositories before starting controller
 	// initial mirror might take longer
 	timeout := 2 * conf.GitMirror.Defaults.MirrorTimeout
-	if err := repos.Mirror(ctx, timeout); err != nil {
+	if err := repos.MirrorAll(ctx, timeout); err != nil {
 		logger.Error("could not perform initial repositories mirror", "err", err)
 		os.Exit(1)
 	}
@@ -704,9 +730,45 @@ func run(c *cli.Context) {
 		}
 	}()
 
+	if !c.Bool("disable-pr-planner") {
+		prPlanner := &prplanner.Planner{
+			ListenAddress: c.String("pr-planner-webhook-port"),
+			WebhookSecret: c.String("github-webhook-secret"),
+			GitMirror:     conf.GitMirror,
+			Interval:      time.Duration(c.Int("pr-planner-interval")) * time.Second,
+			ClusterClt:    mgr.GetClient(),
+			Repos:         repos,
+			RedisClient:   sysutil.Redis{Client: rdb},
+			Runner:        &runner,
+			Log:           logger.With("logger", "pr-planner"),
+		}
+
+		// setup  Key event notifications for 'String' commands
+		// K     Keyspace events, published with __keyspace@<db>__ prefix.
+		// E     Keyevent events, published with __keyevent@<db>__ prefix.
+		// $     String commands
+		err := rdb.ConfigSet(ctx, "notify-keyspace-events", "E$").Err()
+		if err != nil {
+			logger.Error("unable to set notify-keyspace-events config", "error", err)
+			os.Exit(1)
+		}
+
+		// setup subscription for key set
+		sub := rdb.Subscribe(ctx, "__keyevent@0__:set")
+		_, err = sub.Receive(ctx)
+		if err != nil {
+			logger.Error("unable to confirm redis subscription for key update", "error", err)
+			os.Exit(1)
+		}
+
+		err = prPlanner.Init(ctx, c.String("github-token"), sub.Channel())
+		if err != nil {
+			logger.Error("unable to init pr planner", "err", err)
+		}
+	}
+
 	logger.Info("starting manager")
 	if err := mgr.Start(ctx); err != nil {
 		logger.Error("problem running manager", "err", err)
 	}
-
 }
