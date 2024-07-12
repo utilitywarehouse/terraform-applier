@@ -370,11 +370,6 @@ spec:
                       type: array
                   type: object
                 type: array
-              repoName:
-                description: |-
-                  Name of the repository containing Terraform module directory.
-                  Deprecated will be removed in next version
-                type: string
               repoRef:
                 default: HEAD
                 description: |-
@@ -554,6 +549,7 @@ spec:
                 type: object
             required:
             - path
+            - repoURL
             type: object
           status:
             description: ModuleStatus defines the observed state of Module
@@ -593,17 +589,6 @@ spec:
                 description: ObservedGeneration is the last reconciled generation.
                 format: int64
                 type: integer
-              runCommitHash:
-                description: |-
-                  RunCommitHash is the hash of git commit of last run.
-                  Deprecated will be removed in next version
-                type: string
-              runStartedAt:
-                description: |-
-                  Information when was the last time the run was started.
-                  Deprecated will be removed in next version
-                format: date-time
-                type: string
               runType:
                 description: LastRunType is a short description of the kind of terraform
                   run that was attempted.

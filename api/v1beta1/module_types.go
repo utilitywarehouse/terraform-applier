@@ -89,13 +89,7 @@ type ModuleSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	// Name of the repository containing Terraform module directory.
-	// Deprecated will be removed in next version
-	// +optional
-	RepoName string `json:"repoName"`
-
 	// URL to the repository containing Terraform module source code.
-	// +optional
 	RepoURL string `json:"repoURL"`
 
 	// The RepoRef specifies the revision of the repository for the module source code.
@@ -208,16 +202,6 @@ type ModuleStatus struct {
 	// LastAppliedCommitHash is the hash of git commit of last successful apply.
 	// +optional
 	LastAppliedCommitHash string `json:"lastAppliedCommitHash,omitempty"`
-
-	// Information when was the last time the run was started.
-	// Deprecated will be removed in next version
-	// +optional
-	RunStartedAt *metav1.Time `json:"runStartedAt,omitempty"`
-
-	// RunCommitHash is the hash of git commit of last run.
-	// Deprecated will be removed in next version
-	// +optional
-	RunCommitHash string `json:"runCommitHash,omitempty"`
 }
 
 //+kubebuilder:object:root=true

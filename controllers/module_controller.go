@@ -88,25 +88,6 @@ func (r *ModuleReconciler) Reconcile(ctx context.Context, req reconcile.Request)
 		return ctrl.Result{}, nil
 	}
 
-	// verify repoURL exists
-	// this step is required as for migration we have kept repoURL as optional
-	if module.Spec.RepoURL == "" {
-		msg := fmt.Sprintf("repoURL is required, please add repoURL instead of repoName:%s", module.Spec.RepoName)
-		log.Error(msg)
-		r.setFailedStatus(req, module, tfaplv1beta1.ReasonSpecsParsingFailure, msg)
-		// we don't really care about requeuing until we get an update that
-		// fixes the repoURL, so don't return an error
-		return ctrl.Result{}, nil
-	}
-	// copy value form old Deprecated field to new field
-	// not required after first run
-	if module.Status.LastDefaultRunStartedAt.IsZero() {
-		module.Status.LastDefaultRunStartedAt = module.Status.RunStartedAt
-	}
-	if module.Status.LastDefaultRunCommitHash == "" {
-		module.Status.LastDefaultRunCommitHash = module.Status.RunCommitHash
-	}
-
 	// pollIntervalDuration is used as minimum duration for re-queue
 	pollIntervalDuration := time.Duration(module.Spec.PollInterval) * time.Second
 
