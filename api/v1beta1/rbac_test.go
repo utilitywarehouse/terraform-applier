@@ -17,7 +17,7 @@ func TestCanForceRun(t *testing.T) {
 			"no rbac",
 			args{
 				"u1", []string{"group1", "group2"},
-				&Module{Spec: ModuleSpec{RepoName: "test"}},
+				&Module{Spec: ModuleSpec{RepoURL: "test"}},
 			},
 			false,
 		}, {
