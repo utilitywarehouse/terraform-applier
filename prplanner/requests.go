@@ -20,7 +20,9 @@ func (p *Planner) ensurePlanRequests(ctx context.Context, pr *pr, prModules []ty
 			continue
 		}
 
-		if module.Spec.PlanOnPR == nil || !*module.Spec.PlanOnPR {
+		// TODO: Verify this
+		// We need to skip module only if planOnPR was explicitly disabled
+		if module.Spec.PlanOnPR != nil && *module.Spec.PlanOnPR == false {
 			continue
 		}
 
@@ -68,11 +70,11 @@ func (p *Planner) checkPRCommits(ctx context.Context, pr *pr, module *tfaplv1bet
 		}
 
 		// check if we have already processed (uploaded output) this commit
-		if isPlanOutputPostedForCommit(pr, commit.Oid, module.NamespacedName()) {
+		if isPlanOutputPostedForCommit(pr, commit.Oid, module.Spec.Path, module.NamespacedName()) {
 			return nil, nil
 		}
 
-		if isPlanRequestAckPostedForCommit(pr, commit.Oid, module.NamespacedName()) {
+		if isPlanRequestAckPostedForCommit(pr, commit.Oid, module.Spec.Path, module.NamespacedName()) {
 			return nil, nil
 		}
 
@@ -109,24 +111,25 @@ func (p *Planner) checkPRCommentsForPlanRequests(pr *pr, module *tfaplv1beta1.Mo
 		comment := pr.Comments.Nodes[i]
 
 		// Skip if request already acknowledged for module
-		commentModule, _, _, reqAt := parseRequestAcknowledgedMsg(comment.Body)
-		if commentModule == module.NamespacedName() &&
+		commentModule, commentPath, _, reqAt := parseRequestAcknowledgedMsg(comment.Body)
+		if commentModule == module.NamespacedName() && commentPath == module.Spec.Path &&
 			reqAt != nil && time.Until(*reqAt) < 10*time.Minute {
 			return nil, nil
 		}
 
 		// Skip if terraform plan output is already posted
-		commentModule, _ = parseRunOutputMsg(comment.Body)
-		if commentModule == module.NamespacedName() {
+		commentModule, commentPath, _ = parseRunOutputMsg(comment.Body)
+		if commentModule == module.NamespacedName() && commentPath == module.Spec.Path {
 			return nil, nil
 		}
 
 		// Check if user requested terraform plan run
 		// '@terraform-applier plan [<module namespace>]/<module name>'
-		commentModule = parsePlanReqMsg(comment.Body)
-		if commentModule.Name != module.Name {
+		commentPath = parsePlanReqMsg(comment.Body)
+		if commentPath != module.Spec.Path {
 			continue
 		}
+
 		// commented module's namespace needs to match as well if its given by user
 		if commentModule.Namespace != "" && commentModule.Namespace != module.Namespace {
 			continue
@@ -146,12 +149,12 @@ func (p *Planner) checkPRCommentsForPlanRequests(pr *pr, module *tfaplv1beta1.Mo
 
 // isPlanOutputPostedForCommit loops through all the comments to check if given commit
 // ids plan output is already posted
-func isPlanOutputPostedForCommit(pr *pr, commitID string, module types.NamespacedName) bool {
+func isPlanOutputPostedForCommit(pr *pr, commitID, modulePath string, module types.NamespacedName) bool {
 	for i := len(pr.Comments.Nodes) - 1; i >= 0; i-- {
 		comment := pr.Comments.Nodes[i]
 
-		commentModule, commentCommitID := parseRunOutputMsg(comment.Body)
-		if commentModule == module && commentCommitID == commitID {
+		commentModule, commentPath, commentCommitID := parseRunOutputMsg(comment.Body)
+		if commentModule == module && commentPath == modulePath && commentCommitID == commitID {
 			return true
 		}
 	}
@@ -161,12 +164,13 @@ func isPlanOutputPostedForCommit(pr *pr, commitID string, module types.Namespace
 
 // isPlanRequestAckPostedForCommit loops through all the comments to check if given commit
 // ids plan request is already acknowledged
-func isPlanRequestAckPostedForCommit(pr *pr, commitID string, module types.NamespacedName) bool {
+func isPlanRequestAckPostedForCommit(pr *pr, commitID, modulePath string, module types.NamespacedName) bool {
 	for i := len(pr.Comments.Nodes) - 1; i >= 0; i-- {
 		comment := pr.Comments.Nodes[i]
 
-		commentModule, _, commentCommitID, reqAt := parseRequestAcknowledgedMsg(comment.Body)
+		commentModule, commentPath, commentCommitID, reqAt := parseRequestAcknowledgedMsg(comment.Body)
 		if commentModule == module &&
+			commentPath == modulePath &&
 			commentCommitID == commitID &&
 			reqAt != nil && time.Until(*reqAt) > -10*time.Minute && time.Until(*reqAt) < time.Minute {
 			return true

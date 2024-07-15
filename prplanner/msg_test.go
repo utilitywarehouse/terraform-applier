@@ -16,71 +16,77 @@ func Test_parsePlanReqMsg(t *testing.T) {
 		commentBody string
 	}
 	tests := []struct {
-		name string
-		args args
-		want types.NamespacedName
+		name          string
+		args          args
+		wantNamespace types.NamespacedName
+		wantPath      string
 	}{
 		{
-			name: "Namespace and Name",
-			args: args{commentBody: "@terraform-applier plan foo/one"},
-			want: types.NamespacedName{Namespace: "foo", Name: "one"},
+			name:     "Correct path given",
+			args:     args{commentBody: "@terraform-applier plan foo/one"},
+			wantPath: "foo/one",
 		},
 		{
-			name: "Namespace and Name",
-			args: args{commentBody: "@terraform-applier plan foo/two\n@terraform-applier plan foo/one"},
-			want: types.NamespacedName{Namespace: "foo", Name: "two"},
+			name:     "Request made twice",
+			args:     args{commentBody: "@terraform-applier plan foo/one\n@terraform-applier plan foo/baz"},
+			wantPath: "foo/one",
 		},
 		{
-			name: "Name only",
-			args: args{commentBody: "@terraform-applier plan one"},
-			want: types.NamespacedName{Name: "one"},
+			name:     "Name only",
+			args:     args{commentBody: "@terraform-applier plan one"},
+			wantPath: "",
 		},
 		{
-			name: "Empty string",
-			args: args{commentBody: ""},
-			want: types.NamespacedName{},
+			name:     "Empty string",
+			args:     args{commentBody: ""},
+			wantPath: "",
 		},
 		{
-			name: "Multiple slashes",
-			args: args{commentBody: "foo/one/extra"},
-			want: types.NamespacedName{},
+			name:     "Too many slashes",
+			args:     args{commentBody: "foo/one/baz"},
+			wantPath: "",
 		},
 		{
-			name: "Leading slash",
-			args: args{commentBody: "/one"},
-			want: types.NamespacedName{},
+			name:     "Leading slash",
+			args:     args{commentBody: "/one"},
+			wantPath: "",
 		},
 		{
-			name: "Trailing slash",
-			args: args{commentBody: "foo/"},
-			want: types.NamespacedName{},
+			name:     "Trailing slash",
+			args:     args{commentBody: "foo/"},
+			wantPath: "",
 		},
 		{
-			name: "do not trigger plan on module limit comment",
-			args: args{commentBody: moduleLimitReachedTml},
-			want: types.NamespacedName{},
-		}, {
-			name: "do not trigger plan on our module request Acknowledged Msg",
-			args: args{commentBody: requestAcknowledgedMsg("foo/one", "path/to/module/one", "hash1", mustParseMetaTime("2006-01-02T15:04:05+07:00"))},
-			want: types.NamespacedName{},
-		}, {
-			name: "do not trigger plan on our module run Output Msg",
-			args: args{commentBody: runOutputMsg("foo/one", "foo/one", &v1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy."})},
-			want: types.NamespacedName{},
-		}, {
-			name: "with surrounding `",
-			args: args{commentBody: "`@terraform-applier plan foo-bar/one`"},
-			want: types.NamespacedName{Namespace: "foo-bar", Name: "one"},
-		}, {
-			name: "with ` surrounding only name",
-			args: args{commentBody: "@terraform-applier plan `foo_bar/one`"},
-			want: types.NamespacedName{Namespace: "foo_bar", Name: "one"},
+			name:     "do not trigger plan on module limit comment",
+			args:     args{commentBody: moduleLimitReachedTml},
+			wantPath: "",
+		},
+		{
+			name:     "do not trigger plan on our module request Acknowledged Msg",
+			args:     args{commentBody: requestAcknowledgedMsg("foo/one", "path/to/module/one", "hash1", mustParseMetaTime("2006-01-02T15:04:05+07:00"))},
+			wantPath: "",
+		},
+		{
+			name:     "do not trigger plan on our module run Output Msg",
+			args:     args{commentBody: runOutputMsg("foo/one", "foo/one", &v1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy."})},
+			wantPath: "",
+		},
+		{
+			name:     "with surrounding `",
+			args:     args{commentBody: "`@terraform-applier plan foo-baz/one`"},
+			wantPath: "foo-baz/one",
+		},
+		{
+			name:     "with ` surrounding only name",
+			args:     args{commentBody: "@terraform-applier plan `foo_bar/one`"},
+			wantPath: "foo_bar/one",
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := parsePlanReqMsg(tt.args.commentBody); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("parsePlanReqMsg() = %v, want %v", got, tt.want)
+			gotPath := parsePlanReqMsg(tt.args.commentBody)
+			if !reflect.DeepEqual(gotPath, tt.wantPath) {
+				t.Errorf("parsePlanReqMsg() = %v, wantPath %v", gotPath, tt.wantPath)
 			}
 		})
 	}
@@ -177,50 +183,81 @@ func Test_parseRunOutputMsg(t *testing.T) {
 		name       string
 		args       args
 		wantModule types.NamespacedName
+		wantPath   string
 		wantCommit string
 	}{
 		{
 			name:       "NamespaceName + Commit ID",
-			args:       args{comment: runOutputMsg("foo/one", "foo/one", &v1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy."})},
-			wantModule: types.NamespacedName{Namespace: "foo", Name: "one"},
+			args:       args{comment: runOutputMsg("baz/one", "foo/one", &v1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy."})},
+			wantModule: types.NamespacedName{Namespace: "baz", Name: "one"},
+			wantPath:   "foo/one",
 			wantCommit: "hash2",
 		},
 		{
-			name:       "NamespaceName only",
+			name:       "Module Name only",
 			args:       args{comment: runOutputMsg("one", "foo/one", &v1beta1.Run{Summary: "Plan: x to add, x to change, x to destroy."})},
 			wantModule: types.NamespacedName{},
+			wantPath:   "",
 			wantCommit: "",
 		},
 		{
-			name:       "missing name",
+			name:       "Module Name missing",
 			args:       args{comment: runOutputMsg("", "foo/one", &v1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy."})},
 			wantModule: types.NamespacedName{},
+			wantPath:   "",
 			wantCommit: "",
 		},
 		{
-			name:       "Name + Commit ID",
+			name:       "Module Name + Commit ID",
 			args:       args{comment: runOutputMsg("one", "foo/one", &v1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy."})},
 			wantModule: types.NamespacedName{Name: "one"},
+			wantPath:   "foo/one",
+			wantCommit: "hash2",
+		},
+		{
+			name:       "Path cluster only",
+			args:       args{comment: runOutputMsg("baz/one", "foo/", &v1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy."})},
+			wantModule: types.NamespacedName{Namespace: "baz", Name: "one"},
+			wantPath:   "foo/",
+			wantCommit: "hash2",
+		},
+		{
+			name:       "Path Module Name only",
+			args:       args{comment: runOutputMsg("baz/one", "/one", &v1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy."})},
+			wantModule: types.NamespacedName{Namespace: "baz", Name: "one"},
+			wantPath:   "/one",
+			wantCommit: "hash2",
+		},
+		{
+			name:       "Path one word only",
+			args:       args{comment: runOutputMsg("baz/one", "one", &v1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy."})},
+			wantModule: types.NamespacedName{Namespace: "baz", Name: "one"},
+			wantPath:   "one",
 			wantCommit: "hash2",
 		},
 		{
 			name:       "@terraform-applier plan only",
 			args:       args{comment: "@terraform-applier plan"},
 			wantModule: types.NamespacedName{},
+			wantPath:   "",
 			wantCommit: "",
 		},
 		{
 			name:       "Empty string",
 			args:       args{comment: ""},
 			wantModule: types.NamespacedName{},
+			wantPath:   "",
 			wantCommit: "",
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gotModule, gotCommit := parseRunOutputMsg(tt.args.comment)
+			gotModule, gotPath, gotCommit := parseRunOutputMsg(tt.args.comment)
 			if !reflect.DeepEqual(gotModule, tt.wantModule) {
 				t.Errorf("parseRunOutputMsg() gotModule = %v, want %v", gotModule, tt.wantModule)
+			}
+			if gotPath != tt.wantPath {
+				t.Errorf("parseRunOutputMsg() gotPath = %v, want %v", gotPath, tt.wantPath)
 			}
 			if gotCommit != tt.wantCommit {
 				t.Errorf("parseRunOutputMsg() gotCommit = %v, want %v", gotCommit, tt.wantCommit)

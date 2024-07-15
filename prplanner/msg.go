@@ -44,18 +44,22 @@ var (
 	runOutputMsgRegex = regexp.MustCompile(`Terraform plan output for\n\x60{3}\nModule: (.+)\nPath: (.+)\nCommit ID: (.+)\n`)
 )
 
-func parsePlanReqMsg(commentBody string) types.NamespacedName {
+func parsePlanReqMsg(commentBody string) string {
 	matches := planReqMsgRegex.FindStringSubmatch(commentBody)
 
 	if len(matches) == 2 && matches[1] != "" {
-		return parseNamespaceName(matches[1])
+		cluster, name := parsePath(matches[1])
+		if cluster != "" && name != "" {
+			path := cluster + "/" + name
+			return path
+		}
 	}
 
-	return types.NamespacedName{}
+	return ""
 }
 
 func requestAcknowledgedMsg(module, path, commitID string, reqAt *metav1.Time) string {
-	return fmt.Sprintf(requestAcknowledgedMsgTml, module, path, commitID, reqAt.Format(time.RFC3339), module)
+	return fmt.Sprintf(requestAcknowledgedMsgTml, module, path, commitID, reqAt.Format(time.RFC3339), path)
 }
 
 func parseRequestAcknowledgedMsg(commentBody string) (types.NamespacedName, string, string, *time.Time) {
@@ -71,13 +75,13 @@ func parseRequestAcknowledgedMsg(commentBody string) (types.NamespacedName, stri
 	return types.NamespacedName{}, "", "", nil
 }
 
-func parseRunOutputMsg(comment string) (module types.NamespacedName, commit string) {
+func parseRunOutputMsg(comment string) (module types.NamespacedName, path string, commit string) {
 	matches := runOutputMsgRegex.FindStringSubmatch(comment)
 	if len(matches) == 4 {
-		return parseNamespaceName(matches[1]), matches[3]
+		return parseNamespaceName(matches[1]), matches[2], matches[3]
 	}
 
-	return types.NamespacedName{}, ""
+	return types.NamespacedName{}, "", ""
 }
 
 func runOutputMsg(module, path string, run *v1beta1.Run) string {
@@ -91,11 +95,22 @@ func runOutputMsg(module, path string, run *v1beta1.Run) string {
 			"The output is truncated from the top.\n" + string(runes[characterLimit:])
 	}
 
-	return fmt.Sprintf(runOutputMsgTml, module, path, run.CommitHash, run.Status, run.Summary, runOutput, module)
+	return fmt.Sprintf(runOutputMsgTml, module, path, run.CommitHash, run.Status, run.Summary, runOutput, path)
+}
+
+func parsePath(str string) (string, string) {
+	path := strings.Split(str, "/")
+
+	if len(path) == 2 {
+		return path[0], path[1]
+	}
+
+	return "", ""
 }
 
 func parseNamespaceName(str string) types.NamespacedName {
 	namespacedName := strings.Split(str, "/")
+
 	if len(namespacedName) == 2 {
 		return types.NamespacedName{Namespace: namespacedName[0], Name: namespacedName[1]}
 	}
