@@ -16,77 +16,87 @@ func Test_parsePlanReqMsg(t *testing.T) {
 		commentBody string
 	}
 	tests := []struct {
-		name          string
-		args          args
-		wantNamespace types.NamespacedName
-		wantPath      string
+		name                 string
+		args                 args
+		wantNamespace        types.NamespacedName
+		wantModuleNameOrPath string
 	}{
 		{
-			name:     "Correct path given",
-			args:     args{commentBody: "@terraform-applier plan foo/one"},
-			wantPath: "foo/one",
+			name:                 "Correct path given",
+			args:                 args{commentBody: "@terraform-applier plan foo/one"},
+			wantModuleNameOrPath: "foo/one",
 		},
 		{
-			name:     "Request made twice",
-			args:     args{commentBody: "@terraform-applier plan foo/one\n@terraform-applier plan foo/baz"},
-			wantPath: "foo/one",
+			name:                 "relative path with dot",
+			args:                 args{commentBody: "@terraform-applier plan ./foo/one"},
+			wantModuleNameOrPath: "./foo/one",
 		},
 		{
-			name:     "Name only",
-			args:     args{commentBody: "@terraform-applier plan one"},
-			wantPath: "",
+			name:                 "Request made twice",
+			args:                 args{commentBody: "@terraform-applier plan foo/one\n@terraform-applier plan foo/baz"},
+			wantModuleNameOrPath: "",
 		},
 		{
-			name:     "Empty string",
-			args:     args{commentBody: ""},
-			wantPath: "",
+			name:                 "Name only",
+			args:                 args{commentBody: "@terraform-applier plan one"},
+			wantModuleNameOrPath: "one",
 		},
 		{
-			name:     "Too many slashes",
-			args:     args{commentBody: "foo/one/baz"},
-			wantPath: "",
+			name:                 "Empty string",
+			args:                 args{commentBody: ""},
+			wantModuleNameOrPath: "",
 		},
 		{
-			name:     "Leading slash",
-			args:     args{commentBody: "/one"},
-			wantPath: "",
+			name:                 "Too many slashes",
+			args:                 args{commentBody: "@terraform-applier plan foo/one/baz"},
+			wantModuleNameOrPath: "foo/one/baz",
 		},
 		{
-			name:     "Trailing slash",
-			args:     args{commentBody: "foo/"},
-			wantPath: "",
+			name:                 "dot as path",
+			args:                 args{commentBody: "@terraform-applier plan ."},
+			wantModuleNameOrPath: ".",
 		},
 		{
-			name:     "do not trigger plan on module limit comment",
-			args:     args{commentBody: moduleLimitReachedTml},
-			wantPath: "",
+			name:                 "Trailing slash",
+			args:                 args{commentBody: "@terraform-applier plan foo/"},
+			wantModuleNameOrPath: "foo/",
 		},
 		{
-			name:     "do not trigger plan on our module request Acknowledged Msg",
-			args:     args{commentBody: requestAcknowledgedMsg("foo/one", "path/to/module/one", "hash1", mustParseMetaTime("2006-01-02T15:04:05+07:00"))},
-			wantPath: "",
+			name:                 "do not trigger plan on module limit comment",
+			args:                 args{commentBody: moduleLimitReachedTml},
+			wantModuleNameOrPath: "",
 		},
 		{
-			name:     "do not trigger plan on our module run Output Msg",
-			args:     args{commentBody: runOutputMsg("foo/one", "foo/one", &v1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy."})},
-			wantPath: "",
+			name:                 "do not trigger plan on our module request Acknowledged Msg",
+			args:                 args{commentBody: requestAcknowledgedMsg("foo/one", "path/to/module/one", "hash1", mustParseMetaTime("2006-01-02T15:04:05+07:00"))},
+			wantModuleNameOrPath: "",
 		},
 		{
-			name:     "with surrounding `",
-			args:     args{commentBody: "`@terraform-applier plan foo-baz/one`"},
-			wantPath: "foo-baz/one",
+			name:                 "do not trigger plan on our module run Output Msg",
+			args:                 args{commentBody: runOutputMsg("foo/one", "foo/one", &v1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy."})},
+			wantModuleNameOrPath: "",
 		},
 		{
-			name:     "with ` surrounding only name",
-			args:     args{commentBody: "@terraform-applier plan `foo_bar/one`"},
-			wantPath: "foo_bar/one",
+			name:                 "with surrounding `",
+			args:                 args{commentBody: "`@terraform-applier plan foo-baz/one`"},
+			wantModuleNameOrPath: "foo-baz/one",
+		},
+		{
+			name:                 "with ` surrounding only name",
+			args:                 args{commentBody: "@terraform-applier plan `foo_bar/one`"},
+			wantModuleNameOrPath: "foo_bar/one",
+		},
+		{
+			name:                 "correct Name with a random suffix",
+			args:                 args{commentBody: "@terraform-applier plan two please"},
+			wantModuleNameOrPath: "",
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gotPath := parsePlanReqMsg(tt.args.commentBody)
-			if !reflect.DeepEqual(gotPath, tt.wantPath) {
-				t.Errorf("parsePlanReqMsg() = %v, wantPath %v", gotPath, tt.wantPath)
+			gotModuleNameOrPath := parsePlanReqMsg(tt.args.commentBody)
+			if !reflect.DeepEqual(gotModuleNameOrPath, tt.wantModuleNameOrPath) {
+				t.Errorf("parsePlanReqMsg() = %v, wantModuleNameOrPath %v", gotModuleNameOrPath, tt.wantModuleNameOrPath)
 			}
 		})
 	}

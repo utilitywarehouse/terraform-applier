@@ -12,7 +12,7 @@ import (
 )
 
 var (
-	planReqMsgRegex = regexp.MustCompile("^`?@terraform-applier plan `?([\\w-]+\\/?[\\w-]+)`?")
+	planReqMsgRegex = regexp.MustCompile("^`?@terraform-applier plan `?([\\w-.\\/]+)`?$")
 
 	moduleLimitReachedTml = "A limit of 5 modules per PR has been reached, hence auto plan is disabled for this PR.\n" +
 		"Please post `@terraform-applier plan <module_name>` as comment if you want to request terraform plan for a particular module."
@@ -47,12 +47,8 @@ var (
 func parsePlanReqMsg(commentBody string) string {
 	matches := planReqMsgRegex.FindStringSubmatch(commentBody)
 
-	if len(matches) == 2 && matches[1] != "" {
-		cluster, name := parsePath(matches[1])
-		if cluster != "" && name != "" {
-			path := cluster + "/" + name
-			return path
-		}
+	if len(matches) == 2 {
+		return matches[1]
 	}
 
 	return ""
@@ -96,16 +92,6 @@ func runOutputMsg(module, path string, run *v1beta1.Run) string {
 	}
 
 	return fmt.Sprintf(runOutputMsgTml, module, path, run.CommitHash, run.Status, run.Summary, runOutput, path)
-}
-
-func parsePath(str string) (string, string) {
-	path := strings.Split(str, "/")
-
-	if len(path) == 2 {
-		return path[0], path[1]
-	}
-
-	return "", ""
 }
 
 func parseNamespaceName(str string) types.NamespacedName {

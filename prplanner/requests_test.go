@@ -388,11 +388,11 @@ func Test_checkPRCommentsForPlanRequests(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{Namespace: "foo", Name: "two"},
 		Spec: tfaplv1beta1.ModuleSpec{
 			RepoURL: "https://github.com/owner-a/repo-a.git",
-			Path:    "baz/two",
+			Path:    "path/foo/two",
 		},
 	}
 
-	t.Run("request acknowledged for module", func(t *testing.T) {
+	t.Run("request acknowledged for module (using name)", func(t *testing.T) {
 		// avoid generating another request from `@terraform-applier plan` comment
 		// is there's already a request ID posted for the module
 		// module might not be annotated by the time the loop checks it, which in this
@@ -400,9 +400,9 @@ func Test_checkPRCommentsForPlanRequests(t *testing.T) {
 		pr := generateMockPR(123, "ref1",
 			[]string{"hash1", "hash2", "hash3"},
 			[]string{
-				"@terraform-applier plan foo/two",
-				requestAcknowledgedMsg("foo/two", "baz/two", "hash2", mustParseMetaTime("2023-04-02T15:04:05Z")),
-				requestAcknowledgedMsg("foo/three", "baz/three", "hash3", mustParseMetaTime("2023-04-02T15:04:05Z")),
+				"@terraform-applier plan two",
+				requestAcknowledgedMsg("foo/two", "path/foo/two", "hash2", mustParseMetaTime("2023-04-02T15:04:05Z")),
+				requestAcknowledgedMsg("foo/three", "path/foo/three", "hash3", mustParseMetaTime("2023-04-02T15:04:05Z")),
 			},
 			nil,
 		)
@@ -417,12 +417,17 @@ func Test_checkPRCommentsForPlanRequests(t *testing.T) {
 		}
 	})
 
-	t.Run("plan out posted for module", func(t *testing.T) {
+	t.Run("request acknowledged for module (using path)", func(t *testing.T) {
+		// avoid generating another request from `@terraform-applier plan` comment
+		// is there's already a request ID posted for the module
+		// module might not be annotated by the time the loop checks it, which in this
+		// case would mean plan out is ready ot be posted and NOT run hasn't been requested yet
 		pr := generateMockPR(123, "ref1",
 			[]string{"hash1", "hash2", "hash3"},
 			[]string{
-				runOutputMsg("foo/two", "baz/two", &tfaplv1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy.", Output: "tf plan output"}),
-				runOutputMsg("foo/three", "baz/three", &tfaplv1beta1.Run{CommitHash: "hash3", Summary: "Plan: x to add, x to change, x to destroy.", Output: "tf plan output"}),
+				"@terraform-applier plan path/foo/two",
+				requestAcknowledgedMsg("foo/two", "path/foo/two", "hash2", mustParseMetaTime("2023-04-02T15:04:05Z")),
+				requestAcknowledgedMsg("foo/three", "path/foo/three", "hash3", mustParseMetaTime("2023-04-02T15:04:05Z")),
 			},
 			nil,
 		)
@@ -437,13 +442,55 @@ func Test_checkPRCommentsForPlanRequests(t *testing.T) {
 		}
 	})
 
-	t.Run("plan run is not requested for module", func(t *testing.T) {
+	t.Run("plan out posted for module (by name)", func(t *testing.T) {
+		pr := generateMockPR(123, "ref1",
+			[]string{"hash1", "hash2", "hash3"},
+			[]string{
+				"@terraform-applier plan two",
+				runOutputMsg("foo/two", "path/foo/two", &tfaplv1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy.", Output: "tf plan output"}),
+				runOutputMsg("foo/three", "path/foo/three", &tfaplv1beta1.Run{CommitHash: "hash3", Summary: "Plan: x to add, x to change, x to destroy.", Output: "tf plan output"}),
+			},
+			nil,
+		)
+
+		gotReq, err := planner.checkPRCommentsForPlanRequests(pr, module)
+		if err != nil {
+			t.Fatalf("unexpected error: %s", err)
+		}
+
+		if gotReq != nil {
+			t.Errorf("checkPRCommentsForPlanRequests() returner non-nil Request")
+		}
+	})
+
+	t.Run("plan out posted for module (by path)", func(t *testing.T) {
+		pr := generateMockPR(123, "ref1",
+			[]string{"hash1", "hash2", "hash3"},
+			[]string{
+				"@terraform-applier plan path/foo/two",
+				runOutputMsg("foo/two", "path/foo/two", &tfaplv1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy.", Output: "tf plan output"}),
+				runOutputMsg("foo/three", "path/foo/three", &tfaplv1beta1.Run{CommitHash: "hash3", Summary: "Plan: x to add, x to change, x to destroy.", Output: "tf plan output"}),
+			},
+			nil,
+		)
+
+		gotReq, err := planner.checkPRCommentsForPlanRequests(pr, module)
+		if err != nil {
+			t.Fatalf("unexpected error: %s", err)
+		}
+
+		if gotReq != nil {
+			t.Errorf("checkPRCommentsForPlanRequests() returner non-nil Request")
+		}
+	})
+
+	t.Run("plan run is not requested for current module", func(t *testing.T) {
 		pr := generateMockPR(123, "ref1",
 			[]string{"hash1", "hash2", "hash3"},
 			[]string{
 				"@terraform-applier plan one",
-				"@terraform-applier plan baz/one",
-				"@terraform-applier plan baz/three",
+				"@terraform-applier plan path/foo/one",
+				"@terraform-applier plan path/foo/three",
 			},
 			nil,
 		)
@@ -458,16 +505,16 @@ func Test_checkPRCommentsForPlanRequests(t *testing.T) {
 		}
 	})
 
-	t.Run("plan run is requested for module using correct path", func(t *testing.T) {
+	t.Run("plan run is requested for module using correct module path", func(t *testing.T) {
 		testGithub := NewMockGithubInterface(goMockCtrl)
 		planner.github = testGithub
 
 		p := generateMockPR(123, "ref1",
 			[]string{"hash1", "hash2", "hash3"},
 			[]string{
-				"@terraform-applier plan baz/one",
-				"@terraform-applier plan baz/two",
-				"@terraform-applier plan baz/three",
+				"@terraform-applier plan foo/one",
+				"@terraform-applier plan path/foo/two",
+				"@terraform-applier plan foo/three",
 			},
 			nil,
 		)
@@ -477,17 +524,17 @@ func Test_checkPRCommentsForPlanRequests(t *testing.T) {
 			DoAndReturn(func(_ context.Context, _, hash string) ([]string, error) {
 				switch hash {
 				case "hash1":
-					return []string{"foo/one"}, nil
+					return []string{"path/foo/one"}, nil
 				case "hash2":
-					return []string{"foo/two"}, nil
+					return []string{"path/foo/two"}, nil
 				case "hash3":
-					return []string{"foo/one", "foo/three"}, nil
+					return []string{"path/foo/one", "path/foo/three"}, nil
 				default:
 					return nil, fmt.Errorf("hash not found")
 				}
 			}).AnyTimes()
 
-		testGit.EXPECT().Hash(gomock.Any(), gomock.Any(), "ref1", "baz/two").
+		testGit.EXPECT().Hash(gomock.Any(), gomock.Any(), "ref1", "path/foo/two").
 			Return("hash1", nil)
 
 		// mock github API Call adding new request info
@@ -520,7 +567,7 @@ func Test_checkPRCommentsForPlanRequests(t *testing.T) {
 		}
 	})
 
-	t.Run("plan run is requested for module using Module Name only", func(t *testing.T) {
+	t.Run("plan run is requested for module using correct Name", func(t *testing.T) {
 		testGithub := NewMockGithubInterface(goMockCtrl)
 		planner.github = testGithub
 
@@ -534,23 +581,47 @@ func Test_checkPRCommentsForPlanRequests(t *testing.T) {
 			nil,
 		)
 
+		// mock github API Call adding new request info
+		testGithub.EXPECT().postComment(gomock.Any(), gomock.Any(), 0, 123, gomock.Any()).
+			DoAndReturn(func(repoOwner, repoName string, commentID, prNumber int, commentBody prComment) (int, error) {
+				// validate comment message
+				if !requestAcknowledgedMsgRegex.Match([]byte(commentBody.Body)) {
+					return 0, fmt.Errorf("comment body doesn't match requestAcknowledgedRegex")
+				}
+				return 111, nil
+			})
+
+		testGit.EXPECT().Hash(gomock.Any(), gomock.Any(), "ref1", "path/foo/two").
+			Return("hash1", nil)
+
 		// Call Test function
 		gotReq, err := planner.checkPRCommentsForPlanRequests(p, module)
 		if err != nil {
 			t.Fatalf("unexpected error: %s", err)
 		}
 
-		if gotReq != nil {
-			t.Errorf("checkPRCommentsForPlanRequests() returner non-nil Request")
+		wantReq := &tfaplv1beta1.Request{
+			Type: "PullRequestPlan",
+			PR: &tfaplv1beta1.PullRequest{
+				Number:     123,
+				HeadBranch: "ref1",
+				CommentID:  111,
+			},
+		}
+
+		if diff := cmp.Diff(wantReq, gotReq, cmpIgnoreRandFields); diff != "" {
+			t.Errorf("checkPRCommits() mismatch (-want +got):\n%s", diff)
 		}
 	})
 
-	t.Run("plan run is requested for module in different Namespace", func(t *testing.T) {
+	t.Run("plan run is requested for module in different Namespace or diff path", func(t *testing.T) {
 		p := generateMockPR(123, "ref1",
 			[]string{"hash1", "hash2", "hash3"},
 			[]string{
 				"@terraform-applier plan foo/one",
 				"@terraform-applier plan bar/two",
+				"@terraform-applier plan path/bar/two",
+				"@terraform-applier plan path/foo",
 				"@terraform-applier plan foo/three",
 			},
 			nil,

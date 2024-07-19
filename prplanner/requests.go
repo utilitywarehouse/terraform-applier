@@ -123,25 +123,23 @@ func (p *Planner) checkPRCommentsForPlanRequests(pr *pr, module *tfaplv1beta1.Mo
 			return nil, nil
 		}
 
-		// Check if user requested terraform plan run
-		// '@terraform-applier plan [<module namespace>]/<module name>'
-		commentPath = parsePlanReqMsg(comment.Body)
-		if commentPath != module.Spec.Path {
-			continue
-		}
+		// Check if user requested terraform plan run via
+		// '@terraform-applier plan module-name'
+		// or
+		// '@terraform-applier plan path/to/the/module-name'
+		requestedModuleNameOrPath := parsePlanReqMsg(comment.Body)
 
-		// commented module's namespace needs to match as well if its given by user
-		if commentModule.Namespace != "" && commentModule.Namespace != module.Namespace {
-			continue
-		}
+		// match either given name or path
+		if requestedModuleNameOrPath == module.Name || requestedModuleNameOrPath == module.Spec.Path {
+			// get current hash of the module path to create new plan request
+			modulePathHash, err := p.Repos.Hash(context.Background(), module.Spec.RepoURL, pr.HeadRefName, module.Spec.Path)
+			if err != nil {
+				return nil, err
+			}
 
-		modulePathHash, err := p.Repos.Hash(context.Background(), module.Spec.RepoURL, pr.HeadRefName, module.Spec.Path)
-		if err != nil {
-			return nil, err
+			p.Log.Info("triggering plan requested via comment", "module", module.NamespacedName(), "pr", pr.Number, "author", comment.Author.Login)
+			return p.addNewRequest(module, pr, modulePathHash)
 		}
-
-		p.Log.Info("triggering plan requested via comment", "module", module.NamespacedName(), "pr", pr.Number, "author", comment.Author.Login)
-		return p.addNewRequest(module, pr, modulePathHash)
 	}
 
 	return nil, nil
