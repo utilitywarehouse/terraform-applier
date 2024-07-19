@@ -22,7 +22,7 @@ func (p *Planner) ensurePlanRequests(ctx context.Context, pr *pr, prModules []ty
 
 		// TODO: Verify this
 		// We need to skip module only if planOnPR was explicitly disabled
-		if module.Spec.PlanOnPR != nil && *module.Spec.PlanOnPR == false {
+		if module.Spec.PlanOnPR != nil && !*module.Spec.PlanOnPR {
 			continue
 		}
 
