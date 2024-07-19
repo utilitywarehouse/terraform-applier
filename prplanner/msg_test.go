@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/utilitywarehouse/terraform-applier/api/v1beta1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
 
@@ -102,6 +103,43 @@ func Test_parsePlanReqMsg(t *testing.T) {
 	}
 }
 
+func Test_requestAcknowledgedMsg(t *testing.T) {
+	type args struct {
+		module   string
+		path     string
+		commitID string
+		reqAt    *metav1.Time
+	}
+	tests := []struct {
+		name string
+		args args
+		want string
+	}{
+		{
+			"1",
+			args{module: "foo/one", path: "path/to/module/one", commitID: "hash1", reqAt: mustParseMetaTime("2006-01-02T15:04:05+07:00")},
+			"Received terraform plan request\n" +
+				"```\n" +
+				"Module: foo/one\n" +
+				"Path: path/to/module/one\n" +
+				"Commit ID: hash1\n" +
+				"Requested At: 2006-01-02T15:04:05+07:00\n" +
+				"```\n" +
+				"Do not edit this comment. This message will be updated once the plan run is completed.\n" +
+				"To manually trigger plan again please post `@terraform-applier plan path/to/module/one` as comment.",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := requestAcknowledgedMsg(tt.args.module, tt.args.path, tt.args.commitID, tt.args.reqAt)
+
+			if diff := cmp.Diff(tt.want, got); diff != "" {
+				t.Errorf("requestAcknowledgedMsg() mismatch (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
 func Test_parseRequestAcknowledgedMsg(t *testing.T) {
 	type args struct {
 		commentBody string
@@ -180,6 +218,46 @@ func Test_parseRequestAcknowledgedMsg(t *testing.T) {
 			}
 			if diff := cmp.Diff(tt.wantReqAt, gotReqAt); diff != "" {
 				t.Errorf("parseRequestAcknowledgedMsg() mismatch (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func Test_runOutputMsg(t *testing.T) {
+	type args struct {
+		module string
+		path   string
+		run    *v1beta1.Run
+	}
+	tests := []struct {
+		name string
+		args args
+		want string
+	}{
+		{
+			"1",
+			args{module: "baz/one", path: "path/baz/one", run: &v1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy.", Output: "Terraform apply output...."}},
+			"Terraform plan output for\n" +
+				"```\n" +
+				"Module: baz/one\n" +
+				"Path: path/baz/one\n" +
+				"Commit ID: hash2\n" +
+				"```\n" +
+				"<details><summary><b>Run Status: , Run Summary: Plan: x to add, x to change, x to destroy.</b></summary>\n\n" +
+				"```" +
+				"terraform\n" +
+				"Terraform apply output....\n" +
+				"```\n" +
+				"</details>\n" +
+				"To manually trigger plan again please post `@terraform-applier plan path/baz/one` as comment.",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := runOutputMsg(tt.args.module, tt.args.path, tt.args.run)
+
+			if diff := cmp.Diff(tt.want, got); diff != "" {
+				t.Errorf("runOutputMsg() mismatch (-want +got):\n%s", diff)
 			}
 		})
 	}
