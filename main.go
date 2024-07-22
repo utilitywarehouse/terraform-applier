@@ -287,6 +287,12 @@ var (
 			EnvVars: []string{"GITHUB_WEBHOOK_SECRET"},
 			Usage:   "used to sign and authorise GH webhooks",
 		},
+		&cli.StringFlag{
+			Name:    "cluster-env-name",
+			EnvVars: []string{"CLUSTER_ENV_NAME"},
+			Value:   "default",
+			Usage:   "cluster-env-name is used as cluster identifier while posting msg on PRs",
+		},
 	}
 )
 
@@ -732,15 +738,16 @@ func run(c *cli.Context) {
 
 	if !c.Bool("disable-pr-planner") {
 		prPlanner := &prplanner.Planner{
-			ListenAddress: c.String("pr-planner-webhook-port"),
-			WebhookSecret: c.String("github-webhook-secret"),
-			GitMirror:     conf.GitMirror,
-			Interval:      time.Duration(c.Int("pr-planner-interval")) * time.Second,
-			ClusterClt:    mgr.GetClient(),
-			Repos:         repos,
-			RedisClient:   sysutil.Redis{Client: rdb},
-			Runner:        &runner,
-			Log:           logger.With("logger", "pr-planner"),
+			ListenAddress:  c.String("pr-planner-webhook-port"),
+			WebhookSecret:  c.String("github-webhook-secret"),
+			ClusterEnvName: c.String("cluster-env-name"),
+			GitMirror:      conf.GitMirror,
+			Interval:       time.Duration(c.Int("pr-planner-interval")) * time.Second,
+			ClusterClt:     mgr.GetClient(),
+			Repos:          repos,
+			RedisClient:    sysutil.Redis{Client: rdb},
+			Runner:         &runner,
+			Log:            logger.With("logger", "pr-planner"),
 		}
 
 		// setup  Key event notifications for 'String' commands

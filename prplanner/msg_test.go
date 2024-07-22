@@ -69,12 +69,12 @@ func Test_parsePlanReqMsg(t *testing.T) {
 		},
 		{
 			name:                 "do not trigger plan on our module request Acknowledged Msg",
-			args:                 args{commentBody: requestAcknowledgedMsg("foo/one", "path/to/module/one", "hash1", mustParseMetaTime("2006-01-02T15:04:05+07:00"))},
+			args:                 args{commentBody: requestAcknowledgedMsg("default", "foo/one", "path/to/module/one", "hash1", mustParseMetaTime("2006-01-02T15:04:05+07:00"))},
 			wantModuleNameOrPath: "",
 		},
 		{
 			name:                 "do not trigger plan on our module run Output Msg",
-			args:                 args{commentBody: runOutputMsg("foo/one", "foo/one", &v1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy."})},
+			args:                 args{commentBody: runOutputMsg("default", "foo/one", "foo/one", &v1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy."})},
 			wantModuleNameOrPath: "",
 		},
 		{
@@ -105,6 +105,7 @@ func Test_parsePlanReqMsg(t *testing.T) {
 
 func Test_requestAcknowledgedMsg(t *testing.T) {
 	type args struct {
+		cluster  string
 		module   string
 		path     string
 		commitID string
@@ -117,9 +118,10 @@ func Test_requestAcknowledgedMsg(t *testing.T) {
 	}{
 		{
 			"1",
-			args{module: "foo/one", path: "path/to/module/one", commitID: "hash1", reqAt: mustParseMetaTime("2006-01-02T15:04:05+07:00")},
+			args{cluster: "default", module: "foo/one", path: "path/to/module/one", commitID: "hash1", reqAt: mustParseMetaTime("2006-01-02T15:04:05+07:00")},
 			"Received terraform plan request\n" +
 				"```\n" +
+				"Cluster: default\n" +
 				"Module: foo/one\n" +
 				"Path: path/to/module/one\n" +
 				"Commit ID: hash1\n" +
@@ -131,7 +133,7 @@ func Test_requestAcknowledgedMsg(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := requestAcknowledgedMsg(tt.args.module, tt.args.path, tt.args.commitID, tt.args.reqAt)
+			got := requestAcknowledgedMsg(tt.args.cluster, tt.args.module, tt.args.path, tt.args.commitID, tt.args.reqAt)
 
 			if diff := cmp.Diff(tt.want, got); diff != "" {
 				t.Errorf("requestAcknowledgedMsg() mismatch (-want +got):\n%s", diff)
@@ -145,12 +147,13 @@ func Test_parseRequestAcknowledgedMsg(t *testing.T) {
 		commentBody string
 	}
 	tests := []struct {
-		name       string
-		args       args
-		wantModule types.NamespacedName
-		wantPath   string
-		wantHash   string
-		wantReqAt  *time.Time
+		name        string
+		args        args
+		wantCluster string
+		wantModule  types.NamespacedName
+		wantPath    string
+		wantHash    string
+		wantReqAt   *time.Time
 	}{
 		{
 			name:       "Empty string",
@@ -159,28 +162,31 @@ func Test_parseRequestAcknowledgedMsg(t *testing.T) {
 			wantReqAt:  nil,
 		},
 		{
-			name:       "NamespacedName + Requested At",
-			args:       args{commentBody: requestAcknowledgedMsg("foo/one", "path/to/module/one", "hash1", mustParseMetaTime("2006-01-02T15:04:05+07:00"))},
-			wantModule: types.NamespacedName{Namespace: "foo", Name: "one"},
-			wantPath:   "path/to/module/one",
-			wantHash:   "hash1",
-			wantReqAt:  mustParseTime("2006-01-02T15:04:05+07:00"),
+			name:        "NamespacedName + Requested At",
+			args:        args{commentBody: requestAcknowledgedMsg("default", "foo/one", "path/to/module/one", "hash1", mustParseMetaTime("2006-01-02T15:04:05+07:00"))},
+			wantModule:  types.NamespacedName{Namespace: "foo", Name: "one"},
+			wantCluster: "default",
+			wantPath:    "path/to/module/one",
+			wantHash:    "hash1",
+			wantReqAt:   mustParseTime("2006-01-02T15:04:05+07:00"),
 		},
 		{
-			name:       "NamespacedName + Requested At UTC",
-			args:       args{commentBody: requestAcknowledgedMsg("foo/one", "foo/one", "hash2", mustParseMetaTime("2023-04-02T15:04:05Z"))},
-			wantModule: types.NamespacedName{Namespace: "foo", Name: "one"},
-			wantPath:   "foo/one",
-			wantHash:   "hash2",
-			wantReqAt:  mustParseTime("2023-04-02T15:04:05Z"),
+			name:        "NamespacedName + Requested At UTC",
+			args:        args{commentBody: requestAcknowledgedMsg("default", "foo/one", "foo/one", "hash2", mustParseMetaTime("2023-04-02T15:04:05Z"))},
+			wantModule:  types.NamespacedName{Namespace: "foo", Name: "one"},
+			wantCluster: "default",
+			wantPath:    "foo/one",
+			wantHash:    "hash2",
+			wantReqAt:   mustParseTime("2023-04-02T15:04:05Z"),
 		},
 		{
-			name:       "Name + Requested At",
-			args:       args{commentBody: requestAcknowledgedMsg("one", "foo/one", "hash3", mustParseMetaTime("2023-04-02T15:04:05Z"))},
-			wantModule: types.NamespacedName{Name: "one"},
-			wantPath:   "foo/one",
-			wantHash:   "hash3",
-			wantReqAt:  mustParseTime("2023-04-02T15:04:05Z"),
+			name:        "Name + Requested At",
+			args:        args{commentBody: requestAcknowledgedMsg("default", "one", "foo/one", "hash3", mustParseMetaTime("2023-04-02T15:04:05Z"))},
+			wantModule:  types.NamespacedName{Name: "one"},
+			wantCluster: "default",
+			wantPath:    "foo/one",
+			wantHash:    "hash3",
+			wantReqAt:   mustParseTime("2023-04-02T15:04:05Z"),
 		},
 		{
 			name:       "missing Requested At",
@@ -206,7 +212,10 @@ func Test_parseRequestAcknowledgedMsg(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gotModule, gotPath, gotHash, gotReqAt := parseRequestAcknowledgedMsg(tt.args.commentBody)
+			gotCluster, gotModule, gotPath, gotHash, gotReqAt := parseRequestAcknowledgedMsg(tt.args.commentBody)
+			if !reflect.DeepEqual(gotCluster, tt.wantCluster) {
+				t.Errorf("parseRequestAcknowledgedMsg() gotCluster = %v, want %v", gotCluster, tt.wantModule)
+			}
 			if !reflect.DeepEqual(gotModule, tt.wantModule) {
 				t.Errorf("parseRequestAcknowledgedMsg() gotModule = %v, want %v", gotModule, tt.wantModule)
 			}
@@ -225,9 +234,10 @@ func Test_parseRequestAcknowledgedMsg(t *testing.T) {
 
 func Test_runOutputMsg(t *testing.T) {
 	type args struct {
-		module string
-		path   string
-		run    *v1beta1.Run
+		cluster string
+		module  string
+		path    string
+		run     *v1beta1.Run
 	}
 	tests := []struct {
 		name string
@@ -236,9 +246,10 @@ func Test_runOutputMsg(t *testing.T) {
 	}{
 		{
 			"1",
-			args{module: "baz/one", path: "path/baz/one", run: &v1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy.", Output: "Terraform apply output...."}},
+			args{cluster: "default", module: "baz/one", path: "path/baz/one", run: &v1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy.", Output: "Terraform apply output...."}},
 			"Terraform plan output for\n" +
 				"```\n" +
+				"Cluster: default\n" +
 				"Module: baz/one\n" +
 				"Path: path/baz/one\n" +
 				"Commit ID: hash2\n" +
@@ -254,7 +265,7 @@ func Test_runOutputMsg(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := runOutputMsg(tt.args.module, tt.args.path, tt.args.run)
+			got := runOutputMsg(tt.args.cluster, tt.args.module, tt.args.path, tt.args.run)
 
 			if diff := cmp.Diff(tt.want, got); diff != "" {
 				t.Errorf("runOutputMsg() mismatch (-want +got):\n%s", diff)
@@ -268,60 +279,66 @@ func Test_parseRunOutputMsg(t *testing.T) {
 		comment string
 	}
 	tests := []struct {
-		name       string
-		args       args
-		wantModule types.NamespacedName
-		wantPath   string
-		wantCommit string
+		name        string
+		args        args
+		wantCluster string
+		wantModule  types.NamespacedName
+		wantPath    string
+		wantCommit  string
 	}{
 		{
-			name:       "NamespaceName + Commit ID",
-			args:       args{comment: runOutputMsg("baz/one", "foo/one", &v1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy."})},
-			wantModule: types.NamespacedName{Namespace: "baz", Name: "one"},
-			wantPath:   "foo/one",
-			wantCommit: "hash2",
+			name:        "NamespaceName + Commit ID",
+			args:        args{comment: runOutputMsg("default", "baz/one", "foo/one", &v1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy."})},
+			wantModule:  types.NamespacedName{Namespace: "baz", Name: "one"},
+			wantCluster: "default",
+			wantPath:    "foo/one",
+			wantCommit:  "hash2",
 		},
 		{
 			name:       "Module Name only",
-			args:       args{comment: runOutputMsg("one", "foo/one", &v1beta1.Run{Summary: "Plan: x to add, x to change, x to destroy."})},
+			args:       args{comment: runOutputMsg("default", "one", "foo/one", &v1beta1.Run{Summary: "Plan: x to add, x to change, x to destroy."})},
 			wantModule: types.NamespacedName{},
 			wantPath:   "",
 			wantCommit: "",
 		},
 		{
 			name:       "Module Name missing",
-			args:       args{comment: runOutputMsg("", "foo/one", &v1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy."})},
+			args:       args{comment: runOutputMsg("default", "", "foo/one", &v1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy."})},
 			wantModule: types.NamespacedName{},
 			wantPath:   "",
 			wantCommit: "",
 		},
 		{
-			name:       "Module Name + Commit ID",
-			args:       args{comment: runOutputMsg("one", "foo/one", &v1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy."})},
-			wantModule: types.NamespacedName{Name: "one"},
-			wantPath:   "foo/one",
-			wantCommit: "hash2",
+			name:        "Module Name + Commit ID",
+			args:        args{comment: runOutputMsg("default", "one", "foo/one", &v1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy."})},
+			wantModule:  types.NamespacedName{Name: "one"},
+			wantCluster: "default",
+			wantPath:    "foo/one",
+			wantCommit:  "hash2",
 		},
 		{
-			name:       "Path cluster only",
-			args:       args{comment: runOutputMsg("baz/one", "foo/", &v1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy."})},
-			wantModule: types.NamespacedName{Namespace: "baz", Name: "one"},
-			wantPath:   "foo/",
-			wantCommit: "hash2",
+			name:        "Path cluster only",
+			args:        args{comment: runOutputMsg("default", "baz/one", "foo/", &v1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy."})},
+			wantModule:  types.NamespacedName{Namespace: "baz", Name: "one"},
+			wantCluster: "default",
+			wantPath:    "foo/",
+			wantCommit:  "hash2",
 		},
 		{
-			name:       "Path Module Name only",
-			args:       args{comment: runOutputMsg("baz/one", "/one", &v1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy."})},
-			wantModule: types.NamespacedName{Namespace: "baz", Name: "one"},
-			wantPath:   "/one",
-			wantCommit: "hash2",
+			name:        "Path Module Name only",
+			args:        args{comment: runOutputMsg("default", "baz/one", "/one", &v1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy."})},
+			wantModule:  types.NamespacedName{Namespace: "baz", Name: "one"},
+			wantCluster: "default",
+			wantPath:    "/one",
+			wantCommit:  "hash2",
 		},
 		{
-			name:       "Path one word only",
-			args:       args{comment: runOutputMsg("baz/one", "one", &v1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy."})},
-			wantModule: types.NamespacedName{Namespace: "baz", Name: "one"},
-			wantPath:   "one",
-			wantCommit: "hash2",
+			name:        "Path one word only",
+			args:        args{comment: runOutputMsg("default", "baz/one", "one", &v1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy."})},
+			wantModule:  types.NamespacedName{Namespace: "baz", Name: "one"},
+			wantCluster: "default",
+			wantPath:    "one",
+			wantCommit:  "hash2",
 		},
 		{
 			name:       "@terraform-applier plan only",
@@ -340,7 +357,10 @@ func Test_parseRunOutputMsg(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gotModule, gotPath, gotCommit := parseRunOutputMsg(tt.args.comment)
+			gotCluster, gotModule, gotPath, gotCommit := parseRunOutputMsg(tt.args.comment)
+			if !reflect.DeepEqual(gotCluster, tt.wantCluster) {
+				t.Errorf("parseRunOutputMsg() gotCluster = %v, want %v", gotCluster, tt.wantCluster)
+			}
 			if !reflect.DeepEqual(gotModule, tt.wantModule) {
 				t.Errorf("parseRunOutputMsg() gotModule = %v, want %v", gotModule, tt.wantModule)
 			}

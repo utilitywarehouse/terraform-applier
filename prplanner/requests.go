@@ -69,11 +69,11 @@ func (p *Planner) checkPRCommits(ctx context.Context, pr *pr, module *tfaplv1bet
 		}
 
 		// check if we have already processed (uploaded output) this commit
-		if isPlanOutputPostedForCommit(pr, commit.Oid, module.Spec.Path, module.NamespacedName()) {
+		if isPlanOutputPostedForCommit(p.ClusterEnvName, pr, commit.Oid, module.Spec.Path, module.NamespacedName()) {
 			return nil, nil
 		}
 
-		if isPlanRequestAckPostedForCommit(pr, commit.Oid, module.Spec.Path, module.NamespacedName()) {
+		if isPlanRequestAckPostedForCommit(p.ClusterEnvName, pr, commit.Oid, module.Spec.Path, module.NamespacedName()) {
 			return nil, nil
 		}
 
@@ -110,15 +110,19 @@ func (p *Planner) checkPRCommentsForPlanRequests(pr *pr, module *tfaplv1beta1.Mo
 		comment := pr.Comments.Nodes[i]
 
 		// Skip if request already acknowledged for module
-		commentModule, commentPath, _, reqAt := parseRequestAcknowledgedMsg(comment.Body)
-		if commentModule == module.NamespacedName() && commentPath == module.Spec.Path &&
+		commentCluster, commentModule, commentPath, _, reqAt := parseRequestAcknowledgedMsg(comment.Body)
+		if commentCluster == p.ClusterEnvName &&
+			commentModule == module.NamespacedName() &&
+			commentPath == module.Spec.Path &&
 			reqAt != nil && time.Until(*reqAt) < 10*time.Minute {
 			return nil, nil
 		}
 
 		// Skip if terraform plan output is already posted
-		commentModule, commentPath, _ = parseRunOutputMsg(comment.Body)
-		if commentModule == module.NamespacedName() && commentPath == module.Spec.Path {
+		commentCluster, commentModule, commentPath, _ = parseRunOutputMsg(comment.Body)
+		if commentCluster == p.ClusterEnvName &&
+			commentModule == module.NamespacedName() &&
+			commentPath == module.Spec.Path {
 			return nil, nil
 		}
 
@@ -146,12 +150,12 @@ func (p *Planner) checkPRCommentsForPlanRequests(pr *pr, module *tfaplv1beta1.Mo
 
 // isPlanOutputPostedForCommit loops through all the comments to check if given commit
 // ids plan output is already posted
-func isPlanOutputPostedForCommit(pr *pr, commitID, modulePath string, module types.NamespacedName) bool {
+func isPlanOutputPostedForCommit(cluster string, pr *pr, commitID, modulePath string, module types.NamespacedName) bool {
 	for i := len(pr.Comments.Nodes) - 1; i >= 0; i-- {
 		comment := pr.Comments.Nodes[i]
 
-		commentModule, commentPath, commentCommitID := parseRunOutputMsg(comment.Body)
-		if commentModule == module && commentPath == modulePath && commentCommitID == commitID {
+		commentCluster, commentModule, commentPath, commentCommitID := parseRunOutputMsg(comment.Body)
+		if commentCluster == cluster && commentModule == module && commentPath == modulePath && commentCommitID == commitID {
 			return true
 		}
 	}
@@ -161,12 +165,13 @@ func isPlanOutputPostedForCommit(pr *pr, commitID, modulePath string, module typ
 
 // isPlanRequestAckPostedForCommit loops through all the comments to check if given commit
 // ids plan request is already acknowledged
-func isPlanRequestAckPostedForCommit(pr *pr, commitID, modulePath string, module types.NamespacedName) bool {
+func isPlanRequestAckPostedForCommit(cluster string, pr *pr, commitID, modulePath string, module types.NamespacedName) bool {
 	for i := len(pr.Comments.Nodes) - 1; i >= 0; i-- {
 		comment := pr.Comments.Nodes[i]
 
-		commentModule, commentPath, commentCommitID, reqAt := parseRequestAcknowledgedMsg(comment.Body)
-		if commentModule == module &&
+		commentCluster, commentModule, commentPath, commentCommitID, reqAt := parseRequestAcknowledgedMsg(comment.Body)
+		if commentCluster == cluster &&
+			commentModule == module &&
 			commentPath == modulePath &&
 			commentCommitID == commitID &&
 			reqAt != nil && time.Until(*reqAt) > -10*time.Minute && time.Until(*reqAt) < time.Minute {
@@ -181,7 +186,7 @@ func (p *Planner) addNewRequest(module *tfaplv1beta1.Module, pr *pr, commitID st
 	req := module.NewRunRequest(tfaplv1beta1.PRPlan)
 
 	commentBody := prComment{
-		Body: requestAcknowledgedMsg(module.NamespacedName().String(), module.Spec.Path, commitID, req.RequestedAt),
+		Body: requestAcknowledgedMsg(p.ClusterEnvName, module.NamespacedName().String(), module.Spec.Path, commitID, req.RequestedAt),
 	}
 
 	commentID, err := p.github.postComment(pr.BaseRepository.Owner.Login, pr.BaseRepository.Name, 0, pr.Number, commentBody)

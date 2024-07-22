@@ -15,8 +15,12 @@ func (p *Planner) uploadRequestOutput(ctx context.Context, pr *pr) {
 	for i := len(pr.Comments.Nodes) - 1; i >= 0; i-- {
 		comment := pr.Comments.Nodes[i]
 
-		moduleNamespacedName, path, commitID, requestedAt := parseRequestAcknowledgedMsg(comment.Body)
+		cluster, moduleNamespacedName, path, commitID, requestedAt := parseRequestAcknowledgedMsg(comment.Body)
 		if requestedAt == nil {
+			continue
+		}
+
+		if cluster != p.ClusterEnvName {
 			continue
 		}
 
@@ -31,7 +35,7 @@ func (p *Planner) uploadRequestOutput(ctx context.Context, pr *pr) {
 		}
 
 		payload := prComment{
-			Body: runOutputMsg(moduleNamespacedName.String(), path, run),
+			Body: runOutputMsg(p.ClusterEnvName, moduleNamespacedName.String(), path, run),
 		}
 
 		_, err = p.github.postComment(pr.BaseRepository.Owner.Login, pr.BaseRepository.Name, comment.DatabaseID, pr.Number, payload)
@@ -77,7 +81,7 @@ func (p *Planner) processRedisKeySetMsg(ctx context.Context, ch <-chan *redis.Me
 		}
 
 		comment := prComment{
-			Body: runOutputMsg(moduleName.String(), module.Spec.Path, run),
+			Body: runOutputMsg(p.ClusterEnvName, moduleName.String(), module.Spec.Path, run),
 		}
 
 		repo, err := giturl.Parse(module.Spec.RepoURL)

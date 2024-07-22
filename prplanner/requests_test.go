@@ -46,8 +46,9 @@ func TestCheckPRCommits(t *testing.T) {
 	testGit := git.NewMockRepositories(goMockCtrl)
 
 	planner := &Planner{
-		Repos: testGit,
-		Log:   slog.Default(),
+		ClusterEnvName: "default",
+		Repos:          testGit,
+		Log:            slog.Default(),
 	}
 
 	slog.SetLogLoggerLevel(slog.LevelDebug)
@@ -218,7 +219,7 @@ func TestCheckPRCommits(t *testing.T) {
 
 		p := generateMockPR(123, "ref1",
 			[]string{"hash1", "hash2", "hash3"},
-			[]string{"random comment", runOutputMsg("foo/two", "foo/two", &tfaplv1beta1.Run{CommitHash: "hash3", Summary: "Plan: x to add, x to change, x to destroy.", Output: "some output"}), "random comment"},
+			[]string{"random comment", runOutputMsg("default", "foo/two", "foo/two", &tfaplv1beta1.Run{CommitHash: "hash3", Summary: "Plan: x to add, x to change, x to destroy.", Output: "some output"}), "random comment"},
 
 			nil,
 		)
@@ -252,7 +253,7 @@ func TestCheckPRCommits(t *testing.T) {
 
 		p := generateMockPR(123, "ref1",
 			[]string{"hash1", "hash2", "hash3"},
-			[]string{"random comment", requestAcknowledgedMsg("foo/two", "foo/two", "hash3", &metav1.Time{Time: time.Now()}), "random comment"},
+			[]string{"random comment", requestAcknowledgedMsg("default", "foo/two", "foo/two", "hash3", &metav1.Time{Time: time.Now()}), "random comment"},
 
 			nil,
 		)
@@ -378,8 +379,9 @@ func Test_checkPRCommentsForPlanRequests(t *testing.T) {
 	testGit := git.NewMockRepositories(goMockCtrl)
 
 	planner := &Planner{
-		Repos: testGit,
-		Log:   slog.Default(),
+		ClusterEnvName: "default",
+		Repos:          testGit,
+		Log:            slog.Default(),
 	}
 
 	slog.SetLogLoggerLevel(slog.LevelDebug)
@@ -401,8 +403,8 @@ func Test_checkPRCommentsForPlanRequests(t *testing.T) {
 			[]string{"hash1", "hash2", "hash3"},
 			[]string{
 				"@terraform-applier plan two",
-				requestAcknowledgedMsg("foo/two", "path/foo/two", "hash2", mustParseMetaTime("2023-04-02T15:04:05Z")),
-				requestAcknowledgedMsg("foo/three", "path/foo/three", "hash3", mustParseMetaTime("2023-04-02T15:04:05Z")),
+				requestAcknowledgedMsg("default", "foo/two", "path/foo/two", "hash2", mustParseMetaTime("2023-04-02T15:04:05Z")),
+				requestAcknowledgedMsg("default", "foo/three", "path/foo/three", "hash3", mustParseMetaTime("2023-04-02T15:04:05Z")),
 			},
 			nil,
 		)
@@ -426,8 +428,8 @@ func Test_checkPRCommentsForPlanRequests(t *testing.T) {
 			[]string{"hash1", "hash2", "hash3"},
 			[]string{
 				"@terraform-applier plan path/foo/two",
-				requestAcknowledgedMsg("foo/two", "path/foo/two", "hash2", mustParseMetaTime("2023-04-02T15:04:05Z")),
-				requestAcknowledgedMsg("foo/three", "path/foo/three", "hash3", mustParseMetaTime("2023-04-02T15:04:05Z")),
+				requestAcknowledgedMsg("default", "foo/two", "path/foo/two", "hash2", mustParseMetaTime("2023-04-02T15:04:05Z")),
+				requestAcknowledgedMsg("default", "foo/three", "path/foo/three", "hash3", mustParseMetaTime("2023-04-02T15:04:05Z")),
 			},
 			nil,
 		)
@@ -447,8 +449,8 @@ func Test_checkPRCommentsForPlanRequests(t *testing.T) {
 			[]string{"hash1", "hash2", "hash3"},
 			[]string{
 				"@terraform-applier plan two",
-				runOutputMsg("foo/two", "path/foo/two", &tfaplv1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy.", Output: "tf plan output"}),
-				runOutputMsg("foo/three", "path/foo/three", &tfaplv1beta1.Run{CommitHash: "hash3", Summary: "Plan: x to add, x to change, x to destroy.", Output: "tf plan output"}),
+				runOutputMsg("default", "foo/two", "path/foo/two", &tfaplv1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy.", Output: "tf plan output"}),
+				runOutputMsg("default", "foo/three", "path/foo/three", &tfaplv1beta1.Run{CommitHash: "hash3", Summary: "Plan: x to add, x to change, x to destroy.", Output: "tf plan output"}),
 			},
 			nil,
 		)
@@ -468,8 +470,8 @@ func Test_checkPRCommentsForPlanRequests(t *testing.T) {
 			[]string{"hash1", "hash2", "hash3"},
 			[]string{
 				"@terraform-applier plan path/foo/two",
-				runOutputMsg("foo/two", "path/foo/two", &tfaplv1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy.", Output: "tf plan output"}),
-				runOutputMsg("foo/three", "path/foo/three", &tfaplv1beta1.Run{CommitHash: "hash3", Summary: "Plan: x to add, x to change, x to destroy.", Output: "tf plan output"}),
+				runOutputMsg("default", "foo/two", "path/foo/two", &tfaplv1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy.", Output: "tf plan output"}),
+				runOutputMsg("default", "foo/three", "path/foo/three", &tfaplv1beta1.Run{CommitHash: "hash3", Summary: "Plan: x to add, x to change, x to destroy.", Output: "tf plan output"}),
 			},
 			nil,
 		)
@@ -666,6 +668,7 @@ func Test_checkPRCommentsForPlanRequests(t *testing.T) {
 
 func Test_isPlanOutputPostedForCommit(t *testing.T) {
 	type args struct {
+		cluster    string
 		pr         *pr
 		commitID   string
 		modulePath string
@@ -685,9 +688,10 @@ func Test_isPlanOutputPostedForCommit(t *testing.T) {
 				}{Nodes: []prComment{
 					{
 						DatabaseID: 01234567,
-						Body:       runOutputMsg("foo/one", "foo/one", &tfaplv1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy."}),
+						Body:       runOutputMsg("default", "foo/one", "foo/one", &tfaplv1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy."}),
 					},
 				}}},
+				cluster:    "default",
 				commitID:   "hash2",
 				modulePath: "foo/one",
 				module:     types.NamespacedName{Namespace: "foo", Name: "one"},
@@ -702,9 +706,10 @@ func Test_isPlanOutputPostedForCommit(t *testing.T) {
 				}{Nodes: []prComment{
 					{
 						DatabaseID: 01234567,
-						Body:       runOutputMsg("one", "foo/one", &tfaplv1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy."}),
+						Body:       runOutputMsg("default", "one", "foo/one", &tfaplv1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy."}),
 					},
 				}}},
+				cluster:    "default",
 				commitID:   "hash2",
 				modulePath: "foo/one",
 				module:     types.NamespacedName{Name: "one"},
@@ -722,6 +727,7 @@ func Test_isPlanOutputPostedForCommit(t *testing.T) {
 						Body:       "Terraform plan output for module `foo/one` Commit ID: `hash2`",
 					},
 				}}},
+				cluster:  "default",
 				commitID: "e3c7d4a60b8c9b4c9211a7b4e1a837e9e9c3aaaa",
 				module:   types.NamespacedName{Namespace: "foo", Name: "one"},
 			},
@@ -738,6 +744,7 @@ func Test_isPlanOutputPostedForCommit(t *testing.T) {
 						Body:       "Terraform plan output for module `bar/one` Commit ID: `hash2`",
 					},
 				}}},
+				cluster:  "default",
 				commitID: "hash2",
 				module:   types.NamespacedName{Namespace: "foo", Name: "one"},
 			},
@@ -754,6 +761,7 @@ func Test_isPlanOutputPostedForCommit(t *testing.T) {
 						Body:       "Received terraform plan request. Module: `foo/one` Request ID: `a1b2c3d4` Commit ID: `hash2`",
 					},
 				}}},
+				cluster:  "default",
 				commitID: "hash2",
 				module:   types.NamespacedName{Namespace: "foo", Name: "one"},
 			},
@@ -770,6 +778,7 @@ func Test_isPlanOutputPostedForCommit(t *testing.T) {
 						Body:       "",
 					},
 				}}},
+				cluster:  "default",
 				commitID: "hash2",
 				module:   types.NamespacedName{Namespace: "foo", Name: "one"},
 			},
@@ -778,7 +787,7 @@ func Test_isPlanOutputPostedForCommit(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := isPlanOutputPostedForCommit(tt.args.pr, tt.args.commitID, tt.args.modulePath, tt.args.module); got != tt.want {
+			if got := isPlanOutputPostedForCommit(tt.args.cluster, tt.args.pr, tt.args.commitID, tt.args.modulePath, tt.args.module); got != tt.want {
 				t.Errorf("isPlanOutputPostedForCommit() = %v, want %v", got, tt.want)
 			}
 		})
@@ -787,6 +796,7 @@ func Test_isPlanOutputPostedForCommit(t *testing.T) {
 
 func Test_isPlanRequestAckPostedForCommit(t *testing.T) {
 	type args struct {
+		cluster    string
 		pr         *pr
 		commitID   string
 		modulePath string
@@ -808,6 +818,7 @@ func Test_isPlanRequestAckPostedForCommit(t *testing.T) {
 						Body:       "",
 					},
 				}}},
+				cluster:    "default",
 				commitID:   "hash2",
 				modulePath: "",
 				module:     types.NamespacedName{Namespace: "foo", Name: "one"},
@@ -821,9 +832,10 @@ func Test_isPlanRequestAckPostedForCommit(t *testing.T) {
 				}{Nodes: []prComment{
 					{
 						DatabaseID: 01234567,
-						Body:       requestAcknowledgedMsg("foo/one", "foo/one", "hash2", &metav1.Time{Time: time.Now()}),
+						Body:       requestAcknowledgedMsg("default", "foo/one", "foo/one", "hash2", &metav1.Time{Time: time.Now()}),
 					},
 				}}},
+				cluster:    "default",
 				commitID:   "hash2",
 				modulePath: "foo/one",
 				module:     types.NamespacedName{Namespace: "foo", Name: "one"},
@@ -837,9 +849,10 @@ func Test_isPlanRequestAckPostedForCommit(t *testing.T) {
 				}{Nodes: []prComment{
 					{
 						DatabaseID: 01234567,
-						Body:       requestAcknowledgedMsg("foo/one", "foo/one", "hash2", &metav1.Time{Time: time.Now().Add(-30 * time.Minute)}),
+						Body:       requestAcknowledgedMsg("default", "foo/one", "foo/one", "hash2", &metav1.Time{Time: time.Now().Add(-30 * time.Minute)}),
 					},
 				}}},
+				cluster:    "default",
 				commitID:   "hash2",
 				modulePath: "foo/one",
 				module:     types.NamespacedName{Namespace: "foo", Name: "one"},
@@ -853,9 +866,10 @@ func Test_isPlanRequestAckPostedForCommit(t *testing.T) {
 				}{Nodes: []prComment{
 					{
 						DatabaseID: 01234567,
-						Body:       requestAcknowledgedMsg("foo/one", "foo/one", "hash2", &metav1.Time{Time: time.Now().Add(5 * time.Minute)}),
+						Body:       requestAcknowledgedMsg("default", "foo/one", "foo/one", "hash2", &metav1.Time{Time: time.Now().Add(5 * time.Minute)}),
 					},
 				}}},
+				cluster:    "default",
 				commitID:   "hash2",
 				modulePath: "foo/one",
 				module:     types.NamespacedName{Namespace: "foo", Name: "one"},
@@ -869,9 +883,10 @@ func Test_isPlanRequestAckPostedForCommit(t *testing.T) {
 				}{Nodes: []prComment{
 					{
 						DatabaseID: 01234567,
-						Body:       requestAcknowledgedMsg("foo/one", "foo/one", "hash2", &metav1.Time{Time: time.Now()}),
+						Body:       requestAcknowledgedMsg("default", "foo/one", "foo/one", "hash2", &metav1.Time{Time: time.Now()}),
 					},
 				}}},
+				cluster:    "default",
 				commitID:   "hash3",
 				modulePath: "foo/one",
 				module:     types.NamespacedName{Namespace: "foo", Name: "one"},
@@ -885,9 +900,10 @@ func Test_isPlanRequestAckPostedForCommit(t *testing.T) {
 				}{Nodes: []prComment{
 					{
 						DatabaseID: 01234567,
-						Body:       requestAcknowledgedMsg("foo/two", "foo/two", "hash3", &metav1.Time{Time: time.Now()}),
+						Body:       requestAcknowledgedMsg("default", "foo/two", "foo/two", "hash3", &metav1.Time{Time: time.Now()}),
 					},
 				}}},
+				cluster:    "default",
 				commitID:   "hash3",
 				modulePath: "foo/one",
 				module:     types.NamespacedName{Namespace: "foo", Name: "one"},
@@ -897,7 +913,7 @@ func Test_isPlanRequestAckPostedForCommit(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := isPlanRequestAckPostedForCommit(tt.args.pr, tt.args.commitID, tt.args.modulePath, tt.args.module); got != tt.want {
+			if got := isPlanRequestAckPostedForCommit(tt.args.cluster, tt.args.pr, tt.args.commitID, tt.args.modulePath, tt.args.module); got != tt.want {
 				t.Errorf("isPlanRequestAckPostedForCommit() = %v, want %v", got, tt.want)
 			}
 		})
