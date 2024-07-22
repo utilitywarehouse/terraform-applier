@@ -186,7 +186,7 @@ func TestCheckPRCommits(t *testing.T) {
 
 		p := generateMockPR(123, "ref1",
 			[]string{"hash2", "hash3"},
-			[]string{"random comment", "Terraform plan output for module `foo/two` Commit ID: `hash2`", "random comment"},
+			[]string{"random comment", runOutputMsg("default", "foo/two", "foo/two", &tfaplv1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy.", Output: "some output"}), "random comment"},
 			nil,
 		)
 
@@ -245,6 +245,62 @@ func TestCheckPRCommits(t *testing.T) {
 		}
 	})
 
+	t.Run("module output uploaded by diff cluster", func(t *testing.T) {
+		testRedis := sysutil.NewMockRedisInterface(goMockCtrl)
+		testGithub := NewMockGithubInterface(goMockCtrl)
+		planner.github = testGithub
+		planner.RedisClient = testRedis
+
+		p := generateMockPR(123, "ref1",
+			[]string{"hash1", "hash2", "hash3"},
+			[]string{"random comment", runOutputMsg("diff-cluster", "foo/two", "foo/two", &tfaplv1beta1.Run{CommitHash: "hash3", Summary: "Plan: x to add, x to change, x to destroy.", Output: "some output"}), "random comment"},
+
+			nil,
+		)
+
+		module := &tfaplv1beta1.Module{
+			ObjectMeta: metav1.ObjectMeta{Namespace: "foo", Name: "two"},
+			Spec: tfaplv1beta1.ModuleSpec{
+				RepoURL: "https://github.com/owner-a/repo-a.git",
+				Path:    "foo/two",
+			},
+		}
+
+		// mock db call with no result found
+		testRedis.EXPECT().PRRun(gomock.Any(),
+			types.NamespacedName{Namespace: "foo", Name: "two"}, 123, "hash3").
+			Return(nil, sysutil.ErrKeyNotFound)
+
+		// mock github API Call adding new request info
+		testGithub.EXPECT().postComment(gomock.Any(), gomock.Any(), 0, 123, gomock.Any()).
+			DoAndReturn(func(repoOwner, repoName string, commentID, prNumber int, commentBody prComment) (int, error) {
+				// validate comment message
+				if !requestAcknowledgedMsgRegex.Match([]byte(commentBody.Body)) {
+					return 0, fmt.Errorf("comment body doesn't match requestAcknowledgedRegex")
+				}
+				return 111, nil
+			})
+
+		// Call Test function
+		gotReq, err := planner.checkPRCommits(ctx, p, module)
+		if err != nil {
+			t.Fatalf("unexpected error: %s", err)
+		}
+
+		var wantReq = &tfaplv1beta1.Request{
+			Type: "PullRequestPlan",
+			PR: &tfaplv1beta1.PullRequest{
+				Number:     123,
+				HeadBranch: "ref1",
+				CommentID:  111,
+			},
+		}
+
+		if diff := cmp.Diff(wantReq, gotReq, cmpIgnoreRandFields); diff != "" {
+			t.Errorf("checkPRCommits() mismatch (-want +got):\n%s", diff)
+		}
+	})
+
 	t.Run("module run request is pending", func(t *testing.T) {
 		testRedis := sysutil.NewMockRedisInterface(goMockCtrl)
 		testGithub := NewMockGithubInterface(goMockCtrl)
@@ -279,6 +335,62 @@ func TestCheckPRCommits(t *testing.T) {
 		}
 	})
 
+	t.Run("module run request is pending by diff cluster", func(t *testing.T) {
+		testRedis := sysutil.NewMockRedisInterface(goMockCtrl)
+		testGithub := NewMockGithubInterface(goMockCtrl)
+		planner.github = testGithub
+		planner.RedisClient = testRedis
+
+		p := generateMockPR(123, "ref1",
+			[]string{"hash1", "hash2", "hash3"},
+			[]string{"random comment", requestAcknowledgedMsg("diff-cluster", "foo/two", "foo/two", "hash3", &metav1.Time{Time: time.Now()}), "random comment"},
+
+			nil,
+		)
+
+		module := &tfaplv1beta1.Module{
+			ObjectMeta: metav1.ObjectMeta{Namespace: "foo", Name: "two"},
+			Spec: tfaplv1beta1.ModuleSpec{
+				RepoURL: "https://github.com/owner-a/repo-a.git",
+				Path:    "foo/two",
+			},
+		}
+
+		// mock db call with no result found
+		testRedis.EXPECT().PRRun(gomock.Any(),
+			types.NamespacedName{Namespace: "foo", Name: "two"}, 123, "hash3").
+			Return(nil, sysutil.ErrKeyNotFound)
+
+		// mock github API Call adding new request info
+		testGithub.EXPECT().postComment(gomock.Any(), gomock.Any(), 0, 123, gomock.Any()).
+			DoAndReturn(func(repoOwner, repoName string, commentID, prNumber int, commentBody prComment) (int, error) {
+				// validate comment message
+				if !requestAcknowledgedMsgRegex.Match([]byte(commentBody.Body)) {
+					return 0, fmt.Errorf("comment body doesn't match requestAcknowledgedRegex")
+				}
+				return 111, nil
+			})
+
+		// Call Test function
+		gotReq, err := planner.checkPRCommits(ctx, p, module)
+		if err != nil {
+			t.Fatalf("unexpected error: %s", err)
+		}
+
+		var wantReq = &tfaplv1beta1.Request{
+			Type: "PullRequestPlan",
+			PR: &tfaplv1beta1.PullRequest{
+				Number:     123,
+				HeadBranch: "ref1",
+				CommentID:  111,
+			},
+		}
+
+		if diff := cmp.Diff(wantReq, gotReq, cmpIgnoreRandFields); diff != "" {
+			t.Errorf("checkPRCommits() mismatch (-want +got):\n%s", diff)
+		}
+	})
+
 	t.Run("old commit run output uploaded and new commit added", func(t *testing.T) {
 		testRedis := sysutil.NewMockRedisInterface(goMockCtrl)
 		testGithub := NewMockGithubInterface(goMockCtrl)
@@ -287,7 +399,7 @@ func TestCheckPRCommits(t *testing.T) {
 
 		p := generateMockPR(123, "ref1",
 			[]string{"hash1", "hash2", "hash3"},
-			[]string{"random comment", "Terraform plan output for module `foo/two` Commit ID: `hash2`", "random comment"},
+			[]string{"random comment", runOutputMsg("default", "foo/two", "foo/two", &tfaplv1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy.", Output: "some output"}), "random comment"},
 			nil,
 		)
 
@@ -616,6 +728,102 @@ func Test_checkPRCommentsForPlanRequests(t *testing.T) {
 		}
 	})
 
+	t.Run("request acknowledged for module by diff cluster", func(t *testing.T) {
+		testGithub := NewMockGithubInterface(goMockCtrl)
+		planner.github = testGithub
+
+		// avoid generating another request from `@terraform-applier plan` comment
+		// is there's already a request ID posted for the module
+		// module might not be annotated by the time the loop checks it, which in this
+		// case would mean plan out is ready ot be posted and NOT run hasn't been requested yet
+		pr := generateMockPR(123, "ref1",
+			[]string{"hash1", "hash2", "hash3"},
+			[]string{
+				"@terraform-applier plan two",
+				requestAcknowledgedMsg("diff-cluster", "foo/two", "path/foo/two", "hash2", mustParseMetaTime("2023-04-02T15:04:05Z")),
+				requestAcknowledgedMsg("default", "foo/three", "path/foo/three", "hash3", mustParseMetaTime("2023-04-02T15:04:05Z")),
+			},
+			nil,
+		)
+
+		// mock github API Call adding new request info
+		testGithub.EXPECT().postComment(gomock.Any(), gomock.Any(), 0, 123, gomock.Any()).
+			DoAndReturn(func(repoOwner, repoName string, commentID, prNumber int, commentBody prComment) (int, error) {
+				// validate comment message
+				if !requestAcknowledgedMsgRegex.Match([]byte(commentBody.Body)) {
+					return 0, fmt.Errorf("comment body doesn't match requestAcknowledgedRegex")
+				}
+				return 111, nil
+			})
+
+		testGit.EXPECT().Hash(gomock.Any(), gomock.Any(), "ref1", "path/foo/two").
+			Return("hash1", nil)
+
+		gotReq, err := planner.checkPRCommentsForPlanRequests(pr, module)
+		if err != nil {
+			t.Fatalf("unexpected error: %s", err)
+		}
+
+		wantReq := &tfaplv1beta1.Request{
+			Type: "PullRequestPlan",
+			PR: &tfaplv1beta1.PullRequest{
+				Number:     123,
+				HeadBranch: "ref1",
+				CommentID:  111,
+			},
+		}
+
+		if diff := cmp.Diff(wantReq, gotReq, cmpIgnoreRandFields); diff != "" {
+			t.Errorf("checkPRCommits() mismatch (-want +got):\n%s", diff)
+		}
+	})
+
+	t.Run("plan out posted for module by diff cluster", func(t *testing.T) {
+		testGithub := NewMockGithubInterface(goMockCtrl)
+		planner.github = testGithub
+
+		pr := generateMockPR(123, "ref1",
+			[]string{"hash1", "hash2", "hash3"},
+			[]string{
+				"@terraform-applier plan two",
+				runOutputMsg("diff-cluster", "foo/two", "path/foo/two", &tfaplv1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy.", Output: "tf plan output"}),
+				runOutputMsg("default", "foo/three", "path/foo/three", &tfaplv1beta1.Run{CommitHash: "hash3", Summary: "Plan: x to add, x to change, x to destroy.", Output: "tf plan output"}),
+			},
+			nil,
+		)
+
+		// mock github API Call adding new request info
+		testGithub.EXPECT().postComment(gomock.Any(), gomock.Any(), 0, 123, gomock.Any()).
+			DoAndReturn(func(repoOwner, repoName string, commentID, prNumber int, commentBody prComment) (int, error) {
+				// validate comment message
+				if !requestAcknowledgedMsgRegex.Match([]byte(commentBody.Body)) {
+					return 0, fmt.Errorf("comment body doesn't match requestAcknowledgedRegex")
+				}
+				return 111, nil
+			})
+
+		testGit.EXPECT().Hash(gomock.Any(), gomock.Any(), "ref1", "path/foo/two").
+			Return("hash1", nil)
+
+		gotReq, err := planner.checkPRCommentsForPlanRequests(pr, module)
+		if err != nil {
+			t.Fatalf("unexpected error: %s", err)
+		}
+
+		wantReq := &tfaplv1beta1.Request{
+			Type: "PullRequestPlan",
+			PR: &tfaplv1beta1.PullRequest{
+				Number:     123,
+				HeadBranch: "ref1",
+				CommentID:  111,
+			},
+		}
+
+		if diff := cmp.Diff(wantReq, gotReq, cmpIgnoreRandFields); diff != "" {
+			t.Errorf("checkPRCommits() mismatch (-want +got):\n%s", diff)
+		}
+	})
+
 	t.Run("plan run is requested for module in different Namespace or diff path", func(t *testing.T) {
 		p := generateMockPR(123, "ref1",
 			[]string{"hash1", "hash2", "hash3"},
@@ -697,6 +905,24 @@ func Test_isPlanOutputPostedForCommit(t *testing.T) {
 				module:     types.NamespacedName{Namespace: "foo", Name: "one"},
 			},
 			want: true,
+		},
+		{
+			name: "Matching NamespacedName and Commit ID - diff cluster",
+			args: args{
+				pr: &pr{Comments: struct {
+					Nodes []prComment `json:"nodes"`
+				}{Nodes: []prComment{
+					{
+						DatabaseID: 01234567,
+						Body:       runOutputMsg("diff-cluster", "foo/one", "foo/one", &tfaplv1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy."}),
+					},
+				}}},
+				cluster:    "default",
+				commitID:   "hash2",
+				modulePath: "foo/one",
+				module:     types.NamespacedName{Namespace: "foo", Name: "one"},
+			},
+			want: false,
 		},
 		{
 			name: "Matching Name and Commit ID",
@@ -841,6 +1067,23 @@ func Test_isPlanRequestAckPostedForCommit(t *testing.T) {
 				module:     types.NamespacedName{Namespace: "foo", Name: "one"},
 			},
 			want: true,
+		}, {
+			name: "Matching NamespacedName and Commit ID and req is current from diff cluster",
+			args: args{
+				pr: &pr{Comments: struct {
+					Nodes []prComment `json:"nodes"`
+				}{Nodes: []prComment{
+					{
+						DatabaseID: 01234567,
+						Body:       requestAcknowledgedMsg("diff-cluster", "foo/one", "foo/one", "hash2", &metav1.Time{Time: time.Now()}),
+					},
+				}}},
+				cluster:    "default",
+				commitID:   "hash2",
+				modulePath: "foo/one",
+				module:     types.NamespacedName{Namespace: "foo", Name: "one"},
+			},
+			want: false,
 		}, {
 			name: "Matching NamespacedName and Commit ID and req is old",
 			args: args{
