@@ -17,8 +17,8 @@ spec:
       port: 8081
       targetPort: 8081
     - name: webhook
-      port: 8083
       protocol: TCP
+      port: 8083
       targetPort: 8083
   selector:
     control-plane: terraform-applier
