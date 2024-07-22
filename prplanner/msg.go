@@ -85,7 +85,14 @@ func parseRunOutputMsg(comment string) (cluster string, module types.NamespacedN
 func runOutputMsg(cluster, module, path string, run *v1beta1.Run) string {
 	// https://github.com/orgs/community/discussions/27190
 	characterLimit := 65000
+
 	runOutput := run.Output
+	// when run fails upload init output as well since it may contain
+	// reason of the failure
+	if run.Status == v1beta1.StatusErrored {
+		runOutput = run.InitOutput + "\n" + run.Output
+	}
+
 	runes := []rune(runOutput)
 
 	if len(runes) > characterLimit {

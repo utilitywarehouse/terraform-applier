@@ -271,6 +271,24 @@ func Test_runOutputMsg(t *testing.T) {
 				"</details>\n" +
 				"To manually trigger plan again please post `@terraform-applier plan path/baz/one` as comment.",
 		},
+		{
+			"2",
+			args{cluster: "default", module: "baz/one", path: "path/baz/one", run: &v1beta1.Run{Status: v1beta1.StatusErrored, CommitHash: "hash2", Summary: "unable to plan module", InitOutput: "Some Init Output...", Output: "Some TF Output ....."}},
+			"Terraform plan output for\n" +
+				"```\n" +
+				"Cluster: default\n" +
+				"Module: baz/one\n" +
+				"Path: path/baz/one\n" +
+				"Commit ID: hash2\n" +
+				"```\n" +
+				"<details><summary><b>Run Status: Errored, Run Summary: unable to plan module</b></summary>\n\n" +
+				"```" +
+				"terraform\n" +
+				"Some Init Output...\nSome TF Output .....\n" +
+				"```\n" +
+				"</details>\n" +
+				"To manually trigger plan again please post `@terraform-applier plan path/baz/one` as comment.",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

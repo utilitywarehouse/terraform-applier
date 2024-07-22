@@ -435,6 +435,7 @@ func (r *Runner) SetRunFinishedStatus(run *tfaplv1beta1.Run, m *tfaplv1beta1.Mod
 func (r *Runner) setFailedStatus(run *tfaplv1beta1.Run, module *tfaplv1beta1.Module, reason, msg string) {
 	run.Status = tfaplv1beta1.StatusErrored
 	run.Duration = time.Since(run.StartedAt.Time)
+	run.Summary = msg
 	// msg in this case is an error message
 	run.Output = msg + "\n" + run.Output
 
