@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/utilitywarehouse/terraform-applier/api/v1beta1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
 
@@ -16,71 +17,126 @@ func Test_parsePlanReqMsg(t *testing.T) {
 		commentBody string
 	}
 	tests := []struct {
-		name string
-		args args
-		want types.NamespacedName
+		name                 string
+		args                 args
+		wantNamespace        types.NamespacedName
+		wantModuleNameOrPath string
 	}{
 		{
-			name: "Namespace and Name",
-			args: args{commentBody: "@terraform-applier plan foo/one"},
-			want: types.NamespacedName{Namespace: "foo", Name: "one"},
+			name:                 "Correct path given",
+			args:                 args{commentBody: "@terraform-applier plan foo/one"},
+			wantModuleNameOrPath: "foo/one",
 		},
 		{
-			name: "Namespace and Name",
-			args: args{commentBody: "@terraform-applier plan foo/two\n@terraform-applier plan foo/one"},
-			want: types.NamespacedName{Namespace: "foo", Name: "two"},
+			name:                 "relative path with dot",
+			args:                 args{commentBody: "@terraform-applier plan ./foo/one"},
+			wantModuleNameOrPath: "./foo/one",
 		},
 		{
-			name: "Name only",
-			args: args{commentBody: "@terraform-applier plan one"},
-			want: types.NamespacedName{Name: "one"},
+			name:                 "Request made twice",
+			args:                 args{commentBody: "@terraform-applier plan foo/one\n@terraform-applier plan foo/baz"},
+			wantModuleNameOrPath: "",
 		},
 		{
-			name: "Empty string",
-			args: args{commentBody: ""},
-			want: types.NamespacedName{},
+			name:                 "Name only",
+			args:                 args{commentBody: "@terraform-applier plan one"},
+			wantModuleNameOrPath: "one",
 		},
 		{
-			name: "Multiple slashes",
-			args: args{commentBody: "foo/one/extra"},
-			want: types.NamespacedName{},
+			name:                 "Empty string",
+			args:                 args{commentBody: ""},
+			wantModuleNameOrPath: "",
 		},
 		{
-			name: "Leading slash",
-			args: args{commentBody: "/one"},
-			want: types.NamespacedName{},
+			name:                 "Too many slashes",
+			args:                 args{commentBody: "@terraform-applier plan foo/one/baz"},
+			wantModuleNameOrPath: "foo/one/baz",
 		},
 		{
-			name: "Trailing slash",
-			args: args{commentBody: "foo/"},
-			want: types.NamespacedName{},
+			name:                 "dot as path",
+			args:                 args{commentBody: "@terraform-applier plan ."},
+			wantModuleNameOrPath: ".",
 		},
 		{
-			name: "do not trigger plan on module limit comment",
-			args: args{commentBody: moduleLimitReachedTml},
-			want: types.NamespacedName{},
-		}, {
-			name: "do not trigger plan on our module request Acknowledged Msg",
-			args: args{commentBody: requestAcknowledgedMsg("foo/one", "path/to/module/one", "hash1", mustParseMetaTime("2006-01-02T15:04:05+07:00"))},
-			want: types.NamespacedName{},
-		}, {
-			name: "do not trigger plan on our module run Output Msg",
-			args: args{commentBody: runOutputMsg("foo/one", "foo/one", &v1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy."})},
-			want: types.NamespacedName{},
-		}, {
-			name: "with surrounding `",
-			args: args{commentBody: "`@terraform-applier plan foo-bar/one`"},
-			want: types.NamespacedName{Namespace: "foo-bar", Name: "one"},
-		}, {
-			name: "with ` surrounding only name",
-			args: args{commentBody: "@terraform-applier plan `foo_bar/one`"},
-			want: types.NamespacedName{Namespace: "foo_bar", Name: "one"},
+			name:                 "Trailing slash",
+			args:                 args{commentBody: "@terraform-applier plan foo/"},
+			wantModuleNameOrPath: "foo/",
+		},
+		{
+			name:                 "do not trigger plan on module limit comment",
+			args:                 args{commentBody: moduleLimitReachedTml},
+			wantModuleNameOrPath: "",
+		},
+		{
+			name:                 "do not trigger plan on our module request Acknowledged Msg",
+			args:                 args{commentBody: requestAcknowledgedMsg("default", "foo/one", "path/to/module/one", "hash1", mustParseMetaTime("2006-01-02T15:04:05+07:00"))},
+			wantModuleNameOrPath: "",
+		},
+		{
+			name:                 "do not trigger plan on our module run Output Msg",
+			args:                 args{commentBody: runOutputMsg("default", "foo/one", "foo/one", &v1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy."})},
+			wantModuleNameOrPath: "",
+		},
+		{
+			name:                 "with surrounding `",
+			args:                 args{commentBody: "`@terraform-applier plan foo-baz/one`"},
+			wantModuleNameOrPath: "foo-baz/one",
+		},
+		{
+			name:                 "with ` surrounding only name",
+			args:                 args{commentBody: "@terraform-applier plan `foo_bar/one`"},
+			wantModuleNameOrPath: "foo_bar/one",
+		},
+		{
+			name:                 "correct Name with a random suffix",
+			args:                 args{commentBody: "@terraform-applier plan two please"},
+			wantModuleNameOrPath: "",
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := parsePlanReqMsg(tt.args.commentBody); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("parsePlanReqMsg() = %v, want %v", got, tt.want)
+			gotModuleNameOrPath := parsePlanReqMsg(tt.args.commentBody)
+			if !reflect.DeepEqual(gotModuleNameOrPath, tt.wantModuleNameOrPath) {
+				t.Errorf("parsePlanReqMsg() = %v, wantModuleNameOrPath %v", gotModuleNameOrPath, tt.wantModuleNameOrPath)
+			}
+		})
+	}
+}
+
+func Test_requestAcknowledgedMsg(t *testing.T) {
+	type args struct {
+		cluster  string
+		module   string
+		path     string
+		commitID string
+		reqAt    *metav1.Time
+	}
+	tests := []struct {
+		name string
+		args args
+		want string
+	}{
+		{
+			"1",
+			args{cluster: "default", module: "foo/one", path: "path/to/module/one", commitID: "hash1", reqAt: mustParseMetaTime("2006-01-02T15:04:05+07:00")},
+			"Received terraform plan request\n" +
+				"```\n" +
+				"Cluster: default\n" +
+				"Module: foo/one\n" +
+				"Path: path/to/module/one\n" +
+				"Commit ID: hash1\n" +
+				"Requested At: 2006-01-02T15:04:05+07:00\n" +
+				"```\n" +
+				"Do not edit this comment. This message will be updated once the plan run is completed.\n" +
+				"To manually trigger plan again please post `@terraform-applier plan path/to/module/one` as comment.",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := requestAcknowledgedMsg(tt.args.cluster, tt.args.module, tt.args.path, tt.args.commitID, tt.args.reqAt)
+
+			if diff := cmp.Diff(tt.want, got); diff != "" {
+				t.Errorf("requestAcknowledgedMsg() mismatch (-want +got):\n%s", diff)
 			}
 		})
 	}
@@ -91,12 +147,13 @@ func Test_parseRequestAcknowledgedMsg(t *testing.T) {
 		commentBody string
 	}
 	tests := []struct {
-		name       string
-		args       args
-		wantModule types.NamespacedName
-		wantPath   string
-		wantHash   string
-		wantReqAt  *time.Time
+		name        string
+		args        args
+		wantCluster string
+		wantModule  types.NamespacedName
+		wantPath    string
+		wantHash    string
+		wantReqAt   *time.Time
 	}{
 		{
 			name:       "Empty string",
@@ -105,28 +162,40 @@ func Test_parseRequestAcknowledgedMsg(t *testing.T) {
 			wantReqAt:  nil,
 		},
 		{
-			name:       "NamespacedName + Requested At",
-			args:       args{commentBody: requestAcknowledgedMsg("foo/one", "path/to/module/one", "hash1", mustParseMetaTime("2006-01-02T15:04:05+07:00"))},
-			wantModule: types.NamespacedName{Namespace: "foo", Name: "one"},
-			wantPath:   "path/to/module/one",
-			wantHash:   "hash1",
-			wantReqAt:  mustParseTime("2006-01-02T15:04:05+07:00"),
+			name:        "NamespacedName + Requested At",
+			args:        args{commentBody: requestAcknowledgedMsg("default", "foo/one", "path/to/module/one", "hash1", mustParseMetaTime("2006-01-02T15:04:05+07:00"))},
+			wantModule:  types.NamespacedName{Namespace: "foo", Name: "one"},
+			wantCluster: "default",
+			wantPath:    "path/to/module/one",
+			wantHash:    "hash1",
+			wantReqAt:   mustParseTime("2006-01-02T15:04:05+07:00"),
 		},
 		{
-			name:       "NamespacedName + Requested At UTC",
-			args:       args{commentBody: requestAcknowledgedMsg("foo/one", "foo/one", "hash2", mustParseMetaTime("2023-04-02T15:04:05Z"))},
-			wantModule: types.NamespacedName{Namespace: "foo", Name: "one"},
-			wantPath:   "foo/one",
-			wantHash:   "hash2",
-			wantReqAt:  mustParseTime("2023-04-02T15:04:05Z"),
+			name:        "cluster env with spec char",
+			args:        args{commentBody: requestAcknowledgedMsg("clusterEnv-with_", "foo/one", "path/to/module/one", "hash1", mustParseMetaTime("2006-01-02T15:04:05+07:00"))},
+			wantModule:  types.NamespacedName{Namespace: "foo", Name: "one"},
+			wantCluster: "clusterEnv-with_",
+			wantPath:    "path/to/module/one",
+			wantHash:    "hash1",
+			wantReqAt:   mustParseTime("2006-01-02T15:04:05+07:00"),
 		},
 		{
-			name:       "Name + Requested At",
-			args:       args{commentBody: requestAcknowledgedMsg("one", "foo/one", "hash3", mustParseMetaTime("2023-04-02T15:04:05Z"))},
-			wantModule: types.NamespacedName{Name: "one"},
-			wantPath:   "foo/one",
-			wantHash:   "hash3",
-			wantReqAt:  mustParseTime("2023-04-02T15:04:05Z"),
+			name:        "NamespacedName + Requested At UTC",
+			args:        args{commentBody: requestAcknowledgedMsg("default", "foo/one", "foo/one", "hash2", mustParseMetaTime("2023-04-02T15:04:05Z"))},
+			wantModule:  types.NamespacedName{Namespace: "foo", Name: "one"},
+			wantCluster: "default",
+			wantPath:    "foo/one",
+			wantHash:    "hash2",
+			wantReqAt:   mustParseTime("2023-04-02T15:04:05Z"),
+		},
+		{
+			name:        "Name + Requested At",
+			args:        args{commentBody: requestAcknowledgedMsg("default", "one", "foo/one", "hash3", mustParseMetaTime("2023-04-02T15:04:05Z"))},
+			wantModule:  types.NamespacedName{Name: "one"},
+			wantCluster: "default",
+			wantPath:    "foo/one",
+			wantHash:    "hash3",
+			wantReqAt:   mustParseTime("2023-04-02T15:04:05Z"),
 		},
 		{
 			name:       "missing Requested At",
@@ -152,7 +221,10 @@ func Test_parseRequestAcknowledgedMsg(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gotModule, gotPath, gotHash, gotReqAt := parseRequestAcknowledgedMsg(tt.args.commentBody)
+			gotCluster, gotModule, gotPath, gotHash, gotReqAt := parseRequestAcknowledgedMsg(tt.args.commentBody)
+			if !reflect.DeepEqual(gotCluster, tt.wantCluster) {
+				t.Errorf("parseRequestAcknowledgedMsg() gotCluster = %v, want %v", gotCluster, tt.wantModule)
+			}
 			if !reflect.DeepEqual(gotModule, tt.wantModule) {
 				t.Errorf("parseRequestAcknowledgedMsg() gotModule = %v, want %v", gotModule, tt.wantModule)
 			}
@@ -169,58 +241,166 @@ func Test_parseRequestAcknowledgedMsg(t *testing.T) {
 	}
 }
 
+func Test_runOutputMsg(t *testing.T) {
+	type args struct {
+		cluster string
+		module  string
+		path    string
+		run     *v1beta1.Run
+	}
+	tests := []struct {
+		name string
+		args args
+		want string
+	}{
+		{
+			"1",
+			args{cluster: "default", module: "baz/one", path: "path/baz/one", run: &v1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy.", Output: "Terraform apply output...."}},
+			"Terraform plan output for\n" +
+				"```\n" +
+				"Cluster: default\n" +
+				"Module: baz/one\n" +
+				"Path: path/baz/one\n" +
+				"Commit ID: hash2\n" +
+				"```\n" +
+				"<details><summary><b>Run Status: , Run Summary: Plan: x to add, x to change, x to destroy.</b></summary>\n\n" +
+				"```" +
+				"terraform\n" +
+				"Terraform apply output....\n" +
+				"```\n" +
+				"</details>\n" +
+				"To manually trigger plan again please post `@terraform-applier plan path/baz/one` as comment.",
+		},
+		{
+			"2",
+			args{cluster: "default", module: "baz/one", path: "path/baz/one", run: &v1beta1.Run{Status: v1beta1.StatusErrored, CommitHash: "hash2", Summary: "unable to plan module", InitOutput: "Some Init Output...", Output: "Some TF Output ....."}},
+			"Terraform plan output for\n" +
+				"```\n" +
+				"Cluster: default\n" +
+				"Module: baz/one\n" +
+				"Path: path/baz/one\n" +
+				"Commit ID: hash2\n" +
+				"```\n" +
+				"<details><summary><b>Run Status: Errored, Run Summary: unable to plan module</b></summary>\n\n" +
+				"```" +
+				"terraform\n" +
+				"Some Init Output...\nSome TF Output .....\n" +
+				"```\n" +
+				"</details>\n" +
+				"To manually trigger plan again please post `@terraform-applier plan path/baz/one` as comment.",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := runOutputMsg(tt.args.cluster, tt.args.module, tt.args.path, tt.args.run)
+
+			if diff := cmp.Diff(tt.want, got); diff != "" {
+				t.Errorf("runOutputMsg() mismatch (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
 func Test_parseRunOutputMsg(t *testing.T) {
 	type args struct {
 		comment string
 	}
 	tests := []struct {
-		name       string
-		args       args
-		wantModule types.NamespacedName
-		wantCommit string
+		name        string
+		args        args
+		wantCluster string
+		wantModule  types.NamespacedName
+		wantPath    string
+		wantCommit  string
 	}{
 		{
-			name:       "NamespaceName + Commit ID",
-			args:       args{comment: runOutputMsg("foo/one", "foo/one", &v1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy."})},
-			wantModule: types.NamespacedName{Namespace: "foo", Name: "one"},
-			wantCommit: "hash2",
+			name:        "NamespaceName + Commit ID",
+			args:        args{comment: runOutputMsg("default", "baz/one", "foo/one", &v1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy."})},
+			wantModule:  types.NamespacedName{Namespace: "baz", Name: "one"},
+			wantCluster: "default",
+			wantPath:    "foo/one",
+			wantCommit:  "hash2",
 		},
 		{
-			name:       "NamespaceName only",
-			args:       args{comment: runOutputMsg("one", "foo/one", &v1beta1.Run{Summary: "Plan: x to add, x to change, x to destroy."})},
+			name:        "cluster env with spec char",
+			args:        args{comment: runOutputMsg("default_-", "baz/one", "foo/one", &v1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy."})},
+			wantModule:  types.NamespacedName{Namespace: "baz", Name: "one"},
+			wantCluster: "default_-",
+			wantPath:    "foo/one",
+			wantCommit:  "hash2",
+		},
+		{
+			name:       "Module Name only",
+			args:       args{comment: runOutputMsg("default", "one", "foo/one", &v1beta1.Run{Summary: "Plan: x to add, x to change, x to destroy."})},
 			wantModule: types.NamespacedName{},
+			wantPath:   "",
 			wantCommit: "",
 		},
 		{
-			name:       "missing name",
-			args:       args{comment: runOutputMsg("", "foo/one", &v1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy."})},
+			name:       "Module Name missing",
+			args:       args{comment: runOutputMsg("default", "", "foo/one", &v1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy."})},
 			wantModule: types.NamespacedName{},
+			wantPath:   "",
 			wantCommit: "",
 		},
 		{
-			name:       "Name + Commit ID",
-			args:       args{comment: runOutputMsg("one", "foo/one", &v1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy."})},
-			wantModule: types.NamespacedName{Name: "one"},
-			wantCommit: "hash2",
+			name:        "Module Name + Commit ID",
+			args:        args{comment: runOutputMsg("default", "one", "foo/one", &v1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy."})},
+			wantModule:  types.NamespacedName{Name: "one"},
+			wantCluster: "default",
+			wantPath:    "foo/one",
+			wantCommit:  "hash2",
+		},
+		{
+			name:        "Path cluster only",
+			args:        args{comment: runOutputMsg("default", "baz/one", "foo/", &v1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy."})},
+			wantModule:  types.NamespacedName{Namespace: "baz", Name: "one"},
+			wantCluster: "default",
+			wantPath:    "foo/",
+			wantCommit:  "hash2",
+		},
+		{
+			name:        "Path Module Name only",
+			args:        args{comment: runOutputMsg("default", "baz/one", "/one", &v1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy."})},
+			wantModule:  types.NamespacedName{Namespace: "baz", Name: "one"},
+			wantCluster: "default",
+			wantPath:    "/one",
+			wantCommit:  "hash2",
+		},
+		{
+			name:        "Path one word only",
+			args:        args{comment: runOutputMsg("default", "baz/one", "one", &v1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy."})},
+			wantModule:  types.NamespacedName{Namespace: "baz", Name: "one"},
+			wantCluster: "default",
+			wantPath:    "one",
+			wantCommit:  "hash2",
 		},
 		{
 			name:       "@terraform-applier plan only",
 			args:       args{comment: "@terraform-applier plan"},
 			wantModule: types.NamespacedName{},
+			wantPath:   "",
 			wantCommit: "",
 		},
 		{
 			name:       "Empty string",
 			args:       args{comment: ""},
 			wantModule: types.NamespacedName{},
+			wantPath:   "",
 			wantCommit: "",
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gotModule, gotCommit := parseRunOutputMsg(tt.args.comment)
+			gotCluster, gotModule, gotPath, gotCommit := parseRunOutputMsg(tt.args.comment)
+			if !reflect.DeepEqual(gotCluster, tt.wantCluster) {
+				t.Errorf("parseRunOutputMsg() gotCluster = %v, want %v", gotCluster, tt.wantCluster)
+			}
 			if !reflect.DeepEqual(gotModule, tt.wantModule) {
 				t.Errorf("parseRunOutputMsg() gotModule = %v, want %v", gotModule, tt.wantModule)
+			}
+			if gotPath != tt.wantPath {
+				t.Errorf("parseRunOutputMsg() gotPath = %v, want %v", gotPath, tt.wantPath)
 			}
 			if gotCommit != tt.wantCommit {
 				t.Errorf("parseRunOutputMsg() gotCommit = %v, want %v", gotCommit, tt.wantCommit)

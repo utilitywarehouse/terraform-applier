@@ -20,7 +20,8 @@ func (p *Planner) ensurePlanRequests(ctx context.Context, pr *pr, prModules []ty
 			continue
 		}
 
-		if module.Spec.PlanOnPR == nil || !*module.Spec.PlanOnPR {
+		// We need to skip module only if planOnPR was explicitly disabled
+		if module.Spec.PlanOnPR != nil && !*module.Spec.PlanOnPR {
 			continue
 		}
 
@@ -68,11 +69,11 @@ func (p *Planner) checkPRCommits(ctx context.Context, pr *pr, module *tfaplv1bet
 		}
 
 		// check if we have already processed (uploaded output) this commit
-		if isPlanOutputPostedForCommit(pr, commit.Oid, module.NamespacedName()) {
+		if isPlanOutputPostedForCommit(p.ClusterEnvName, pr, commit.Oid, module.Spec.Path, module.NamespacedName()) {
 			return nil, nil
 		}
 
-		if isPlanRequestAckPostedForCommit(pr, commit.Oid, module.NamespacedName()) {
+		if isPlanRequestAckPostedForCommit(p.ClusterEnvName, pr, commit.Oid, module.Spec.Path, module.NamespacedName()) {
 			return nil, nil
 		}
 
@@ -109,36 +110,39 @@ func (p *Planner) checkPRCommentsForPlanRequests(pr *pr, module *tfaplv1beta1.Mo
 		comment := pr.Comments.Nodes[i]
 
 		// Skip if request already acknowledged for module
-		commentModule, _, _, reqAt := parseRequestAcknowledgedMsg(comment.Body)
-		if commentModule == module.NamespacedName() &&
+		commentCluster, commentModule, commentPath, _, reqAt := parseRequestAcknowledgedMsg(comment.Body)
+		if commentCluster == p.ClusterEnvName &&
+			commentModule == module.NamespacedName() &&
+			commentPath == module.Spec.Path &&
 			reqAt != nil && time.Until(*reqAt) < 10*time.Minute {
 			return nil, nil
 		}
 
 		// Skip if terraform plan output is already posted
-		commentModule, _ = parseRunOutputMsg(comment.Body)
-		if commentModule == module.NamespacedName() {
+		commentCluster, commentModule, commentPath, _ = parseRunOutputMsg(comment.Body)
+		if commentCluster == p.ClusterEnvName &&
+			commentModule == module.NamespacedName() &&
+			commentPath == module.Spec.Path {
 			return nil, nil
 		}
 
-		// Check if user requested terraform plan run
-		// '@terraform-applier plan [<module namespace>]/<module name>'
-		commentModule = parsePlanReqMsg(comment.Body)
-		if commentModule.Name != module.Name {
-			continue
-		}
-		// commented module's namespace needs to match as well if its given by user
-		if commentModule.Namespace != "" && commentModule.Namespace != module.Namespace {
-			continue
-		}
+		// Check if user requested terraform plan run via
+		// '@terraform-applier plan module-name'
+		// or
+		// '@terraform-applier plan path/to/the/module-name'
+		requestedModuleNameOrPath := parsePlanReqMsg(comment.Body)
 
-		modulePathHash, err := p.Repos.Hash(context.Background(), module.Spec.RepoURL, pr.HeadRefName, module.Spec.Path)
-		if err != nil {
-			return nil, err
-		}
+		// match either given name or path
+		if requestedModuleNameOrPath == module.Name || requestedModuleNameOrPath == module.Spec.Path {
+			// get current hash of the module path to create new plan request
+			modulePathHash, err := p.Repos.Hash(context.Background(), module.Spec.RepoURL, pr.HeadRefName, module.Spec.Path)
+			if err != nil {
+				return nil, err
+			}
 
-		p.Log.Info("triggering plan requested via comment", "module", module.NamespacedName(), "pr", pr.Number, "author", comment.Author.Login)
-		return p.addNewRequest(module, pr, modulePathHash)
+			p.Log.Info("triggering plan requested via comment", "module", module.NamespacedName(), "pr", pr.Number, "author", comment.Author.Login)
+			return p.addNewRequest(module, pr, modulePathHash)
+		}
 	}
 
 	return nil, nil
@@ -146,12 +150,12 @@ func (p *Planner) checkPRCommentsForPlanRequests(pr *pr, module *tfaplv1beta1.Mo
 
 // isPlanOutputPostedForCommit loops through all the comments to check if given commit
 // ids plan output is already posted
-func isPlanOutputPostedForCommit(pr *pr, commitID string, module types.NamespacedName) bool {
+func isPlanOutputPostedForCommit(cluster string, pr *pr, commitID, modulePath string, module types.NamespacedName) bool {
 	for i := len(pr.Comments.Nodes) - 1; i >= 0; i-- {
 		comment := pr.Comments.Nodes[i]
 
-		commentModule, commentCommitID := parseRunOutputMsg(comment.Body)
-		if commentModule == module && commentCommitID == commitID {
+		commentCluster, commentModule, commentPath, commentCommitID := parseRunOutputMsg(comment.Body)
+		if commentCluster == cluster && commentModule == module && commentPath == modulePath && commentCommitID == commitID {
 			return true
 		}
 	}
@@ -161,12 +165,14 @@ func isPlanOutputPostedForCommit(pr *pr, commitID string, module types.Namespace
 
 // isPlanRequestAckPostedForCommit loops through all the comments to check if given commit
 // ids plan request is already acknowledged
-func isPlanRequestAckPostedForCommit(pr *pr, commitID string, module types.NamespacedName) bool {
+func isPlanRequestAckPostedForCommit(cluster string, pr *pr, commitID, modulePath string, module types.NamespacedName) bool {
 	for i := len(pr.Comments.Nodes) - 1; i >= 0; i-- {
 		comment := pr.Comments.Nodes[i]
 
-		commentModule, _, commentCommitID, reqAt := parseRequestAcknowledgedMsg(comment.Body)
-		if commentModule == module &&
+		commentCluster, commentModule, commentPath, commentCommitID, reqAt := parseRequestAcknowledgedMsg(comment.Body)
+		if commentCluster == cluster &&
+			commentModule == module &&
+			commentPath == modulePath &&
 			commentCommitID == commitID &&
 			reqAt != nil && time.Until(*reqAt) > -10*time.Minute && time.Until(*reqAt) < time.Minute {
 			return true
@@ -180,7 +186,7 @@ func (p *Planner) addNewRequest(module *tfaplv1beta1.Module, pr *pr, commitID st
 	req := module.NewRunRequest(tfaplv1beta1.PRPlan)
 
 	commentBody := prComment{
-		Body: requestAcknowledgedMsg(module.NamespacedName().String(), module.Spec.Path, commitID, req.RequestedAt),
+		Body: requestAcknowledgedMsg(p.ClusterEnvName, module.NamespacedName().String(), module.Spec.Path, commitID, req.RequestedAt),
 	}
 
 	commentID, err := p.github.postComment(pr.BaseRepository.Owner.Login, pr.BaseRepository.Name, 0, pr.Number, commentBody)

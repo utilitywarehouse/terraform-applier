@@ -46,8 +46,9 @@ func TestCheckPRCommits(t *testing.T) {
 	testGit := git.NewMockRepositories(goMockCtrl)
 
 	planner := &Planner{
-		Repos: testGit,
-		Log:   slog.Default(),
+		ClusterEnvName: "default",
+		Repos:          testGit,
+		Log:            slog.Default(),
 	}
 
 	slog.SetLogLoggerLevel(slog.LevelDebug)
@@ -185,7 +186,7 @@ func TestCheckPRCommits(t *testing.T) {
 
 		p := generateMockPR(123, "ref1",
 			[]string{"hash2", "hash3"},
-			[]string{"random comment", "Terraform plan output for module `foo/two` Commit ID: `hash2`", "random comment"},
+			[]string{"random comment", runOutputMsg("default", "foo/two", "foo/two", &tfaplv1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy.", Output: "some output"}), "random comment"},
 			nil,
 		)
 
@@ -218,7 +219,7 @@ func TestCheckPRCommits(t *testing.T) {
 
 		p := generateMockPR(123, "ref1",
 			[]string{"hash1", "hash2", "hash3"},
-			[]string{"random comment", runOutputMsg("foo/two", "foo/two", &tfaplv1beta1.Run{CommitHash: "hash3", Summary: "Plan: x to add, x to change, x to destroy.", Output: "some output"}), "random comment"},
+			[]string{"random comment", runOutputMsg("default", "foo/two", "foo/two", &tfaplv1beta1.Run{CommitHash: "hash3", Summary: "Plan: x to add, x to change, x to destroy.", Output: "some output"}), "random comment"},
 
 			nil,
 		)
@@ -238,6 +239,62 @@ func TestCheckPRCommits(t *testing.T) {
 		}
 
 		var wantReq *tfaplv1beta1.Request
+
+		if diff := cmp.Diff(wantReq, gotReq, cmpIgnoreRandFields); diff != "" {
+			t.Errorf("checkPRCommits() mismatch (-want +got):\n%s", diff)
+		}
+	})
+
+	t.Run("module output uploaded by diff cluster", func(t *testing.T) {
+		testRedis := sysutil.NewMockRedisInterface(goMockCtrl)
+		testGithub := NewMockGithubInterface(goMockCtrl)
+		planner.github = testGithub
+		planner.RedisClient = testRedis
+
+		p := generateMockPR(123, "ref1",
+			[]string{"hash1", "hash2", "hash3"},
+			[]string{"random comment", runOutputMsg("diff-cluster", "foo/two", "foo/two", &tfaplv1beta1.Run{CommitHash: "hash3", Summary: "Plan: x to add, x to change, x to destroy.", Output: "some output"}), "random comment"},
+
+			nil,
+		)
+
+		module := &tfaplv1beta1.Module{
+			ObjectMeta: metav1.ObjectMeta{Namespace: "foo", Name: "two"},
+			Spec: tfaplv1beta1.ModuleSpec{
+				RepoURL: "https://github.com/owner-a/repo-a.git",
+				Path:    "foo/two",
+			},
+		}
+
+		// mock db call with no result found
+		testRedis.EXPECT().PRRun(gomock.Any(),
+			types.NamespacedName{Namespace: "foo", Name: "two"}, 123, "hash3").
+			Return(nil, sysutil.ErrKeyNotFound)
+
+		// mock github API Call adding new request info
+		testGithub.EXPECT().postComment(gomock.Any(), gomock.Any(), 0, 123, gomock.Any()).
+			DoAndReturn(func(repoOwner, repoName string, commentID, prNumber int, commentBody prComment) (int, error) {
+				// validate comment message
+				if !requestAcknowledgedMsgRegex.Match([]byte(commentBody.Body)) {
+					return 0, fmt.Errorf("comment body doesn't match requestAcknowledgedRegex")
+				}
+				return 111, nil
+			})
+
+		// Call Test function
+		gotReq, err := planner.checkPRCommits(ctx, p, module)
+		if err != nil {
+			t.Fatalf("unexpected error: %s", err)
+		}
+
+		var wantReq = &tfaplv1beta1.Request{
+			Type: "PullRequestPlan",
+			PR: &tfaplv1beta1.PullRequest{
+				Number:     123,
+				HeadBranch: "ref1",
+				CommentID:  111,
+			},
+		}
 
 		if diff := cmp.Diff(wantReq, gotReq, cmpIgnoreRandFields); diff != "" {
 			t.Errorf("checkPRCommits() mismatch (-want +got):\n%s", diff)
@@ -252,7 +309,7 @@ func TestCheckPRCommits(t *testing.T) {
 
 		p := generateMockPR(123, "ref1",
 			[]string{"hash1", "hash2", "hash3"},
-			[]string{"random comment", requestAcknowledgedMsg("foo/two", "foo/two", "hash3", &metav1.Time{Time: time.Now()}), "random comment"},
+			[]string{"random comment", requestAcknowledgedMsg("default", "foo/two", "foo/two", "hash3", &metav1.Time{Time: time.Now()}), "random comment"},
 
 			nil,
 		)
@@ -278,6 +335,62 @@ func TestCheckPRCommits(t *testing.T) {
 		}
 	})
 
+	t.Run("module run request is pending by diff cluster", func(t *testing.T) {
+		testRedis := sysutil.NewMockRedisInterface(goMockCtrl)
+		testGithub := NewMockGithubInterface(goMockCtrl)
+		planner.github = testGithub
+		planner.RedisClient = testRedis
+
+		p := generateMockPR(123, "ref1",
+			[]string{"hash1", "hash2", "hash3"},
+			[]string{"random comment", requestAcknowledgedMsg("diff-cluster", "foo/two", "foo/two", "hash3", &metav1.Time{Time: time.Now()}), "random comment"},
+
+			nil,
+		)
+
+		module := &tfaplv1beta1.Module{
+			ObjectMeta: metav1.ObjectMeta{Namespace: "foo", Name: "two"},
+			Spec: tfaplv1beta1.ModuleSpec{
+				RepoURL: "https://github.com/owner-a/repo-a.git",
+				Path:    "foo/two",
+			},
+		}
+
+		// mock db call with no result found
+		testRedis.EXPECT().PRRun(gomock.Any(),
+			types.NamespacedName{Namespace: "foo", Name: "two"}, 123, "hash3").
+			Return(nil, sysutil.ErrKeyNotFound)
+
+		// mock github API Call adding new request info
+		testGithub.EXPECT().postComment(gomock.Any(), gomock.Any(), 0, 123, gomock.Any()).
+			DoAndReturn(func(repoOwner, repoName string, commentID, prNumber int, commentBody prComment) (int, error) {
+				// validate comment message
+				if !requestAcknowledgedMsgRegex.Match([]byte(commentBody.Body)) {
+					return 0, fmt.Errorf("comment body doesn't match requestAcknowledgedRegex")
+				}
+				return 111, nil
+			})
+
+		// Call Test function
+		gotReq, err := planner.checkPRCommits(ctx, p, module)
+		if err != nil {
+			t.Fatalf("unexpected error: %s", err)
+		}
+
+		var wantReq = &tfaplv1beta1.Request{
+			Type: "PullRequestPlan",
+			PR: &tfaplv1beta1.PullRequest{
+				Number:     123,
+				HeadBranch: "ref1",
+				CommentID:  111,
+			},
+		}
+
+		if diff := cmp.Diff(wantReq, gotReq, cmpIgnoreRandFields); diff != "" {
+			t.Errorf("checkPRCommits() mismatch (-want +got):\n%s", diff)
+		}
+	})
+
 	t.Run("old commit run output uploaded and new commit added", func(t *testing.T) {
 		testRedis := sysutil.NewMockRedisInterface(goMockCtrl)
 		testGithub := NewMockGithubInterface(goMockCtrl)
@@ -286,7 +399,7 @@ func TestCheckPRCommits(t *testing.T) {
 
 		p := generateMockPR(123, "ref1",
 			[]string{"hash1", "hash2", "hash3"},
-			[]string{"random comment", "Terraform plan output for module `foo/two` Commit ID: `hash2`", "random comment"},
+			[]string{"random comment", runOutputMsg("default", "foo/two", "foo/two", &tfaplv1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy.", Output: "some output"}), "random comment"},
 			nil,
 		)
 
@@ -378,8 +491,9 @@ func Test_checkPRCommentsForPlanRequests(t *testing.T) {
 	testGit := git.NewMockRepositories(goMockCtrl)
 
 	planner := &Planner{
-		Repos: testGit,
-		Log:   slog.Default(),
+		ClusterEnvName: "default",
+		Repos:          testGit,
+		Log:            slog.Default(),
 	}
 
 	slog.SetLogLoggerLevel(slog.LevelDebug)
@@ -388,11 +502,11 @@ func Test_checkPRCommentsForPlanRequests(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{Namespace: "foo", Name: "two"},
 		Spec: tfaplv1beta1.ModuleSpec{
 			RepoURL: "https://github.com/owner-a/repo-a.git",
-			Path:    "foo/two",
+			Path:    "path/foo/two",
 		},
 	}
 
-	t.Run("request acknowledged for module", func(t *testing.T) {
+	t.Run("request acknowledged for module (using name)", func(t *testing.T) {
 		// avoid generating another request from `@terraform-applier plan` comment
 		// is there's already a request ID posted for the module
 		// module might not be annotated by the time the loop checks it, which in this
@@ -400,9 +514,9 @@ func Test_checkPRCommentsForPlanRequests(t *testing.T) {
 		pr := generateMockPR(123, "ref1",
 			[]string{"hash1", "hash2", "hash3"},
 			[]string{
-				"@terraform-applier plan foo/two",
-				requestAcknowledgedMsg("foo/two", "module/path/is/going/to/be/here", "hash2", mustParseMetaTime("2023-04-02T15:04:05Z")),
-				requestAcknowledgedMsg("foo/three", "module/path/is/going/to/be/here", "hash3", mustParseMetaTime("2023-04-02T15:04:05Z")),
+				"@terraform-applier plan two",
+				requestAcknowledgedMsg("default", "foo/two", "path/foo/two", "hash2", mustParseMetaTime("2023-04-02T15:04:05Z")),
+				requestAcknowledgedMsg("default", "foo/three", "path/foo/three", "hash3", mustParseMetaTime("2023-04-02T15:04:05Z")),
 			},
 			nil,
 		)
@@ -417,12 +531,17 @@ func Test_checkPRCommentsForPlanRequests(t *testing.T) {
 		}
 	})
 
-	t.Run("plan out posted for module", func(t *testing.T) {
+	t.Run("request acknowledged for module (using path)", func(t *testing.T) {
+		// avoid generating another request from `@terraform-applier plan` comment
+		// is there's already a request ID posted for the module
+		// module might not be annotated by the time the loop checks it, which in this
+		// case would mean plan out is ready ot be posted and NOT run hasn't been requested yet
 		pr := generateMockPR(123, "ref1",
 			[]string{"hash1", "hash2", "hash3"},
 			[]string{
-				runOutputMsg("foo/two", "module/path/is/going/to/be/here", &tfaplv1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy.", Output: "tf plan output"}),
-				runOutputMsg("foo/three", "module/path/is/going/to/be/here", &tfaplv1beta1.Run{CommitHash: "hash3", Summary: "Plan: x to add, x to change, x to destroy.", Output: "tf plan output"}),
+				"@terraform-applier plan path/foo/two",
+				requestAcknowledgedMsg("default", "foo/two", "path/foo/two", "hash2", mustParseMetaTime("2023-04-02T15:04:05Z")),
+				requestAcknowledgedMsg("default", "foo/three", "path/foo/three", "hash3", mustParseMetaTime("2023-04-02T15:04:05Z")),
 			},
 			nil,
 		)
@@ -437,13 +556,55 @@ func Test_checkPRCommentsForPlanRequests(t *testing.T) {
 		}
 	})
 
-	t.Run("plan run is not requested for module", func(t *testing.T) {
+	t.Run("plan out posted for module (by name)", func(t *testing.T) {
+		pr := generateMockPR(123, "ref1",
+			[]string{"hash1", "hash2", "hash3"},
+			[]string{
+				"@terraform-applier plan two",
+				runOutputMsg("default", "foo/two", "path/foo/two", &tfaplv1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy.", Output: "tf plan output"}),
+				runOutputMsg("default", "foo/three", "path/foo/three", &tfaplv1beta1.Run{CommitHash: "hash3", Summary: "Plan: x to add, x to change, x to destroy.", Output: "tf plan output"}),
+			},
+			nil,
+		)
+
+		gotReq, err := planner.checkPRCommentsForPlanRequests(pr, module)
+		if err != nil {
+			t.Fatalf("unexpected error: %s", err)
+		}
+
+		if gotReq != nil {
+			t.Errorf("checkPRCommentsForPlanRequests() returner non-nil Request")
+		}
+	})
+
+	t.Run("plan out posted for module (by path)", func(t *testing.T) {
+		pr := generateMockPR(123, "ref1",
+			[]string{"hash1", "hash2", "hash3"},
+			[]string{
+				"@terraform-applier plan path/foo/two",
+				runOutputMsg("default", "foo/two", "path/foo/two", &tfaplv1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy.", Output: "tf plan output"}),
+				runOutputMsg("default", "foo/three", "path/foo/three", &tfaplv1beta1.Run{CommitHash: "hash3", Summary: "Plan: x to add, x to change, x to destroy.", Output: "tf plan output"}),
+			},
+			nil,
+		)
+
+		gotReq, err := planner.checkPRCommentsForPlanRequests(pr, module)
+		if err != nil {
+			t.Fatalf("unexpected error: %s", err)
+		}
+
+		if gotReq != nil {
+			t.Errorf("checkPRCommentsForPlanRequests() returner non-nil Request")
+		}
+	})
+
+	t.Run("plan run is not requested for current module", func(t *testing.T) {
 		pr := generateMockPR(123, "ref1",
 			[]string{"hash1", "hash2", "hash3"},
 			[]string{
 				"@terraform-applier plan one",
-				"@terraform-applier plan foo/one",
-				"@terraform-applier plan foo/three",
+				"@terraform-applier plan path/foo/one",
+				"@terraform-applier plan path/foo/three",
 			},
 			nil,
 		)
@@ -458,7 +619,7 @@ func Test_checkPRCommentsForPlanRequests(t *testing.T) {
 		}
 	})
 
-	t.Run("plan run is requested for module using correct NamespacedName", func(t *testing.T) {
+	t.Run("plan run is requested for module using correct module path", func(t *testing.T) {
 		testGithub := NewMockGithubInterface(goMockCtrl)
 		planner.github = testGithub
 
@@ -466,7 +627,7 @@ func Test_checkPRCommentsForPlanRequests(t *testing.T) {
 			[]string{"hash1", "hash2", "hash3"},
 			[]string{
 				"@terraform-applier plan foo/one",
-				"@terraform-applier plan foo/two",
+				"@terraform-applier plan path/foo/two",
 				"@terraform-applier plan foo/three",
 			},
 			nil,
@@ -477,17 +638,17 @@ func Test_checkPRCommentsForPlanRequests(t *testing.T) {
 			DoAndReturn(func(_ context.Context, _, hash string) ([]string, error) {
 				switch hash {
 				case "hash1":
-					return []string{"foo/one"}, nil
+					return []string{"path/foo/one"}, nil
 				case "hash2":
-					return []string{"foo/two"}, nil
+					return []string{"path/foo/two"}, nil
 				case "hash3":
-					return []string{"foo/one", "foo/three"}, nil
+					return []string{"path/foo/one", "path/foo/three"}, nil
 				default:
 					return nil, fmt.Errorf("hash not found")
 				}
 			}).AnyTimes()
 
-		testGit.EXPECT().Hash(gomock.Any(), gomock.Any(), "ref1", "foo/two").
+		testGit.EXPECT().Hash(gomock.Any(), gomock.Any(), "ref1", "path/foo/two").
 			Return("hash1", nil)
 
 		// mock github API Call adding new request info
@@ -544,7 +705,7 @@ func Test_checkPRCommentsForPlanRequests(t *testing.T) {
 				return 111, nil
 			})
 
-		testGit.EXPECT().Hash(gomock.Any(), gomock.Any(), "ref1", "foo/two").
+		testGit.EXPECT().Hash(gomock.Any(), gomock.Any(), "ref1", "path/foo/two").
 			Return("hash1", nil)
 
 		// Call Test function
@@ -567,12 +728,110 @@ func Test_checkPRCommentsForPlanRequests(t *testing.T) {
 		}
 	})
 
-	t.Run("plan run is requested for module in different Namespace", func(t *testing.T) {
+	t.Run("request acknowledged for module by diff cluster", func(t *testing.T) {
+		testGithub := NewMockGithubInterface(goMockCtrl)
+		planner.github = testGithub
+
+		// avoid generating another request from `@terraform-applier plan` comment
+		// is there's already a request ID posted for the module
+		// module might not be annotated by the time the loop checks it, which in this
+		// case would mean plan out is ready ot be posted and NOT run hasn't been requested yet
+		pr := generateMockPR(123, "ref1",
+			[]string{"hash1", "hash2", "hash3"},
+			[]string{
+				"@terraform-applier plan two",
+				requestAcknowledgedMsg("diff-cluster", "foo/two", "path/foo/two", "hash2", mustParseMetaTime("2023-04-02T15:04:05Z")),
+				requestAcknowledgedMsg("default", "foo/three", "path/foo/three", "hash3", mustParseMetaTime("2023-04-02T15:04:05Z")),
+			},
+			nil,
+		)
+
+		// mock github API Call adding new request info
+		testGithub.EXPECT().postComment(gomock.Any(), gomock.Any(), 0, 123, gomock.Any()).
+			DoAndReturn(func(repoOwner, repoName string, commentID, prNumber int, commentBody prComment) (int, error) {
+				// validate comment message
+				if !requestAcknowledgedMsgRegex.Match([]byte(commentBody.Body)) {
+					return 0, fmt.Errorf("comment body doesn't match requestAcknowledgedRegex")
+				}
+				return 111, nil
+			})
+
+		testGit.EXPECT().Hash(gomock.Any(), gomock.Any(), "ref1", "path/foo/two").
+			Return("hash1", nil)
+
+		gotReq, err := planner.checkPRCommentsForPlanRequests(pr, module)
+		if err != nil {
+			t.Fatalf("unexpected error: %s", err)
+		}
+
+		wantReq := &tfaplv1beta1.Request{
+			Type: "PullRequestPlan",
+			PR: &tfaplv1beta1.PullRequest{
+				Number:     123,
+				HeadBranch: "ref1",
+				CommentID:  111,
+			},
+		}
+
+		if diff := cmp.Diff(wantReq, gotReq, cmpIgnoreRandFields); diff != "" {
+			t.Errorf("checkPRCommits() mismatch (-want +got):\n%s", diff)
+		}
+	})
+
+	t.Run("plan out posted for module by diff cluster", func(t *testing.T) {
+		testGithub := NewMockGithubInterface(goMockCtrl)
+		planner.github = testGithub
+
+		pr := generateMockPR(123, "ref1",
+			[]string{"hash1", "hash2", "hash3"},
+			[]string{
+				"@terraform-applier plan two",
+				runOutputMsg("diff-cluster", "foo/two", "path/foo/two", &tfaplv1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy.", Output: "tf plan output"}),
+				runOutputMsg("default", "foo/three", "path/foo/three", &tfaplv1beta1.Run{CommitHash: "hash3", Summary: "Plan: x to add, x to change, x to destroy.", Output: "tf plan output"}),
+			},
+			nil,
+		)
+
+		// mock github API Call adding new request info
+		testGithub.EXPECT().postComment(gomock.Any(), gomock.Any(), 0, 123, gomock.Any()).
+			DoAndReturn(func(repoOwner, repoName string, commentID, prNumber int, commentBody prComment) (int, error) {
+				// validate comment message
+				if !requestAcknowledgedMsgRegex.Match([]byte(commentBody.Body)) {
+					return 0, fmt.Errorf("comment body doesn't match requestAcknowledgedRegex")
+				}
+				return 111, nil
+			})
+
+		testGit.EXPECT().Hash(gomock.Any(), gomock.Any(), "ref1", "path/foo/two").
+			Return("hash1", nil)
+
+		gotReq, err := planner.checkPRCommentsForPlanRequests(pr, module)
+		if err != nil {
+			t.Fatalf("unexpected error: %s", err)
+		}
+
+		wantReq := &tfaplv1beta1.Request{
+			Type: "PullRequestPlan",
+			PR: &tfaplv1beta1.PullRequest{
+				Number:     123,
+				HeadBranch: "ref1",
+				CommentID:  111,
+			},
+		}
+
+		if diff := cmp.Diff(wantReq, gotReq, cmpIgnoreRandFields); diff != "" {
+			t.Errorf("checkPRCommits() mismatch (-want +got):\n%s", diff)
+		}
+	})
+
+	t.Run("plan run is requested for module in different Namespace or diff path", func(t *testing.T) {
 		p := generateMockPR(123, "ref1",
 			[]string{"hash1", "hash2", "hash3"},
 			[]string{
 				"@terraform-applier plan foo/one",
 				"@terraform-applier plan bar/two",
+				"@terraform-applier plan path/bar/two",
+				"@terraform-applier plan path/foo",
 				"@terraform-applier plan foo/three",
 			},
 			nil,
@@ -603,45 +862,25 @@ func Test_checkPRCommentsForPlanRequests(t *testing.T) {
 			nil,
 		)
 
-		// mock github API Call adding new request info
-		testGithub.EXPECT().postComment(gomock.Any(), gomock.Any(), 0, 123, gomock.Any()).
-			DoAndReturn(func(repoOwner, repoName string, commentID, prNumber int, commentBody prComment) (int, error) {
-				// validate comment message
-				if !requestAcknowledgedMsgRegex.Match([]byte(commentBody.Body)) {
-					return 0, fmt.Errorf("comment body doesn't match requestAcknowledgedRegex")
-				}
-				return 111, nil
-			})
-
-		testGit.EXPECT().Hash(gomock.Any(), gomock.Any(), "ref1", "foo/two").
-			Return("hash1", nil)
-
 		// Call Test function
 		gotReq, err := planner.checkPRCommentsForPlanRequests(p, module)
 		if err != nil {
 			t.Fatalf("unexpected error: %s", err)
 		}
 
-		wantReq := &tfaplv1beta1.Request{
-			Type: "PullRequestPlan",
-			PR: &tfaplv1beta1.PullRequest{
-				Number:     123,
-				HeadBranch: "ref1",
-				CommentID:  111,
-			},
-		}
-
-		if diff := cmp.Diff(wantReq, gotReq, cmpIgnoreRandFields); diff != "" {
-			t.Errorf("checkPRCommits() mismatch (-want +got):\n%s", diff)
+		if gotReq != nil {
+			t.Errorf("checkPRCommentsForPlanRequests() returner non-nil Request")
 		}
 	})
 }
 
 func Test_isPlanOutputPostedForCommit(t *testing.T) {
 	type args struct {
-		pr       *pr
-		commitID string
-		module   types.NamespacedName
+		cluster    string
+		pr         *pr
+		commitID   string
+		modulePath string
+		module     types.NamespacedName
 	}
 	tests := []struct {
 		name string
@@ -657,13 +896,33 @@ func Test_isPlanOutputPostedForCommit(t *testing.T) {
 				}{Nodes: []prComment{
 					{
 						DatabaseID: 01234567,
-						Body:       runOutputMsg("foo/one", "foo/one", &tfaplv1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy."}),
+						Body:       runOutputMsg("default", "foo/one", "foo/one", &tfaplv1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy."}),
 					},
 				}}},
-				commitID: "hash2",
-				module:   types.NamespacedName{Namespace: "foo", Name: "one"},
+				cluster:    "default",
+				commitID:   "hash2",
+				modulePath: "foo/one",
+				module:     types.NamespacedName{Namespace: "foo", Name: "one"},
 			},
 			want: true,
+		},
+		{
+			name: "Matching NamespacedName and Commit ID - diff cluster",
+			args: args{
+				pr: &pr{Comments: struct {
+					Nodes []prComment `json:"nodes"`
+				}{Nodes: []prComment{
+					{
+						DatabaseID: 01234567,
+						Body:       runOutputMsg("diff-cluster", "foo/one", "foo/one", &tfaplv1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy."}),
+					},
+				}}},
+				cluster:    "default",
+				commitID:   "hash2",
+				modulePath: "foo/one",
+				module:     types.NamespacedName{Namespace: "foo", Name: "one"},
+			},
+			want: false,
 		},
 		{
 			name: "Matching Name and Commit ID",
@@ -673,11 +932,13 @@ func Test_isPlanOutputPostedForCommit(t *testing.T) {
 				}{Nodes: []prComment{
 					{
 						DatabaseID: 01234567,
-						Body:       runOutputMsg("one", "foo/one", &tfaplv1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy."}),
+						Body:       runOutputMsg("default", "one", "foo/one", &tfaplv1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy."}),
 					},
 				}}},
-				commitID: "hash2",
-				module:   types.NamespacedName{Name: "one"},
+				cluster:    "default",
+				commitID:   "hash2",
+				modulePath: "foo/one",
+				module:     types.NamespacedName{Name: "one"},
 			},
 			want: true,
 		},
@@ -692,6 +953,7 @@ func Test_isPlanOutputPostedForCommit(t *testing.T) {
 						Body:       "Terraform plan output for module `foo/one` Commit ID: `hash2`",
 					},
 				}}},
+				cluster:  "default",
 				commitID: "e3c7d4a60b8c9b4c9211a7b4e1a837e9e9c3aaaa",
 				module:   types.NamespacedName{Namespace: "foo", Name: "one"},
 			},
@@ -708,6 +970,7 @@ func Test_isPlanOutputPostedForCommit(t *testing.T) {
 						Body:       "Terraform plan output for module `bar/one` Commit ID: `hash2`",
 					},
 				}}},
+				cluster:  "default",
 				commitID: "hash2",
 				module:   types.NamespacedName{Namespace: "foo", Name: "one"},
 			},
@@ -724,6 +987,7 @@ func Test_isPlanOutputPostedForCommit(t *testing.T) {
 						Body:       "Received terraform plan request. Module: `foo/one` Request ID: `a1b2c3d4` Commit ID: `hash2`",
 					},
 				}}},
+				cluster:  "default",
 				commitID: "hash2",
 				module:   types.NamespacedName{Namespace: "foo", Name: "one"},
 			},
@@ -740,6 +1004,7 @@ func Test_isPlanOutputPostedForCommit(t *testing.T) {
 						Body:       "",
 					},
 				}}},
+				cluster:  "default",
 				commitID: "hash2",
 				module:   types.NamespacedName{Namespace: "foo", Name: "one"},
 			},
@@ -748,7 +1013,7 @@ func Test_isPlanOutputPostedForCommit(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := isPlanOutputPostedForCommit(tt.args.pr, tt.args.commitID, tt.args.module); got != tt.want {
+			if got := isPlanOutputPostedForCommit(tt.args.cluster, tt.args.pr, tt.args.commitID, tt.args.modulePath, tt.args.module); got != tt.want {
 				t.Errorf("isPlanOutputPostedForCommit() = %v, want %v", got, tt.want)
 			}
 		})
@@ -757,9 +1022,11 @@ func Test_isPlanOutputPostedForCommit(t *testing.T) {
 
 func Test_isPlanRequestAckPostedForCommit(t *testing.T) {
 	type args struct {
-		pr       *pr
-		commitID string
-		module   types.NamespacedName
+		cluster    string
+		pr         *pr
+		commitID   string
+		modulePath string
+		module     types.NamespacedName
 	}
 	tests := []struct {
 		name string
@@ -777,8 +1044,10 @@ func Test_isPlanRequestAckPostedForCommit(t *testing.T) {
 						Body:       "",
 					},
 				}}},
-				commitID: "hash2",
-				module:   types.NamespacedName{Namespace: "foo", Name: "one"},
+				cluster:    "default",
+				commitID:   "hash2",
+				modulePath: "",
+				module:     types.NamespacedName{Namespace: "foo", Name: "one"},
 			},
 			want: false,
 		}, {
@@ -789,13 +1058,32 @@ func Test_isPlanRequestAckPostedForCommit(t *testing.T) {
 				}{Nodes: []prComment{
 					{
 						DatabaseID: 01234567,
-						Body:       requestAcknowledgedMsg("foo/one", "foo/one", "hash2", &metav1.Time{Time: time.Now()}),
+						Body:       requestAcknowledgedMsg("default", "foo/one", "foo/one", "hash2", &metav1.Time{Time: time.Now()}),
 					},
 				}}},
-				commitID: "hash2",
-				module:   types.NamespacedName{Namespace: "foo", Name: "one"},
+				cluster:    "default",
+				commitID:   "hash2",
+				modulePath: "foo/one",
+				module:     types.NamespacedName{Namespace: "foo", Name: "one"},
 			},
 			want: true,
+		}, {
+			name: "Matching NamespacedName and Commit ID and req is current from diff cluster",
+			args: args{
+				pr: &pr{Comments: struct {
+					Nodes []prComment `json:"nodes"`
+				}{Nodes: []prComment{
+					{
+						DatabaseID: 01234567,
+						Body:       requestAcknowledgedMsg("diff-cluster", "foo/one", "foo/one", "hash2", &metav1.Time{Time: time.Now()}),
+					},
+				}}},
+				cluster:    "default",
+				commitID:   "hash2",
+				modulePath: "foo/one",
+				module:     types.NamespacedName{Namespace: "foo", Name: "one"},
+			},
+			want: false,
 		}, {
 			name: "Matching NamespacedName and Commit ID and req is old",
 			args: args{
@@ -804,11 +1092,13 @@ func Test_isPlanRequestAckPostedForCommit(t *testing.T) {
 				}{Nodes: []prComment{
 					{
 						DatabaseID: 01234567,
-						Body:       requestAcknowledgedMsg("foo/one", "foo/one", "hash2", &metav1.Time{Time: time.Now().Add(-30 * time.Minute)}),
+						Body:       requestAcknowledgedMsg("default", "foo/one", "foo/one", "hash2", &metav1.Time{Time: time.Now().Add(-30 * time.Minute)}),
 					},
 				}}},
-				commitID: "hash2",
-				module:   types.NamespacedName{Namespace: "foo", Name: "one"},
+				cluster:    "default",
+				commitID:   "hash2",
+				modulePath: "foo/one",
+				module:     types.NamespacedName{Namespace: "foo", Name: "one"},
 			},
 			want: false,
 		}, {
@@ -819,11 +1109,13 @@ func Test_isPlanRequestAckPostedForCommit(t *testing.T) {
 				}{Nodes: []prComment{
 					{
 						DatabaseID: 01234567,
-						Body:       requestAcknowledgedMsg("foo/one", "foo/one", "hash2", &metav1.Time{Time: time.Now().Add(5 * time.Minute)}),
+						Body:       requestAcknowledgedMsg("default", "foo/one", "foo/one", "hash2", &metav1.Time{Time: time.Now().Add(5 * time.Minute)}),
 					},
 				}}},
-				commitID: "hash2",
-				module:   types.NamespacedName{Namespace: "foo", Name: "one"},
+				cluster:    "default",
+				commitID:   "hash2",
+				modulePath: "foo/one",
+				module:     types.NamespacedName{Namespace: "foo", Name: "one"},
 			},
 			want: false,
 		}, {
@@ -834,11 +1126,13 @@ func Test_isPlanRequestAckPostedForCommit(t *testing.T) {
 				}{Nodes: []prComment{
 					{
 						DatabaseID: 01234567,
-						Body:       requestAcknowledgedMsg("foo/one", "foo/one", "hash2", &metav1.Time{Time: time.Now()}),
+						Body:       requestAcknowledgedMsg("default", "foo/one", "foo/one", "hash2", &metav1.Time{Time: time.Now()}),
 					},
 				}}},
-				commitID: "hash3",
-				module:   types.NamespacedName{Namespace: "foo", Name: "one"},
+				cluster:    "default",
+				commitID:   "hash3",
+				modulePath: "foo/one",
+				module:     types.NamespacedName{Namespace: "foo", Name: "one"},
 			},
 			want: false,
 		}, {
@@ -849,18 +1143,20 @@ func Test_isPlanRequestAckPostedForCommit(t *testing.T) {
 				}{Nodes: []prComment{
 					{
 						DatabaseID: 01234567,
-						Body:       requestAcknowledgedMsg("foo/two", "foo/two", "hash3", &metav1.Time{Time: time.Now()}),
+						Body:       requestAcknowledgedMsg("default", "foo/two", "foo/two", "hash3", &metav1.Time{Time: time.Now()}),
 					},
 				}}},
-				commitID: "hash3",
-				module:   types.NamespacedName{Namespace: "foo", Name: "one"},
+				cluster:    "default",
+				commitID:   "hash3",
+				modulePath: "foo/one",
+				module:     types.NamespacedName{Namespace: "foo", Name: "one"},
 			},
 			want: false,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := isPlanRequestAckPostedForCommit(tt.args.pr, tt.args.commitID, tt.args.module); got != tt.want {
+			if got := isPlanRequestAckPostedForCommit(tt.args.cluster, tt.args.pr, tt.args.commitID, tt.args.modulePath, tt.args.module); got != tt.want {
 				t.Errorf("isPlanRequestAckPostedForCommit() = %v, want %v", got, tt.want)
 			}
 		})
