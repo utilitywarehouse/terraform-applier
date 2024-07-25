@@ -54,6 +54,9 @@ func (p *Planner) Init(ctx context.Context, token string, ch <-chan *redis.Messa
 }
 
 func (p *Planner) StartPRPoll(ctx context.Context) {
+	p.Log.Info("starting PR Poller")
+	defer p.Log.Info("stopping PR Poller")
+
 	ticker := time.NewTicker(p.Interval)
 	defer ticker.Stop()
 	for {
@@ -64,7 +67,7 @@ func (p *Planner) StartPRPoll(ctx context.Context) {
 			kubeModuleList := &tfaplv1beta1.ModuleList{}
 			if err := p.ClusterClt.List(ctx, kubeModuleList); err != nil {
 				p.Log.Error("error retrieving list of modules", "error", err)
-				return
+				continue
 			}
 
 			for _, repoConf := range p.GitMirror.Repositories {
@@ -72,20 +75,20 @@ func (p *Planner) StartPRPoll(ctx context.Context) {
 				err := p.Repos.Mirror(ctx, repoConf.Remote)
 				if err != nil {
 					p.Log.Error("unable to mirror repository", "url", repoConf.Remote, "error", err)
-					return
+					continue
 				}
 
 				repo, err := giturl.Parse(repoConf.Remote)
 				if err != nil {
 					p.Log.Error("unable to parse repo url", "url", repoConf.Remote, "error", err)
-					return
+					continue
 				}
 
 				// Make a GraphQL query to fetch all open Pull Requests from Github
 				prs, err := p.github.openPRs(ctx, repo.Path, repo.Repo)
 				if err != nil {
 					p.Log.Error("error getting a list of open PRs:", "url", repo.Path, "error", err)
-					return
+					continue
 				}
 
 				// Loop through all open PRs
