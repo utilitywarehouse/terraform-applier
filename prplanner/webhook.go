@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 
@@ -14,7 +15,9 @@ import (
 
 func (p *Planner) startWebhook() {
 	http.HandleFunc("/github-events", p.handleWebhook)
-	http.ListenAndServe(p.ListenAddress, nil)
+	if err := http.ListenAndServe(p.ListenAddress, nil); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		p.Log.Error("unable to start server", "err", err)
+	}
 }
 
 func (p *Planner) handleWebhook(w http.ResponseWriter, r *http.Request) {
@@ -44,6 +47,11 @@ func (p *Planner) handleWebhook(w http.ResponseWriter, r *http.Request) {
 	if err := json.Unmarshal(body, &payload); err != nil {
 		p.Log.Error("cannot unmarshal json payload", "error", err)
 		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	if event == "ping" {
+		w.Write([]byte("pong"))
 		return
 	}
 
@@ -96,6 +104,7 @@ func (p *Planner) processPRWebHookEvent(event GitHubWebhook, prNumber int) {
 		return
 	}
 
+	p.Log.Debug("processing PR event", "num", prNumber)
 	p.processPullRequest(ctx, pr, kubeModuleList)
 }
 
