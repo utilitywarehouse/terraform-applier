@@ -38,6 +38,10 @@ func (gc *gitHubClient) openPRs(ctx context.Context, repoOwner, repoName string)
 		return nil, fmt.Errorf("unable to get PRs, error :%w", err)
 	}
 
+	if len(result.Errors) > 0 {
+		return nil, fmt.Errorf("api error %+v", result.Errors)
+	}
+
 	return result.Data.Repository.PullRequests.Nodes, nil
 }
 
@@ -53,6 +57,10 @@ func (gc *gitHubClient) PR(ctx context.Context, repoOwner, repoName string, prNu
 	err := gc.query(ctx, q, &result)
 	if err != nil {
 		return nil, fmt.Errorf("unable to get PR, err:%w", err)
+	}
+
+	if len(result.Errors) > 0 {
+		return nil, fmt.Errorf("api error %+v", result.Errors)
 	}
 
 	return result.Data.Repository.PullRequest, nil

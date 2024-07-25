@@ -59,6 +59,15 @@ type gitPRRequest struct {
 	} `json:"variables,omitempty"`
 }
 
+type Error struct {
+	Message   string   `json:"message"`
+	Path      []string `json:"path"`
+	Locations []struct {
+		Line   int `json:"line"`
+		Column int `json:"column"`
+	} `json:"locations"`
+}
+
 type gitPRsResponse struct {
 	Data struct {
 		Repository struct {
@@ -67,6 +76,7 @@ type gitPRsResponse struct {
 			} `json:"pullRequests"`
 		} `json:"repository"`
 	} `json:"data"`
+	Errors []Error `json:"errors"`
 }
 
 type gitPRResponse struct {
@@ -75,6 +85,7 @@ type gitPRResponse struct {
 			PullRequest *pr `json:"pullRequest"`
 		} `json:"repository"`
 	} `json:"data"`
+	Errors []Error `json:"errors"`
 }
 
 type pr struct {
