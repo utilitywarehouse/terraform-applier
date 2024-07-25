@@ -73,6 +73,10 @@ func (p *Planner) handleWebhook(w http.ResponseWriter, r *http.Request) {
 
 	if event == "issue_comment" && payload.Action == "created" ||
 		event == "issue_comment" && payload.Action == "edited" {
+		if isSelfComment(payload.Comment.Body) {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
 		// we know the body, but we still need to know the module user is requesting
 		// plan run for belongs to this PR hence we need to do full reconcile of PR
 		go p.processPRWebHookEvent(payload, payload.Issue.Number)
@@ -104,7 +108,7 @@ func (p *Planner) processPRWebHookEvent(event GitHubWebhook, prNumber int) {
 		return
 	}
 
-	p.Log.Debug("processing PR event", "num", prNumber)
+	p.Log.Debug("processing PR event", "pr", prNumber)
 	p.processPullRequest(ctx, pr, kubeModuleList)
 }
 

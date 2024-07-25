@@ -199,7 +199,7 @@ func Test_parseRequestAcknowledgedMsg(t *testing.T) {
 		},
 		{
 			name:       "missing Requested At",
-			args:       args{commentBody: fmt.Sprintf(requestAcknowledgedMsgTml, "foo/one", "foo/one", "")},
+			args:       args{commentBody: fmt.Sprintf(requestAcknowledgedMsgTml, "default", "foo/one", "foo/one", "")},
 			wantModule: types.NamespacedName{},
 			wantPath:   "",
 			wantReqAt:  nil,
@@ -484,6 +484,30 @@ func Test_isModuleLimitReachedCommentPosted(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := isModuleLimitReachedCommentPosted(tt.args.prComments); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("parseNamespaceName() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_isSelfAddedComment(t *testing.T) {
+	type args struct {
+		comment string
+	}
+	tests := []struct {
+		name string
+		args args
+		want bool
+	}{
+		{"empty", args{""}, false},
+		{"moduleLimitReachedTml", args{moduleLimitReachedTml}, true},
+		{"requestAcknowledgedMsg", args{requestAcknowledgedMsg("default", "foo/one", "path/to/module/one", "hash1", mustParseMetaTime("2006-01-02T15:04:05+07:00"))}, true},
+		{"runOutputMsg", args{runOutputMsg("default", "one", "foo/one", &v1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy."})}, true},
+		{"other", args{"other"}, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := isSelfComment(tt.args.comment); got != tt.want {
+				t.Errorf("isSelfAddedComment() = %v, want %v", got, tt.want)
 			}
 		})
 	}
