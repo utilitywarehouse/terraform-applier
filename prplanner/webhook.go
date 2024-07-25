@@ -104,6 +104,7 @@ func (p *Planner) processPRWebHookEvent(event GitHubWebhook, prNumber int) {
 		return
 	}
 
+	p.Log.Debug("processing PR event", "num", prNumber)
 	p.processPullRequest(ctx, pr, kubeModuleList)
 }
 
