@@ -100,8 +100,8 @@ func (r *Runner) Start(run *tfaplv1beta1.Run, cancelChan chan struct{}) bool {
 
 	dur := time.Since(start).Seconds()
 
-	r.Metrics.UpdateModuleSuccess(run.Module.Name, run.Module.Namespace, success)
-	r.Metrics.UpdateModuleRunDuration(run.Module.Name, run.Module.Namespace, dur, success)
+	r.Metrics.UpdateModuleSuccess(run.Module.Name, run.Module.Namespace, run.Request.Type, success)
+	r.Metrics.UpdateModuleRunDuration(run.Module.Name, run.Module.Namespace, run.Request.Type, dur, success)
 
 	if success {
 		r.Log.Info("run completed successfully", "module", run.Module, "duration", dur)
