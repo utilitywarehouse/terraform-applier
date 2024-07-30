@@ -17,8 +17,8 @@ const (
 // PrometheusInterface allows for mocking out the functionality of Prometheus when testing the full process of an apply run.
 type PrometheusInterface interface {
 	UpdateTerraformExitCodeCount(string, string, string, int)
-	UpdateModuleSuccess(string, string, bool)
-	UpdateModuleRunDuration(string, string, float64, bool)
+	UpdateModuleSuccess(string, string, string, bool)
+	UpdateModuleRunDuration(string, string, string, float64, bool)
 	SetRunPending(string, string, bool)
 }
 
@@ -49,6 +49,8 @@ func (p *Prometheus) Init() {
 			"module",
 			// Namespace name of the module that was ran
 			"namespace",
+			// Type of the last run
+			"run_type",
 			// Result: true if the run was successful, false otherwise
 			"success",
 		},
@@ -66,6 +68,8 @@ func (p *Prometheus) Init() {
 			"module",
 			// Namespace name of the module that was ran
 			"namespace",
+			// Type of the last run
+			"run_type",
 			// Result: true if the run was successful, false otherwise
 			"success",
 		},
@@ -91,6 +95,8 @@ func (p *Prometheus) Init() {
 			"module",
 			// Namespace name of the module that was ran
 			"namespace",
+			// Type of the last run
+			"run_type",
 		},
 	)
 	p.moduleRunTimestamp = prometheus.NewGaugeVec(prometheus.GaugeOpts{
@@ -102,6 +108,8 @@ func (p *Prometheus) Init() {
 			"module",
 			// Namespace name of the module that was ran
 			"namespace",
+			// Type of the last run
+			"run_type",
 		},
 	)
 	p.terraformExitCodeCount = prometheus.NewCounterVec(prometheus.CounterOpts{
@@ -144,32 +152,35 @@ func (p *Prometheus) UpdateTerraformExitCodeCount(module, namespace string, cmd 
 }
 
 // UpdateModuleSuccess increments the given module's Counter for either successful or failed run attempts.
-func (p *Prometheus) UpdateModuleSuccess(module, namespace string, success bool) {
+func (p *Prometheus) UpdateModuleSuccess(module, namespace, runType string, success bool) {
 	if success {
 		p.moduleRunTimestamp.With(prometheus.Labels{
 			"module":    module,
 			"namespace": namespace,
+			"run_type":  runType,
 		}).Set(float64(time.Now().Unix()))
 	}
 	p.moduleRunCount.With(prometheus.Labels{
 		"module":    module,
 		"namespace": namespace,
+		"run_type":  runType,
 		"success":   strconv.FormatBool(success),
 	}).Inc()
-	p.setRunSuccess(module, namespace, success)
+	p.setRunSuccess(module, namespace, runType, success)
 }
 
 // UpdateModuleRunDuration adds a data point (latency of the most recent run) to the module_apply_duration_seconds Summary metric, with a tag indicating whether or not the run was successful.
-func (p *Prometheus) UpdateModuleRunDuration(module, namespace string, runDuration float64, success bool) {
+func (p *Prometheus) UpdateModuleRunDuration(module, namespace, runType string, runDuration float64, success bool) {
 	p.moduleRunDuration.With(prometheus.Labels{
 		"module":    module,
 		"namespace": namespace,
+		"run_type":  runType,
 		"success":   strconv.FormatBool(success),
 	}).Observe(runDuration)
 }
 
 // setRunSuccess sets last run outcome for a module
-func (p *Prometheus) setRunSuccess(module, namespace string, success bool) {
+func (p *Prometheus) setRunSuccess(module, namespace, runType string, success bool) {
 	as := float64(0)
 	if success {
 		as = 1
@@ -177,6 +188,7 @@ func (p *Prometheus) setRunSuccess(module, namespace string, success bool) {
 	p.moduleRunSuccess.With(prometheus.Labels{
 		"module":    module,
 		"namespace": namespace,
+		"run_type":  runType,
 	}).Set(as)
 }
 

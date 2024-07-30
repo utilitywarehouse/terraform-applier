@@ -46,27 +46,27 @@ func (mr *MockPrometheusInterfaceMockRecorder) SetRunPending(arg0, arg1, arg2 in
 }
 
 // UpdateModuleRunDuration mocks base method.
-func (m *MockPrometheusInterface) UpdateModuleRunDuration(arg0, arg1 string, arg2 float64, arg3 bool) {
+func (m *MockPrometheusInterface) UpdateModuleRunDuration(arg0, arg1, arg2 string, arg3 float64, arg4 bool) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "UpdateModuleRunDuration", arg0, arg1, arg2, arg3)
+	m.ctrl.Call(m, "UpdateModuleRunDuration", arg0, arg1, arg2, arg3, arg4)
 }
 
 // UpdateModuleRunDuration indicates an expected call of UpdateModuleRunDuration.
-func (mr *MockPrometheusInterfaceMockRecorder) UpdateModuleRunDuration(arg0, arg1, arg2, arg3 interface{}) *gomock.Call {
+func (mr *MockPrometheusInterfaceMockRecorder) UpdateModuleRunDuration(arg0, arg1, arg2, arg3, arg4 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateModuleRunDuration", reflect.TypeOf((*MockPrometheusInterface)(nil).UpdateModuleRunDuration), arg0, arg1, arg2, arg3)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateModuleRunDuration", reflect.TypeOf((*MockPrometheusInterface)(nil).UpdateModuleRunDuration), arg0, arg1, arg2, arg3, arg4)
 }
 
 // UpdateModuleSuccess mocks base method.
-func (m *MockPrometheusInterface) UpdateModuleSuccess(arg0, arg1 string, arg2 bool) {
+func (m *MockPrometheusInterface) UpdateModuleSuccess(arg0, arg1, arg2 string, arg3 bool) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "UpdateModuleSuccess", arg0, arg1, arg2)
+	m.ctrl.Call(m, "UpdateModuleSuccess", arg0, arg1, arg2, arg3)
 }
 
 // UpdateModuleSuccess indicates an expected call of UpdateModuleSuccess.
-func (mr *MockPrometheusInterfaceMockRecorder) UpdateModuleSuccess(arg0, arg1, arg2 interface{}) *gomock.Call {
+func (mr *MockPrometheusInterfaceMockRecorder) UpdateModuleSuccess(arg0, arg1, arg2, arg3 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateModuleSuccess", reflect.TypeOf((*MockPrometheusInterface)(nil).UpdateModuleSuccess), arg0, arg1, arg2)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateModuleSuccess", reflect.TypeOf((*MockPrometheusInterface)(nil).UpdateModuleSuccess), arg0, arg1, arg2, arg3)
 }
 
 // UpdateTerraformExitCodeCount mocks base method.

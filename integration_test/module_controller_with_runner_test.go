@@ -60,8 +60,8 @@ var _ = Describe("Module controller with Runner", func() {
 					return "commit124", sysutil.CopyDir(context.TODO(), filepath.Join("src", "modules"), dst, true)
 				}).AnyTimes()
 
-			testMetrics.EXPECT().UpdateModuleRunDuration(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-			testMetrics.EXPECT().UpdateModuleSuccess(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
+			testMetrics.EXPECT().UpdateModuleRunDuration(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
+			testMetrics.EXPECT().UpdateModuleSuccess(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 			testMetrics.EXPECT().UpdateTerraformExitCodeCount(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 			testMetrics.EXPECT().SetRunPending(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 
