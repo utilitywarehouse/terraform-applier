@@ -263,13 +263,13 @@ func Test_runOutputMsg(t *testing.T) {
 				"Path: path/baz/one\n" +
 				"Commit ID: hash2\n" +
 				"```\n" +
-				"<details><summary><b>Run Status: , Run Summary: Plan: x to add, x to change, x to destroy.</b></summary>\n\n" +
+				"<details><summary><b>✅ Run Status: , Run Summary: Plan: x to add, x to change, x to destroy.</b></summary>\n\n" +
 				"```" +
 				"terraform\n" +
 				"Terraform apply output....\n" +
 				"```\n" +
 				"</details>\n" +
-				"To manually trigger plan again please post `@terraform-applier plan path/baz/one` as comment.",
+				"\n> To manually trigger plan again please post `@terraform-applier plan path/baz/one` as comment.",
 		},
 		{
 			"2",
@@ -281,13 +281,13 @@ func Test_runOutputMsg(t *testing.T) {
 				"Path: path/baz/one\n" +
 				"Commit ID: hash2\n" +
 				"```\n" +
-				"<details><summary><b>Run Status: Errored, Run Summary: unable to plan module</b></summary>\n\n" +
+				"<details><summary><b>⛔ Run Status: Errored, Run Summary: unable to plan module</b></summary>\n\n" +
 				"```" +
 				"terraform\n" +
 				"Some Init Output...\nSome TF Output .....\n" +
 				"```\n" +
 				"</details>\n" +
-				"To manually trigger plan again please post `@terraform-applier plan path/baz/one` as comment.",
+				"\n> To manually trigger plan again please post `@terraform-applier plan path/baz/one` as comment.",
 		},
 	}
 	for _, tt := range tests {
