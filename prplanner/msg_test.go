@@ -255,7 +255,7 @@ func Test_runOutputMsg(t *testing.T) {
 	}{
 		{
 			"1",
-			args{cluster: "default", module: "baz/one", path: "path/baz/one", run: &v1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy.", Output: "Terraform apply output...."}},
+			args{cluster: "default", module: "baz/one", path: "path/baz/one", run: &v1beta1.Run{Status: v1beta1.StatusOk, CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy.", Output: "Terraform apply output...."}},
 			"Terraform plan output for\n" +
 				"```\n" +
 				"Cluster: default\n" +
@@ -263,7 +263,7 @@ func Test_runOutputMsg(t *testing.T) {
 				"Path: path/baz/one\n" +
 				"Commit ID: hash2\n" +
 				"```\n" +
-				"<details><summary><b>✅ Run Status: , Run Summary: Plan: x to add, x to change, x to destroy.</b></summary>\n\n" +
+				"<details><summary><b>✅ Run Status: Ok, Run Summary: Plan: x to add, x to change, x to destroy.</b></summary>\n\n" +
 				"```" +
 				"terraform\n" +
 				"Terraform apply output....\n" +
