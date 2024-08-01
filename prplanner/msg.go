@@ -39,9 +39,9 @@ var (
 		"Path: %s\n" +
 		"Commit ID: %s\n" +
 		"```\n" +
-		"<details><summary><b>Run Status: %s, Run Summary: %s</b></summary>" +
+		"<details><summary><b>%s Run Status: %s, Run Summary: %s</b></summary>" +
 		"\n\n```terraform\n%s\n```\n</details>\n" +
-		"To manually trigger plan again please post `@terraform-applier plan %s` as comment."
+		"\n> To manually trigger plan again please post `@terraform-applier plan %s` as comment."
 
 	runOutputMsgRegex = regexp.MustCompile(`Terraform plan output for\n\x60{3}\nCluster: (.+)\nModule: (.+)\nPath: (.+)\nCommit ID: (.+)\n`)
 )
@@ -86,10 +86,13 @@ func runOutputMsg(cluster, module, path string, run *v1beta1.Run) string {
 	// https://github.com/orgs/community/discussions/27190
 	characterLimit := 65000
 
+	statusSymbol := "✅"
+
 	runOutput := run.Output
 	// when run fails upload init output as well since it may contain
 	// reason of the failure
 	if run.Status == v1beta1.StatusErrored {
+		statusSymbol = "⛔"
 		runOutput = run.InitOutput + "\n" + run.Output
 	}
 
@@ -100,7 +103,7 @@ func runOutputMsg(cluster, module, path string, run *v1beta1.Run) string {
 			"The output is truncated from the top.\n" + string(runes[characterLimit:])
 	}
 
-	return fmt.Sprintf(runOutputMsgTml, cluster, module, path, run.CommitHash, run.Status, run.Summary, runOutput, path)
+	return fmt.Sprintf(runOutputMsgTml, cluster, module, path, run.CommitHash, statusSymbol, run.Status, run.Summary, runOutput, path)
 }
 
 func parseNamespaceName(str string) types.NamespacedName {
