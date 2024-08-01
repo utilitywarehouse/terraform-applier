@@ -206,8 +206,8 @@ github.com/stretchr/testify v1.8.0/go.mod h1:yNjHg4UonilssWZ8iaSj1OCr/vHnekPRkoO
 github.com/stretchr/testify v1.8.1/go.mod h1:w2LPCIKwWwSfY2zedu0+kehJoqGctiVI29o6fzry7u4=
 github.com/stretchr/testify v1.9.0 h1:HtqpIVDClZ4nwg75+f6Lvsy/wHu+3BoSGCbBAcpTsTg=
 github.com/stretchr/testify v1.9.0/go.mod h1:r2ic/lqez/lEtzL7wO/rwa5dbSLXVDPFyf8C91i36aY=
-github.com/urfave/cli/v2 v2.27.2 h1:6e0H+AkS+zDckwPCUrZkKX38mRaau4nL2uipkJpbkcI=
-github.com/urfave/cli/v2 v2.27.2/go.mod h1:g0+79LmHHATl7DAcHO99smiR/T7uGLw84w8Y42x+4eM=
+github.com/urfave/cli/v2 v2.27.3 h1:/POWahRmdh7uztQ3CYnaDddk0Rm90PyOgIxgW2rr41M=
+github.com/urfave/cli/v2 v2.27.3/go.mod h1:m4QzxcD2qpra4z7WhzEGn74WZLViBnMpb1ToCAKdGRQ=
 github.com/utilitywarehouse/git-mirror v0.2.2 h1:6rLylP4JenbgfDP7ZN3dcM8kvTyKos430nzyqxEZyeE=
 github.com/utilitywarehouse/git-mirror v0.2.2/go.mod h1:ei/l/I03ywUdzGUJAIjV9NQr7Nxt0vC37RbNR7uJOaw=
 github.com/utilitywarehouse/go-operational v0.0.0-20220413104526-79ce40a50281 h1:o2reBE9vn4ZXmq73rNDmipyJsH0GPqoS8A6CVeWZsGU=
