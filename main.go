@@ -719,6 +719,22 @@ func run(c *cli.Context) {
 		logger.Info("OIDC authentication configured", "issuer", c.String("oidc-issuer"), "clientID", c.String("oidc-client-id"))
 	}
 
+	go func() {
+		ticker := time.NewTicker(time.Minute)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ticker.C:
+				if err := metrics.CollectModuleInfo(ctx, mgr.GetClient()); err != nil {
+					logger.Error("unable to collect module info metrics", "error", err)
+				}
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+
 	webserver := &webserver.WebServer{
 		Authenticator: oidcAuthenticator,
 		ListenAddress: c.String("webserver-bind-address"),

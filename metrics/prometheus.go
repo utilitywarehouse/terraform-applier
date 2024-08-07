@@ -1,10 +1,13 @@
 package metrics
 
 import (
+	"context"
 	"strconv"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
+	tfaplv1beta1 "github.com/utilitywarehouse/terraform-applier/api/v1beta1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/metrics"
 )
 
@@ -33,10 +36,27 @@ type Prometheus struct {
 	moduleRunPending   *prometheus.GaugeVec
 	moduleRunSuccess   *prometheus.GaugeVec
 	moduleRunTimestamp *prometheus.GaugeVec
+	moduleInfo         *prometheus.GaugeVec
 }
 
 // Init creates and registers the custom metrics for terraform-applier.
 func (p *Prometheus) Init() {
+	p.moduleInfo = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Namespace: metricsNamespace,
+		Name:      "module_info",
+		Help:      "Current information about module including status",
+	},
+		[]string{
+			"module",
+			// Namespace name of the module that was ran
+			"namespace",
+			// state of the module
+			"state",
+			// potential reason associated with current state
+			"reason",
+		},
+	)
+
 	p.moduleRunCount = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Namespace: metricsNamespace,
 		Name:      "module_run_count",
@@ -118,6 +138,7 @@ func (p *Prometheus) Init() {
 		p.moduleRunSuccess,
 		p.moduleRunPending,
 		p.moduleRunTimestamp,
+		p.moduleInfo,
 	)
 
 }
@@ -173,4 +194,26 @@ func (p *Prometheus) SetRunPending(module, namespace string, pending bool) {
 		"module":    module,
 		"namespace": namespace,
 	}).Set(as)
+}
+
+// CollectModuleInfo when called resets 'module_info' and collect current state of the modules
+func (p *Prometheus) CollectModuleInfo(ctx context.Context, kc client.Client) error {
+
+	kubeModuleList := &tfaplv1beta1.ModuleList{}
+	if err := kc.List(ctx, kubeModuleList); err != nil {
+		return err
+	}
+
+	// reset all values and re-set current value
+	p.moduleInfo.Reset()
+
+	for _, m := range kubeModuleList.Items {
+		p.moduleInfo.With(prometheus.Labels{
+			"module":    m.Name,
+			"namespace": m.Namespace,
+			"state":     m.Status.CurrentState,
+			"reason":    m.Status.StateReason,
+		}).Set(1)
+	}
+	return nil
 }
