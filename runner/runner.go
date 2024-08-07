@@ -132,7 +132,8 @@ func (r *Runner) process(run *tfaplv1beta1.Run, cancelChan <-chan struct{}, envs
 	defer func() {
 		// there are no annotations for schedule and polling runs
 		if run.Request.Type == tfaplv1beta1.ScheduledRun ||
-			run.Request.Type == tfaplv1beta1.PollingRun {
+			run.Request.Type == tfaplv1beta1.PollingRun ||
+			run.Request.Type == tfaplv1beta1.PRPlan {
 			return
 		}
 		if err := sysutil.RemoveRequest(context.Background(), r.ClusterClt, run.Module, run.Request); err != nil {
