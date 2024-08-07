@@ -720,9 +720,12 @@ func run(c *cli.Context) {
 	}
 
 	go func() {
+		if err := metrics.CollectModuleInfo(ctx, mgr.GetClient()); err != nil {
+			logger.Error("unable to collect module info metrics", "error", err)
+		}
+
 		ticker := time.NewTicker(time.Minute)
 		defer ticker.Stop()
-
 		for {
 			select {
 			case <-ticker.C:
