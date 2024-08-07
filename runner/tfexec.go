@@ -4,15 +4,12 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 
 	"github.com/hashicorp/terraform-exec/tfexec"
 	tfaplv1beta1 "github.com/utilitywarehouse/terraform-applier/api/v1beta1"
-	"github.com/utilitywarehouse/terraform-applier/metrics"
 	"github.com/utilitywarehouse/terraform-applier/sysutil"
 )
 
@@ -36,8 +33,7 @@ type tfRunner struct {
 	workingDir      string
 	planFileName    string
 
-	metrics metrics.PrometheusInterface
-	tf      *tfexec.Terraform
+	tf *tfexec.Terraform
 }
 
 func (r *Runner) NewTFRunner(
@@ -73,7 +69,6 @@ func (r *Runner) NewTFRunner(
 	tfr := &tfRunner{
 		moduleName:      module.Name,
 		moduleNamespace: module.Namespace,
-		metrics:         r.Metrics,
 		rootDir:         tmpRoot,
 		workingDir:      filepath.Join(tmpRoot, module.Spec.Path),
 		planFileName:    "plan.out",
@@ -174,14 +169,8 @@ func (te *tfRunner) init(ctx context.Context, backendConf map[string]string) (st
 	}
 
 	if err := te.tf.Init(ctx, opts...); err != nil {
-		if uerr := errors.Unwrap(err); uerr != nil {
-			if e, ok := uerr.(*exec.ExitError); ok {
-				te.metrics.UpdateTerraformExitCodeCount(te.moduleName, te.moduleNamespace, "init", e.ExitCode())
-			}
-		}
 		return out.String(), err
 	}
-	te.metrics.UpdateTerraformExitCodeCount(te.moduleName, te.moduleNamespace, "init", 0)
 
 	return out.String(), nil
 }
@@ -195,19 +184,8 @@ func (te *tfRunner) plan(ctx context.Context) (bool, string, error) {
 
 	changes, err := te.tf.Plan(ctx, tfexec.Out(planOut))
 	if err != nil {
-		if uerr := errors.Unwrap(err); uerr != nil {
-			if e, ok := uerr.(*exec.ExitError); ok {
-				te.metrics.UpdateTerraformExitCodeCount(te.moduleName, te.moduleNamespace, "plan", e.ExitCode())
-			}
-		}
 		return changes, out.String(), err
 	}
-	if changes {
-		te.metrics.UpdateTerraformExitCodeCount(te.moduleName, te.moduleNamespace, "plan", 2)
-	} else {
-		te.metrics.UpdateTerraformExitCodeCount(te.moduleName, te.moduleNamespace, "plan", 0)
-	}
-
 	return changes, out.String(), nil
 }
 
@@ -231,15 +209,8 @@ func (te *tfRunner) apply(ctx context.Context) (string, error) {
 	}
 
 	if err := te.tf.Apply(ctx, tfexec.DirOrPlan(planOut)); err != nil {
-		if uerr := errors.Unwrap(err); uerr != nil {
-			if e, ok := uerr.(*exec.ExitError); ok {
-				te.metrics.UpdateTerraformExitCodeCount(te.moduleName, te.moduleNamespace, "apply", e.ExitCode())
-			}
-		}
 		return out.String(), err
 	}
-
-	te.metrics.UpdateTerraformExitCodeCount(te.moduleName, te.moduleNamespace, "apply", 0)
 
 	return out.String(), nil
 }

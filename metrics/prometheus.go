@@ -16,7 +16,6 @@ const (
 
 // PrometheusInterface allows for mocking out the functionality of Prometheus when testing the full process of an apply run.
 type PrometheusInterface interface {
-	UpdateTerraformExitCodeCount(string, string, string, int)
 	UpdateModuleSuccess(string, string, string, bool)
 	UpdateModuleRunDuration(string, string, string, float64, bool)
 	SetRunPending(string, string, bool)
@@ -29,12 +28,11 @@ type PrometheusInterface interface {
 // moduleRunSuccess is the last run outcome of the module run.
 // moduleRunning is the number of modules currently in running state.
 type Prometheus struct {
-	terraformExitCodeCount *prometheus.CounterVec
-	moduleRunCount         *prometheus.CounterVec
-	moduleRunDuration      *prometheus.HistogramVec
-	moduleRunPending       *prometheus.GaugeVec
-	moduleRunSuccess       *prometheus.GaugeVec
-	moduleRunTimestamp     *prometheus.GaugeVec
+	moduleRunCount     *prometheus.CounterVec
+	moduleRunDuration  *prometheus.HistogramVec
+	moduleRunPending   *prometheus.GaugeVec
+	moduleRunSuccess   *prometheus.GaugeVec
+	moduleRunTimestamp *prometheus.GaugeVec
 }
 
 // Init creates and registers the custom metrics for terraform-applier.
@@ -112,22 +110,6 @@ func (p *Prometheus) Init() {
 			"run_type",
 		},
 	)
-	p.terraformExitCodeCount = prometheus.NewCounterVec(prometheus.CounterOpts{
-		Namespace: metricsNamespace,
-		Name:      "module_terraform_exit_code_count",
-		Help:      "Count of terraform exit codes",
-	},
-		[]string{
-			// Name of the module that was ran
-			"module",
-			// Namespace name of the module that was ran
-			"namespace",
-			// plan, apply, init etc
-			"command",
-			// Exit code
-			"exit_code",
-		},
-	)
 
 	// Register custom metrics with the global prometheus registry
 	metrics.Registry.MustRegister(
@@ -136,19 +118,8 @@ func (p *Prometheus) Init() {
 		p.moduleRunSuccess,
 		p.moduleRunPending,
 		p.moduleRunTimestamp,
-		p.terraformExitCodeCount,
 	)
 
-}
-
-// UpdateTerraformExitCodeCount increments for each exit code returned by terraform
-func (p *Prometheus) UpdateTerraformExitCodeCount(module, namespace string, cmd string, code int) {
-	p.terraformExitCodeCount.With(prometheus.Labels{
-		"module":    module,
-		"namespace": namespace,
-		"command":   cmd,
-		"exit_code": strconv.Itoa(code),
-	}).Inc()
 }
 
 // UpdateModuleSuccess increments the given module's Counter for either successful or failed run attempts.
