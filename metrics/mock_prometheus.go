@@ -68,15 +68,3 @@ func (mr *MockPrometheusInterfaceMockRecorder) UpdateModuleSuccess(arg0, arg1, a
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateModuleSuccess", reflect.TypeOf((*MockPrometheusInterface)(nil).UpdateModuleSuccess), arg0, arg1, arg2, arg3)
 }
-
-// UpdateTerraformExitCodeCount mocks base method.
-func (m *MockPrometheusInterface) UpdateTerraformExitCodeCount(arg0, arg1, arg2 string, arg3 int) {
-	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "UpdateTerraformExitCodeCount", arg0, arg1, arg2, arg3)
-}
-
-// UpdateTerraformExitCodeCount indicates an expected call of UpdateTerraformExitCodeCount.
-func (mr *MockPrometheusInterfaceMockRecorder) UpdateTerraformExitCodeCount(arg0, arg1, arg2, arg3 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateTerraformExitCodeCount", reflect.TypeOf((*MockPrometheusInterface)(nil).UpdateTerraformExitCodeCount), arg0, arg1, arg2, arg3)
-}

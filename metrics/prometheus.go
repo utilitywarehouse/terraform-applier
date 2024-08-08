@@ -1,10 +1,13 @@
 package metrics
 
 import (
+	"context"
 	"strconv"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
+	tfaplv1beta1 "github.com/utilitywarehouse/terraform-applier/api/v1beta1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/metrics"
 )
 
@@ -16,7 +19,6 @@ const (
 
 // PrometheusInterface allows for mocking out the functionality of Prometheus when testing the full process of an apply run.
 type PrometheusInterface interface {
-	UpdateTerraformExitCodeCount(string, string, string, int)
 	UpdateModuleSuccess(string, string, string, bool)
 	UpdateModuleRunDuration(string, string, string, float64, bool)
 	SetRunPending(string, string, bool)
@@ -29,16 +31,32 @@ type PrometheusInterface interface {
 // moduleRunSuccess is the last run outcome of the module run.
 // moduleRunning is the number of modules currently in running state.
 type Prometheus struct {
-	terraformExitCodeCount *prometheus.CounterVec
-	moduleRunCount         *prometheus.CounterVec
-	moduleRunDuration      *prometheus.HistogramVec
-	moduleRunPending       *prometheus.GaugeVec
-	moduleRunSuccess       *prometheus.GaugeVec
-	moduleRunTimestamp     *prometheus.GaugeVec
+	moduleRunCount     *prometheus.CounterVec
+	moduleRunDuration  *prometheus.HistogramVec
+	moduleRunPending   *prometheus.GaugeVec
+	moduleRunSuccess   *prometheus.GaugeVec
+	moduleRunTimestamp *prometheus.GaugeVec
+	moduleInfo         *prometheus.GaugeVec
 }
 
 // Init creates and registers the custom metrics for terraform-applier.
 func (p *Prometheus) Init() {
+	p.moduleInfo = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Namespace: metricsNamespace,
+		Name:      "module_info",
+		Help:      "Current information about module including status",
+	},
+		[]string{
+			"module",
+			// Namespace name of the module that was ran
+			"namespace",
+			// state of the module
+			"state",
+			// potential reason associated with current state
+			"reason",
+		},
+	)
+
 	p.moduleRunCount = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Namespace: metricsNamespace,
 		Name:      "module_run_count",
@@ -112,22 +130,6 @@ func (p *Prometheus) Init() {
 			"run_type",
 		},
 	)
-	p.terraformExitCodeCount = prometheus.NewCounterVec(prometheus.CounterOpts{
-		Namespace: metricsNamespace,
-		Name:      "module_terraform_exit_code_count",
-		Help:      "Count of terraform exit codes",
-	},
-		[]string{
-			// Name of the module that was ran
-			"module",
-			// Namespace name of the module that was ran
-			"namespace",
-			// plan, apply, init etc
-			"command",
-			// Exit code
-			"exit_code",
-		},
-	)
 
 	// Register custom metrics with the global prometheus registry
 	metrics.Registry.MustRegister(
@@ -136,19 +138,9 @@ func (p *Prometheus) Init() {
 		p.moduleRunSuccess,
 		p.moduleRunPending,
 		p.moduleRunTimestamp,
-		p.terraformExitCodeCount,
+		p.moduleInfo,
 	)
 
-}
-
-// UpdateTerraformExitCodeCount increments for each exit code returned by terraform
-func (p *Prometheus) UpdateTerraformExitCodeCount(module, namespace string, cmd string, code int) {
-	p.terraformExitCodeCount.With(prometheus.Labels{
-		"module":    module,
-		"namespace": namespace,
-		"command":   cmd,
-		"exit_code": strconv.Itoa(code),
-	}).Inc()
 }
 
 // UpdateModuleSuccess increments the given module's Counter for either successful or failed run attempts.
@@ -202,4 +194,26 @@ func (p *Prometheus) SetRunPending(module, namespace string, pending bool) {
 		"module":    module,
 		"namespace": namespace,
 	}).Set(as)
+}
+
+// CollectModuleInfo when called resets 'module_info' and collect current state of the modules
+func (p *Prometheus) CollectModuleInfo(ctx context.Context, kc client.Client) error {
+
+	kubeModuleList := &tfaplv1beta1.ModuleList{}
+	if err := kc.List(ctx, kubeModuleList); err != nil {
+		return err
+	}
+
+	// reset all values and re-set current value
+	p.moduleInfo.Reset()
+
+	for _, m := range kubeModuleList.Items {
+		p.moduleInfo.With(prometheus.Labels{
+			"module":    m.Name,
+			"namespace": m.Namespace,
+			"state":     m.Status.CurrentState,
+			"reason":    m.Status.StateReason,
+		}).Set(1)
+	}
+	return nil
 }
