@@ -75,7 +75,7 @@ func (s *StatusPageHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	modules, err := listModules(r.Context(), s.ClusterClt)
 	if err != nil {
 		http.Error(w, "Error: Unable to get modules", http.StatusInternalServerError)
-		log.Error("Request failed: %v", err)
+		log.Error("Request failed", "err", err)
 		return
 	}
 
@@ -83,7 +83,7 @@ func (s *StatusPageHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	if err := s.Template.ExecuteTemplate(w, "index", result); err != nil {
 		http.Error(w, "Error: Unable to execute HTML template", http.StatusInternalServerError)
-		log.Error("Request failed: %v", err)
+		log.Error("Request failed", "err", err)
 		return
 	}
 	s.Log.Log(r.Context(), trace, "Request completed successfully")
