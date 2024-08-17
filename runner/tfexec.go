@@ -152,7 +152,7 @@ func (te *tfRunner) isLockFileExists() bool {
 }
 
 func (te *tfRunner) cleanUp() {
-	// sysutil.RemoveAll(te.rootDir)
+	sysutil.RemoveAll(te.rootDir)
 }
 
 func (te *tfRunner) init(ctx context.Context, backendConf map[string]string) (string, error) {
