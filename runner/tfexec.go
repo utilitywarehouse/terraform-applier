@@ -13,7 +13,8 @@ import (
 	"github.com/utilitywarehouse/terraform-applier/sysutil"
 )
 
-const strongBoxEnv = "TF_APPLIER_STRONGBOX_KEYRING"
+const strongBoxKeyRingEnv = "TF_APPLIER_STRONGBOX_KEYRING"
+const strongBoxIdentityEnv = "TF_APPLIER_STRONGBOX_IDENTITY"
 
 //go:generate go run github.com/golang/mock/mockgen -package runner -destination tfexec_mock.go github.com/utilitywarehouse/terraform-applier/runner TFExecuter
 
@@ -81,11 +82,16 @@ func (r *Runner) NewTFRunner(
 
 	runEnv := make(map[string]string)
 	var strongboxKeyringData string
+	var strongboxIdentityData string
 
 	for key := range envs {
-		// get SB keyring data if corresponding ENV is set
-		if key == strongBoxEnv {
+		// get SB keyring/Identity data if corresponding ENV is set
+		if key == strongBoxKeyRingEnv {
 			strongboxKeyringData = envs[key]
+			continue
+		}
+		if key == strongBoxIdentityEnv {
+			strongboxIdentityData = envs[key]
 			continue
 		}
 		runEnv[key] = envs[key]
@@ -97,9 +103,8 @@ func (r *Runner) NewTFRunner(
 	//setup SB home for terraform remote module
 	runEnv["STRONGBOX_HOME"] = tfr.workingDir
 
-	if strongboxKeyringData != "" {
-		// TODO: should we be decrypting whole repo with given key?
-		err := ensureDecryption(ctx, tfr.workingDir, strongboxKeyringData)
+	if strongboxKeyringData != "" || strongboxIdentityData != "" {
+		err := ensureDecryption(ctx, tfr.workingDir, strongboxKeyringData, strongboxIdentityData)
 		if err != nil {
 			return nil, fmt.Errorf("unable to setup strongbox err:%w", err)
 		}
@@ -147,7 +152,7 @@ func (te *tfRunner) isLockFileExists() bool {
 }
 
 func (te *tfRunner) cleanUp() {
-	sysutil.RemoveAll(te.rootDir)
+	// sysutil.RemoveAll(te.rootDir)
 }
 
 func (te *tfRunner) init(ctx context.Context, backendConf map[string]string) (string, error) {

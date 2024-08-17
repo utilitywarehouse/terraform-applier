@@ -1,3 +1,11 @@
+module "age_secret" {
+  source = "./age-sec"
+}
+
+output "top_secret_age" {
+  value = module.age_secret.top_secret_age
+}
+
 resource "null_resource" "echo_hw" {
   provisioner "local-exec" {
     command = "echo 'Hello World'"

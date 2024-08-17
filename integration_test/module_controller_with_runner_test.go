@@ -38,6 +38,12 @@ var _ = Describe("Module controller with Runner", func() {
 		Panic()
 	}
 
+	sbIdentityData, err := os.ReadFile(".tests_strongbox_identity")
+	if err != nil {
+		fmt.Println(err)
+		Panic()
+	}
+
 	Context("When creating Module", func() {
 		BeforeEach(func() {
 			// reset Time
@@ -103,6 +109,7 @@ var _ = Describe("Module controller with Runner", func() {
 					Path:     path,
 					Env: []corev1.EnvVar{
 						{Name: "TF_APPLIER_STRONGBOX_KEYRING", Value: string(sbKeyringData)},
+						{Name: "TF_APPLIER_STRONGBOX_IDENTITY", Value: string(sbIdentityData)},
 					},
 				},
 			}
@@ -153,6 +160,7 @@ var _ = Describe("Module controller with Runner", func() {
 
 			// make sure secret values are there in output (strongbox decryption was successful)
 			Expect(lastApplyRun.Output).Should(ContainSubstring("TOP_SECRET_VALUE"))
+			Expect(lastApplyRun.Output).Should(ContainSubstring("TOP_SECRET_VALUE_ENC_USING_AGE"))
 
 			// delete module to stopping requeue
 			Expect(k8sClient.Delete(ctx, module)).Should(Succeed())
@@ -190,6 +198,7 @@ var _ = Describe("Module controller with Runner", func() {
 					PlanOnly: &boolTrue,
 					Env: []corev1.EnvVar{
 						{Name: "TF_APPLIER_STRONGBOX_KEYRING", Value: string(sbKeyringData)},
+						{Name: "TF_APPLIER_STRONGBOX_IDENTITY", Value: string(sbIdentityData)},
 					},
 				},
 			}
@@ -279,6 +288,7 @@ var _ = Describe("Module controller with Runner", func() {
 					},
 					Env: []corev1.EnvVar{
 						{Name: "TF_APPLIER_STRONGBOX_KEYRING", Value: string(sbKeyringData)},
+						{Name: "TF_APPLIER_STRONGBOX_IDENTITY", Value: string(sbIdentityData)},
 						{Name: "TF_ENV_1", Value: "ENV-VALUE1"},
 						{Name: "TF_ENV_2", ValueFrom: &corev1.EnvVarSource{
 							ConfigMapKeyRef: &corev1.ConfigMapKeySelector{
@@ -368,6 +378,7 @@ var _ = Describe("Module controller with Runner", func() {
 
 			// make sure all values are there in output
 			Expect(lastApplyRun.Output).Should(ContainSubstring("TOP_SECRET_VALUE"))
+			Expect(lastApplyRun.Output).Should(ContainSubstring("TOP_SECRET_VALUE_ENC_USING_AGE"))
 			Expect(lastApplyRun.Output).Should(ContainSubstring("ENV-VALUE1"))
 			Expect(lastApplyRun.Output).Should(ContainSubstring("ENV-VALUE2"))
 			Expect(lastApplyRun.Output).Should(ContainSubstring("ENV-VALUE3"))
@@ -424,6 +435,7 @@ var _ = Describe("Module controller with Runner", func() {
 					VaultRequests: &vaultReq,
 					Env: []corev1.EnvVar{
 						{Name: "TF_APPLIER_STRONGBOX_KEYRING", Value: string(sbKeyringData)},
+						{Name: "TF_APPLIER_STRONGBOX_IDENTITY", Value: string(sbIdentityData)},
 					},
 				},
 			}

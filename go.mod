@@ -3,6 +3,7 @@ module github.com/utilitywarehouse/terraform-applier
 go 1.22.0
 
 require (
+	filippo.io/age v1.2.0
 	github.com/go-logr/logr v1.4.2
 	github.com/golang/mock v1.6.0
 	github.com/google/go-cmp v0.6.0
