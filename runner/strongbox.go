@@ -120,14 +120,25 @@ func strongboxAgeRecursiveDecrypt(cwd, sbIdentityData string) error {
 		}
 		defer file.Close()
 
+		// for optimisation only read required chunk of the file and verify if encrypted
+		chunk := make([]byte, 50)
+		_, err = file.Read(chunk)
+		if err != nil && err != io.EOF {
+			return err
+		}
+
+		if !strings.HasPrefix(string(chunk), armor.Header) {
+			return nil
+		}
+
+		// for age's own ^^ validation
+		if _, err := file.Seek(0, io.SeekStart); err != nil {
+			return err
+		}
+
 		armorReader := armor.NewReader(file)
 		ar, err := age.Decrypt(armorReader, identities...)
 		if err != nil {
-			// Doesn't have age header
-			// https://github.com/FiloSottile/age/blob/main/age.go#L208-L215
-			if strings.HasPrefix(err.Error(), "failed to read header") {
-				return nil
-			}
 			return err
 		}
 
