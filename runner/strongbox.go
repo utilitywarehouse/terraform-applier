@@ -1,7 +1,6 @@
 package runner
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -27,9 +26,8 @@ func ensureDecryption(ctx context.Context, cwd string, sbKeyringData string, sbI
 	// setup env for strongbox command
 	runEnv := []string{
 		// HOME is also used to setup git config in current dir
+		// its also used for strongbox decryption
 		fmt.Sprintf("HOME=%s", cwd),
-		//setup SB home for strongbox decryption
-		fmt.Sprintf("STRONGBOX_HOME=%s", cwd),
 		fmt.Sprintf("PATH=%s", os.Getenv("PATH")),
 	}
 
@@ -46,12 +44,7 @@ func ensureDecryption(ctx context.Context, cwd string, sbKeyringData string, sbI
 			return fmt.Errorf("error writing sb identity file %w", err)
 		}
 
-		identities, err := age.ParseIdentities(bytes.NewBuffer([]byte(sbIdentityData)))
-		if err != nil {
-			return fmt.Errorf("error parsing age identity file err:%w", err)
-		}
-
-		if err := strongboxAgeRecursiveDecrypt(cwd, identities); err != nil {
+		if err := strongboxAgeRecursiveDecrypt(cwd, sbIdentityData); err != nil {
 			return fmt.Errorf("error decrypting via age err:%w", err)
 		}
 	}
@@ -102,7 +95,12 @@ func runStrongboxDecryption(ctx context.Context, cwd string, runEnv []string) er
 	return nil
 }
 
-func strongboxAgeRecursiveDecrypt(cwd string, identities []age.Identity) error {
+func strongboxAgeRecursiveDecrypt(cwd, sbIdentityData string) error {
+	identities, err := age.ParseIdentities(strings.NewReader(sbIdentityData))
+	if err != nil {
+		return fmt.Errorf("error parsing age identity file err:%w", err)
+	}
+
 	return filepath.Walk(cwd, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
