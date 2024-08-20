@@ -1,6 +1,7 @@
 package runner
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -120,41 +121,30 @@ func strongboxAgeRecursiveDecrypt(cwd, sbIdentityData string) error {
 		}
 		defer file.Close()
 
-		// for optimisation only read required chunk of the file and verify if encrypted
-		chunk := make([]byte, 50)
-		_, err = file.Read(chunk)
-		if err != nil && err != io.EOF {
+		in, err := io.ReadAll(file)
+		if err != nil {
 			return err
 		}
 
-		if !strings.HasPrefix(string(chunk), armor.Header) {
+		if !strings.HasPrefix(string(in), armor.Header) {
 			return nil
 		}
 
-		// for age's own ^^ validation
-		if _, err := file.Seek(0, io.SeekStart); err != nil {
-			return err
-		}
-
-		armorReader := armor.NewReader(file)
+		armorReader := armor.NewReader(bytes.NewReader(in))
 		ar, err := age.Decrypt(armorReader, identities...)
 		if err != nil {
 			return err
 		}
 
-		if err = file.Truncate(0); err != nil {
-			return err
-		}
-
 		if _, err := file.Seek(0, io.SeekStart); err != nil {
 			return err
 		}
 
-		_, err = io.Copy(file, ar)
+		n, err := io.Copy(file, ar)
 		if err != nil {
 			return err
 		}
 
-		return nil
+		return file.Truncate(n)
 	})
 }
