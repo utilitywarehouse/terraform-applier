@@ -109,9 +109,10 @@ Since key is set on controller it can be used by ALL modules managed by the cont
 
 ### Strongbox decryption
 
-Terraform applier supports strongbox decryption, its triggered if `TF_APPLIER_STRONGBOX_KEYRING` EVN is set on module.
+Terraform applier supports strongbox decryption, its triggered if 
+`TF_APPLIER_STRONGBOX_KEYRING` or `TF_APPLIER_STRONGBOX_IDENTITY` EVN is set on module.
 content of this ENV should be valid strongbox keyring file data which should include strongbox key used to encrypt secrets in the module.
-TF Applier will also configure Git and Strongbox Home before running `init` to decrypt any encrypted file from remote base as well.
+TF Applier will also configure Git and Strongbox Home before running `init` to decrypt any encrypted file from remote terraform module as well.
 
 ### RBAC
 

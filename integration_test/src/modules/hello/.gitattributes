@@ -1,1 +1,2 @@
 secret.tf filter=strongbox diff=strongbox
+age-sec/secret.tf filter=strongbox diff=strongbox
