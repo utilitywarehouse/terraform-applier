@@ -15,7 +15,6 @@ type Repositories interface {
 	ChangedFiles(ctx context.Context, remote, hash string) ([]string, error)
 	Clone(ctx context.Context, remote, dst, branch, pathspec string, rmGitDir bool) (string, error)
 	Hash(ctx context.Context, remote, ref, path string) (string, error)
-	LogMsg(ctx context.Context, remote, ref, path string) (string, error)
 	Mirror(ctx context.Context, remote string) error
 	ObjectExists(ctx context.Context, remote, obj string) error
 	Repository(remote string) (*mirror.Repository, error)

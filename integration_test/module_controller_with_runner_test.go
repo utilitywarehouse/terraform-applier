@@ -57,7 +57,7 @@ var _ = Describe("Module controller with Runner", func() {
 			// all jobs will be triggered automatically as they do not have initial commit hash
 			testRepos.EXPECT().Hash(gomock.Any(), "https://host.xy/dummy/repo.git", "HEAD", "hello").
 				Return(commitHash, nil).AnyTimes()
-			testRepos.EXPECT().LogMsg(gomock.Any(), "https://host.xy/dummy/repo.git", "HEAD", "hello").
+			testRepos.EXPECT().Subject(gomock.Any(), "https://host.xy/dummy/repo.git", commitHash).
 				Return(commitMsg, nil).AnyTimes()
 
 			var dst string
