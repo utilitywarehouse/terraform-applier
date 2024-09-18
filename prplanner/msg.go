@@ -32,7 +32,7 @@ var (
 
 	requestAcknowledgedMsgRegex = regexp.MustCompile(`Received terraform plan request\n\x60{3}\nCluster: (.+)\nModule: (.+)\nPath: (.+)\nCommit ID: (.+)\nRequested At: (.+)`)
 
-	runOutputMsgTml = "Terraform plan output for\n" +
+	runOutputMsgTml = "Terraform run output for\n" +
 		"```\n" +
 		"Cluster: %s\n" +
 		"Module: %s\n" +
@@ -43,7 +43,7 @@ var (
 		"\n\n```terraform\n%s\n```\n</details>\n" +
 		"\n> To manually trigger plan again please post `@terraform-applier plan %s` as comment."
 
-	runOutputMsgRegex = regexp.MustCompile(`Terraform plan output for\n\x60{3}\nCluster: (.+)\nModule: (.+)\nPath: (.+)\nCommit ID: (.+)\n`)
+	runOutputMsgRegex = regexp.MustCompile(`Terraform (?:plan|run) output for\n\x60{3}\nCluster: (.+)\nModule: (.+)\nPath: (.+)\nCommit ID: (.+)\n`)
 )
 
 func parsePlanReqMsg(commentBody string) string {
