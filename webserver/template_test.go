@@ -96,8 +96,8 @@ func Test_ExecuteTemplate(t *testing.T) {
 		},
 	}
 
-	testRedis.EXPECT().Runs(gomock.Any(), gomock.Any()).DoAndReturn(
-		func(ctx context.Context, module types.NamespacedName) ([]*tfaplv1beta1.Run, error) {
+	testRedis.EXPECT().Runs(gomock.Any(), gomock.Any(), "*").DoAndReturn(
+		func(ctx context.Context, module types.NamespacedName, patternSuffix string) ([]*tfaplv1beta1.Run, error) {
 			switch module {
 			case types.NamespacedName{Name: "admins", Namespace: "foo"}:
 				return nil, nil

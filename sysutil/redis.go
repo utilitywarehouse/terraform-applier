@@ -5,8 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"strconv"
-	"strings"
 	"time"
 
 	"github.com/redis/go-redis/v9"
@@ -26,7 +24,8 @@ type RedisInterface interface {
 	DefaultLastRun(ctx context.Context, module types.NamespacedName) (*tfaplv1beta1.Run, error)
 	DefaultApply(ctx context.Context, module types.NamespacedName) (*tfaplv1beta1.Run, error)
 	PRRun(ctx context.Context, module types.NamespacedName, pr int, hash string) (*tfaplv1beta1.Run, error)
-	Runs(ctx context.Context, module types.NamespacedName) ([]*tfaplv1beta1.Run, error)
+	Run(ctx context.Context, key string) (*tfaplv1beta1.Run, error)
+	Runs(ctx context.Context, module types.NamespacedName, keySuffix string) ([]*tfaplv1beta1.Run, error)
 	GetCommitHash(ctx context.Context, key string) (string, error)
 
 	SetDefaultLastRun(ctx context.Context, run *tfaplv1beta1.Run) error
@@ -54,61 +53,32 @@ func DefaultPRLastRunsKey(module types.NamespacedName, pr int, hash string) stri
 	return fmt.Sprintf("%sPR:%d:%s", keyPrefix(module), pr, hash)
 }
 
-func ParsePRRunsKey(str string) (module types.NamespacedName, pr int, hash string, err error) {
-	sections := strings.Split(str, ":")
-	if len(sections) != 5 {
-		err = fmt.Errorf("invalid pr run key")
-		return
-	}
-
-	module.Namespace = sections[0]
-	module.Name = sections[1]
-
-	if sections[2] != "PR" {
-		err = fmt.Errorf("invalid pr run key")
-		return
-	}
-
-	pr, err = strconv.Atoi(sections[3])
-	hash = sections[4]
-
-	if module.Name == "" ||
-		module.Namespace == "" ||
-		pr == 0 ||
-		hash == "" {
-		err = fmt.Errorf("invalid pr run key")
-		return
-	}
-
-	return
-}
-
 // DefaultLastRun will return last run result for the default branch
 func (r Redis) DefaultLastRun(ctx context.Context, module types.NamespacedName) (*tfaplv1beta1.Run, error) {
-	return r.getKV(ctx, defaultLastRunKey(module))
+	return r.Run(ctx, defaultLastRunKey(module))
 }
 
 // DefaultApply will return last apply run's result for the default branch
 func (r Redis) DefaultApply(ctx context.Context, module types.NamespacedName) (*tfaplv1beta1.Run, error) {
-	return r.getKV(ctx, defaultLastApplyKey(module))
+	return r.Run(ctx, defaultLastApplyKey(module))
 }
 
 // PRLastRun will return last run result for the given PR branch
 func (r Redis) PRRun(ctx context.Context, module types.NamespacedName, pr int, hash string) (*tfaplv1beta1.Run, error) {
-	return r.getKV(ctx, DefaultPRLastRunsKey(module, pr, hash))
+	return r.Run(ctx, DefaultPRLastRunsKey(module, pr, hash))
 }
 
 // Runs will return all the runs stored for the given module
-func (r Redis) Runs(ctx context.Context, module types.NamespacedName) ([]*tfaplv1beta1.Run, error) {
+func (r Redis) Runs(ctx context.Context, module types.NamespacedName, patternSuffix string) ([]*tfaplv1beta1.Run, error) {
 	var runs []*tfaplv1beta1.Run
 
-	keys, err := r.Client.Keys(ctx, keyPrefix(module)+"*").Result()
+	keys, err := r.Client.Keys(ctx, keyPrefix(module)+patternSuffix).Result()
 	if err != nil && err != redis.Nil {
 		return nil, fmt.Errorf("unable to get module keys err:%w", err)
 	}
 
 	for _, key := range keys {
-		run, err := r.getKV(ctx, key)
+		run, err := r.Run(ctx, key)
 		if err != nil {
 			return nil, err
 		}
@@ -142,7 +112,7 @@ func (r Redis) setKV(ctx context.Context, key string, run *tfaplv1beta1.Run, exp
 }
 
 func (r Redis) GetCommitHash(ctx context.Context, key string) (string, error) {
-	module, err := r.getKV(ctx, key)
+	module, err := r.Run(ctx, key)
 	if err != nil {
 		return "", fmt.Errorf("unable to get key value pair err:%w", err)
 	}
@@ -150,7 +120,7 @@ func (r Redis) GetCommitHash(ctx context.Context, key string) (string, error) {
 	return module.CommitHash, nil
 }
 
-func (r Redis) getKV(ctx context.Context, key string) (*tfaplv1beta1.Run, error) {
+func (r Redis) Run(ctx context.Context, key string) (*tfaplv1beta1.Run, error) {
 	output, err := r.Client.Get(ctx, key).Result()
 	if err == redis.Nil {
 		return nil, ErrKeyNotFound

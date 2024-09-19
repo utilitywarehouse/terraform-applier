@@ -256,7 +256,7 @@ func Test_runOutputMsg(t *testing.T) {
 		{
 			"1",
 			args{cluster: "default", module: "baz/one", path: "path/baz/one", run: &v1beta1.Run{Status: v1beta1.StatusOk, CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy.", Output: "Terraform apply output...."}},
-			"Terraform plan output for\n" +
+			"Terraform run output for\n" +
 				"```\n" +
 				"Cluster: default\n" +
 				"Module: baz/one\n" +
@@ -274,7 +274,7 @@ func Test_runOutputMsg(t *testing.T) {
 		{
 			"2",
 			args{cluster: "default", module: "baz/one", path: "path/baz/one", run: &v1beta1.Run{Status: v1beta1.StatusErrored, CommitHash: "hash2", Summary: "unable to plan module", InitOutput: "Some Init Output...", Output: "Some TF Output ....."}},
-			"Terraform plan output for\n" +
+			"Terraform run output for\n" +
 				"```\n" +
 				"Cluster: default\n" +
 				"Module: baz/one\n" +
@@ -285,6 +285,23 @@ func Test_runOutputMsg(t *testing.T) {
 				"```" +
 				"terraform\n" +
 				"Some Init Output...\nSome TF Output .....\n" +
+				"```\n" +
+				"</details>\n" +
+				"\n> To manually trigger plan again please post `@terraform-applier plan path/baz/one` as comment.",
+		}, {
+			"3",
+			args{cluster: "default", module: "baz/one", path: "path/baz/one", run: &v1beta1.Run{Status: v1beta1.StatusOk, Applied: true, CommitHash: "hash2", Summary: "Applied: x to add, x to change, x to destroy.", Output: "Terraform apply output...."}},
+			"Terraform run output for\n" +
+				"```\n" +
+				"Cluster: default\n" +
+				"Module: baz/one\n" +
+				"Path: path/baz/one\n" +
+				"Commit ID: hash2\n" +
+				"```\n" +
+				"<details><summary><b>✅ Run Status: Ok, Run Summary: Applied: x to add, x to change, x to destroy.</b></summary>\n\n" +
+				"```" +
+				"terraform\n" +
+				"Terraform apply output....\n" +
 				"```\n" +
 				"</details>\n" +
 				"\n> To manually trigger plan again please post `@terraform-applier plan path/baz/one` as comment.",
@@ -313,6 +330,27 @@ func Test_parseRunOutputMsg(t *testing.T) {
 		wantPath    string
 		wantCommit  string
 	}{
+		{
+			name: "old msg-NamespaceName + Commit ID",
+			args: args{comment: "Terraform plan output for\n" +
+				"```\n" +
+				"Cluster: default\n" +
+				"Module: baz/one\n" +
+				"Path: path/baz/one\n" +
+				"Commit ID: hash12\n" +
+				"```\n" +
+				"<details><summary><b>⛔ Run Status: Errored, Run Summary: unable to plan module</b></summary>\n\n" +
+				"```" +
+				"terraform\n" +
+				"Some Init Output...\nSome TF Output .....\n" +
+				"```\n" +
+				"</details>\n" +
+				"\n> To manually trigger plan again please post `@terraform-applier plan path/baz/one` as comment."},
+			wantModule:  types.NamespacedName{Namespace: "baz", Name: "one"},
+			wantCluster: "default",
+			wantPath:    "path/baz/one",
+			wantCommit:  "hash12",
+		},
 		{
 			name:        "NamespaceName + Commit ID",
 			args:        args{comment: runOutputMsg("default", "baz/one", "foo/one", &v1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy."})},

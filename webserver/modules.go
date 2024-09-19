@@ -33,7 +33,7 @@ func createNamespaceMap(ctx context.Context, modules []tfaplv1beta1.Module, redi
 		module := Module{Module: m}
 
 		// error can be skipped here
-		module.Runs, _ = redis.Runs(ctx, m.NamespacedName())
+		module.Runs, _ = redis.Runs(ctx, m.NamespacedName(), "*")
 
 		// sort runs by StartedAt DESC
 		slices.SortFunc(module.Runs, func(a *tfaplv1beta1.Run, b *tfaplv1beta1.Run) int {

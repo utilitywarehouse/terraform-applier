@@ -37,7 +37,7 @@ var _ = Describe("Module controller without runner with label selector", func() 
 			// Trigger Job run as soon as module is created
 			testRepos.EXPECT().Hash(gomock.Any(), "https://host.xy/dummy/repo.git", "HEAD", "hello-filter-test").
 				Return(commitHash, nil).AnyTimes()
-			testRepos.EXPECT().LogMsg(gomock.Any(), "https://host.xy/dummy/repo.git", "HEAD", "hello-filter-test").
+			testRepos.EXPECT().Subject(gomock.Any(), "https://host.xy/dummy/repo.git", commitHash).
 				Return(commitMsg, nil).AnyTimes()
 
 			testMetrics.EXPECT().SetRunPending(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()

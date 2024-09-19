@@ -190,7 +190,7 @@ func (r *Runner) process(run *tfaplv1beta1.Run, cancelChan <-chan struct{}, envs
 		return false
 	}
 
-	commitLog, err := r.Repos.LogMsg(ctx, module.Spec.RepoURL, run.RepoRef, module.Spec.Path)
+	commitLog, err := r.Repos.Subject(ctx, module.Spec.RepoURL, commitHash)
 	if err != nil {
 		log.Error("unable to get commit log subject", "err", err)
 		return false

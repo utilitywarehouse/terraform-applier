@@ -80,21 +80,6 @@ func (mr *MockRepositoriesMockRecorder) Hash(arg0, arg1, arg2, arg3 interface{})
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Hash", reflect.TypeOf((*MockRepositories)(nil).Hash), arg0, arg1, arg2, arg3)
 }
 
-// LogMsg mocks base method.
-func (m *MockRepositories) LogMsg(arg0 context.Context, arg1, arg2, arg3 string) (string, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "LogMsg", arg0, arg1, arg2, arg3)
-	ret0, _ := ret[0].(string)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// LogMsg indicates an expected call of LogMsg.
-func (mr *MockRepositoriesMockRecorder) LogMsg(arg0, arg1, arg2, arg3 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "LogMsg", reflect.TypeOf((*MockRepositories)(nil).LogMsg), arg0, arg1, arg2, arg3)
-}
-
 // Mirror mocks base method.
 func (m *MockRepositories) Mirror(arg0 context.Context, arg1 string) error {
 	m.ctrl.T.Helper()
