@@ -84,7 +84,7 @@ func (p *Planner) handleWebhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.WriteHeader(http.StatusBadRequest)
+	w.WriteHeader(http.StatusOK)
 }
 
 func (p *Planner) processPRWebHookEvent(event GitHubWebhook, prNumber int) {

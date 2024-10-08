@@ -2,9 +2,7 @@ package prplanner
 
 import (
 	"context"
-	"fmt"
 	"regexp"
-	"strconv"
 	"strings"
 
 	"github.com/redis/go-redis/v9"
@@ -81,20 +79,6 @@ func (p *Planner) processRedisKeySetMsg(ctx context.Context, ch <-chan *redis.Me
 			CommentID = run.Request.PR.CommentID
 		}
 
-		// if run is apply run try and get pr num from commit msg
-		if prNum == 0 && run.Applied {
-			prNum = findPRNumber(run.CommitMsg)
-			if prNum != 0 {
-				// this commit is PR merge commit before posting output to the
-				// PR make sure there was actually plan runs on the PR
-				// this is to avoid uploading apply output on filtered PR
-				runs, _ := p.RedisClient.Runs(ctx, run.Module, fmt.Sprintf("PR:%d:*", prNum))
-				if len(runs) == 0 {
-					continue
-				}
-			}
-		}
-
 		// this is required in case this run is not a PR run && not apply run
 		if prNum == 0 {
 			continue
@@ -124,22 +108,4 @@ func (p *Planner) processRedisKeySetMsg(ctx context.Context, ch <-chan *redis.Me
 		}
 		p.Log.Info("run output posted", "module", run.Module, "pr", prNum)
 	}
-}
-
-// findPRNumber will try and find PR number from the following 2 types of
-// commit msg used by github when merging a PR
-// 'Merge pull request #268 from ....'
-// 'some commit msg... (#95532)'
-func findPRNumber(msg string) int {
-	if matches := mergePRRegex.FindStringSubmatch(msg); len(matches) == 2 {
-		prNum, _ := strconv.Atoi(matches[1])
-		return prNum
-	}
-
-	if matches := prNumSuffixRegex.FindStringSubmatch(msg); len(matches) == 2 {
-		prNum, _ := strconv.Atoi(matches[1])
-		return prNum
-	}
-
-	return 0
 }
