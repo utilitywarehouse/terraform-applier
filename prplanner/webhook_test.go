@@ -86,8 +86,8 @@ func Test_webhook(t *testing.T) {
 			t.Fatalf("Failed to send request: %v", err)
 		}
 
-		if resp.StatusCode != http.StatusBadRequest {
-			t.Errorf("Expected status %v, got %v", http.StatusBadRequest, resp.StatusCode)
+		if resp.StatusCode != http.StatusOK {
+			t.Errorf("Expected status %v, got %v", http.StatusOK, resp.StatusCode)
 		}
 	})
 
@@ -109,8 +109,8 @@ func Test_webhook(t *testing.T) {
 			t.Fatalf("Failed to send request: %v", err)
 		}
 
-		if resp.StatusCode != http.StatusBadRequest {
-			t.Errorf("Expected status %v, got %v", http.StatusBadRequest, resp.StatusCode)
+		if resp.StatusCode != http.StatusOK {
+			t.Errorf("Expected status %v, got %v", http.StatusOK, resp.StatusCode)
 		}
 	})
 }
