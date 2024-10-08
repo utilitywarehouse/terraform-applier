@@ -29,7 +29,6 @@ type Run struct {
 	CommitHash   string        `json:"commitHash,omitempty"`
 	CommitMsg    string        `json:"commitMsg,omitempty"`
 	DiffDetected bool          `json:"diffDetected,omitempty"`
-	Applied      bool          `json:"applied,omitempty"`
 	InitOutput   string        `json:"initOutput,omitempty"`
 	Output       string        `json:"output,omitempty"`
 	Summary      string        `json:"summary,omitempty"`

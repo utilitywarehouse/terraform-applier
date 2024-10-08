@@ -222,7 +222,7 @@
                                 href="#{{sanitizedUniqueName .Module}}-{{$i}}" data-bs-toggle="tab" role="tab">
                                 {{if $run.Request.PR}}
                                 PR #{{$run.Request.PR.Number}} Run
-                                {{else if $run.Applied}}
+                                {{else if and $run.DiffDetected (not $run.PlanOnly)}}
                                 Last Applied Run
                                 {{else}}
                                 Last Planned Run

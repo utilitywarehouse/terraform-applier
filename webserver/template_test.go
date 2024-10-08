@@ -186,14 +186,14 @@ Terraform will perform the following actions:
 Plan: 7 to add, 0 to change, 0 to destroy.`,
 					},
 					{
-						Module:     types.NamespacedName{Name: "groups", Namespace: "bar"},
-						Request:    &tfaplv1beta1.Request{Type: tfaplv1beta1.PollingRun, RequestedAt: getMetaTime(3, 1, 2)},
-						StartedAt:  getMetaTime(10, 30, 1),
-						Status:     tfaplv1beta1.StatusOk,
-						Duration:   60 * time.Second,
-						CommitHash: "abcccf2a0f758ba0d8e88a834a2acdba5885577c",
-						CommitMsg:  `initial commit (john)`,
-						Applied:    true,
+						Module:       types.NamespacedName{Name: "groups", Namespace: "bar"},
+						Request:      &tfaplv1beta1.Request{Type: tfaplv1beta1.PollingRun, RequestedAt: getMetaTime(3, 1, 2)},
+						StartedAt:    getMetaTime(10, 30, 1),
+						Status:       tfaplv1beta1.StatusOk,
+						Duration:     60 * time.Second,
+						CommitHash:   "abcccf2a0f758ba0d8e88a834a2acdba5885577c",
+						CommitMsg:    `initial commit (john)`,
+						DiffDetected: true,
 						InitOutput: `
 {
   "terraform_version": "1.8.2",
