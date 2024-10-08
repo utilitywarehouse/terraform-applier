@@ -340,15 +340,6 @@ func (r *Runner) runTF(
 		return false
 	}
 
-	// return if no drift detected
-	if !diffDetected {
-		if err = r.SetRunFinishedStatus(run, module, tfaplv1beta1.ReasonNoDriftDetected, planStatus, r.Clock.Now()); err != nil {
-			log.Error("unable to set no drift status", "err", err)
-			return false
-		}
-		return true
-	}
-
 	// return if plan only mode
 	if run.PlanOnly {
 		if err = r.SetRunFinishedStatus(run, module, tfaplv1beta1.ReasonDriftDetected, "PlanOnly/"+planStatus, r.Clock.Now()); err != nil {
@@ -374,7 +365,6 @@ func (r *Runner) runTF(
 		r.setFailedStatus(run, module, tfaplv1beta1.ReasonApplyFailed, "unable to apply module")
 		return false
 	}
-	run.Applied = true
 	module.Status.LastAppliedAt = &metav1.Time{Time: r.Clock.Now()}
 	module.Status.LastAppliedCommitHash = commitHash
 
@@ -478,7 +468,7 @@ func (r *Runner) updateRedis(ctx context.Context, run *tfaplv1beta1.Run) error {
 		return err
 	}
 
-	if run.Applied {
+	if run.DiffDetected && !run.PlanOnly {
 		// set default last applied run
 		if err := r.Redis.SetDefaultApply(ctx, run); err != nil {
 			return err

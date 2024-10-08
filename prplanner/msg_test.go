@@ -290,7 +290,7 @@ func Test_runOutputMsg(t *testing.T) {
 				"\n> To manually trigger plan again please post `@terraform-applier plan path/baz/one` as comment.",
 		}, {
 			"3",
-			args{cluster: "default", module: "baz/one", path: "path/baz/one", run: &v1beta1.Run{Status: v1beta1.StatusOk, Applied: true, CommitHash: "hash2", Summary: "Applied: x to add, x to change, x to destroy.", Output: "Terraform apply output...."}},
+			args{cluster: "default", module: "baz/one", path: "path/baz/one", run: &v1beta1.Run{Status: v1beta1.StatusOk, DiffDetected: true, CommitHash: "hash2", Summary: "Applied: x to add, x to change, x to destroy.", Output: "Terraform apply output...."}},
 			"Terraform run output for\n" +
 				"```\n" +
 				"Cluster: default\n" +
