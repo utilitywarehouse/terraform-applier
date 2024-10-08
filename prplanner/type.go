@@ -138,10 +138,6 @@ type GitHubWebhook struct {
 	Action string `json:"action"`
 	Number int    `json:"number"`
 
-	Issue struct {
-		Number int `json:"number"`
-	} `json:"issue"`
-
 	Repository struct {
 		Name  string `json:"name"`
 		Owner struct {
@@ -151,6 +147,10 @@ type GitHubWebhook struct {
 	} `json:"repository"`
 
 	// only for comments
+	Issue struct {
+		Number int `json:"number"`
+	} `json:"issue"`
+
 	Comment struct {
 		User struct {
 			Login string `json:"login"`
