@@ -468,7 +468,7 @@ func (r *Runner) updateRedis(ctx context.Context, run *tfaplv1beta1.Run) error {
 		return err
 	}
 
-	if run.DiffDetected {
+	if run.DiffDetected && !run.PlanOnly {
 		// set default last applied run
 		if err := r.Redis.SetDefaultApply(ctx, run); err != nil {
 			return err
