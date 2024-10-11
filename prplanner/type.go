@@ -32,13 +32,6 @@ mergeCommit {
 author {
   login
 }
-commits(last: 20) {
-  nodes {
-    commit {
-      oid
-    }
-  }
-}
 comments(last:50) {
   nodes {
     databaseId
@@ -46,11 +39,6 @@ comments(last:50) {
     author {
       login
     }
-  }
-}
-files(first: 100) {
-  nodes {
-    path
   }
 }
 `
@@ -103,15 +91,9 @@ type pr struct {
 	Merged         bool   `json:"merged"`
 	MergeCommit    Commit `json:"mergeCommit"`
 	Author         author `json:"author"`
-	Commits        struct {
-		Nodes []prCommitNode `json:"nodes"`
-	} `json:"commits"`
-	Comments struct {
+	Comments       struct {
 		Nodes []prComment `json:"nodes"`
 	} `json:"comments"`
-	Files struct {
-		Nodes []prFiles `json:"nodes"`
-	} `json:"files"`
 }
 
 type author struct {
@@ -126,10 +108,6 @@ type prRepo struct {
 	} `json:"owner"`
 }
 
-type prCommitNode struct {
-	Commit Commit `json:"commit"`
-}
-
 type Commit struct {
 	Oid string `json:"oid"`
 }
@@ -138,10 +116,6 @@ type prComment struct {
 	DatabaseID int    `json:"databaseId"`
 	Author     author `json:"author"`
 	Body       string `json:"body"`
-}
-
-type prFiles struct {
-	Path string `json:"path"`
 }
 
 type GitHubWebhook struct {

@@ -6,7 +6,9 @@ import (
 	"testing"
 
 	gomock "github.com/golang/mock/gomock"
+	"github.com/utilitywarehouse/git-mirror/pkg/mirror"
 	tfaplv1beta1 "github.com/utilitywarehouse/terraform-applier/api/v1beta1"
+	"github.com/utilitywarehouse/terraform-applier/git"
 )
 
 func Test_processPullRequest(t *testing.T) {
@@ -21,16 +23,17 @@ func Test_processPullRequest(t *testing.T) {
 			{Spec: tfaplv1beta1.ModuleSpec{Path: "six", RepoURL: "https://github.com/utilitywarehouse/foo.git"}},
 		},
 	}
+	goMockCtrl := gomock.NewController(t)
+	testGit := git.NewMockRepositories(goMockCtrl)
 
 	planner := &Planner{
-		Log: slog.Default(),
+		Log:   slog.Default(),
+		Repos: testGit,
 	}
 
 	t.Run("skip draft PR", func(t *testing.T) {
 		p := generateMockPR(123, "ref1",
-			[]string{"hash1", "hash2", "hash3"},
 			[]string{"random comment", "random comment", "random comment"},
-			[]string{"foo1/bar1", "foo2/bar2"},
 		)
 		p.IsDraft = true
 
@@ -40,10 +43,17 @@ func Test_processPullRequest(t *testing.T) {
 	t.Run("len PR modules == 0", func(t *testing.T) {
 		kubeModuleList := &tfaplv1beta1.ModuleList{}
 		p := generateMockPR(123, "ref1",
-			[]string{"hash1", "hash2", "hash3"},
 			[]string{"random comment", "random comment", "random comment"},
-			[]string{},
 		)
+
+		testGit.EXPECT().BranchCommits(gomock.Any(), gomock.Any(), gomock.Any()).
+			DoAndReturn(func(_ context.Context, _, hash string) ([]mirror.CommitInfo, error) {
+				return []mirror.CommitInfo{
+					{Hash: "hash3"},
+					{Hash: "hash2"},
+					{Hash: "hash1"},
+				}, nil
+			})
 
 		planner.processPullRequest(ctx, p, kubeModuleList)
 	})
@@ -54,13 +64,20 @@ func Test_processPullRequest(t *testing.T) {
 		planner.github = testGithub
 
 		p := generateMockPR(123, "ref1",
-			[]string{"hash1", "hash2", "hash3"},
 			[]string{"random comment", "random comment", "random comment"},
-			[]string{"one", "two", "three", "four", "five", "six"},
 		)
 		p.BaseRepository.Owner.Login = "utilitywarehouse"
 		p.BaseRepository.Name = "foo"
 		p.BaseRepository.URL = "git@github.com:utilitywarehouse/foo.git"
+
+		testGit.EXPECT().BranchCommits(gomock.Any(), gomock.Any(), gomock.Any()).
+			DoAndReturn(func(_ context.Context, _, hash string) ([]mirror.CommitInfo, error) {
+				return []mirror.CommitInfo{
+					{Hash: "hash3", ChangedFiles: []string{"four", "three"}},
+					{Hash: "hash2", ChangedFiles: []string{"two", "five"}},
+					{Hash: "hash1", ChangedFiles: []string{"one", "six"}},
+				}, nil
+			})
 
 		testGithub.EXPECT().postComment(gomock.Any(), gomock.Any(), 0, 123, gomock.Any()).
 			DoAndReturn(func(repoOwner, repoName string, commentID, prNumber int, commentBody prComment) (int, error) {

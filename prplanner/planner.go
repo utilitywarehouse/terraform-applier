@@ -106,8 +106,19 @@ func (p *Planner) processPullRequest(ctx context.Context, pr *pr, kubeModuleList
 		return
 	}
 
+	if pr.Closed && !pr.Merged {
+		return
+	}
+
+	// get list of commits and changed file for the PR branch
+	commitsInfo, err := p.Repos.BranchCommits(ctx, pr.BaseRepository.URL, pr.HeadRefName)
+	if err != nil {
+		p.Log.Error("unable to commit info", "repo", pr.BaseRepository.URL, "branch", pr.HeadRefName, "pr", pr.Number, "error", err)
+		return
+	}
+
 	// verify if PR belongs to module based on files changed
-	prModules, err := p.getPRModuleList(pr, kubeModuleList)
+	prModules, err := p.getPRModuleList(pr, commitsInfo, kubeModuleList)
 	if err != nil {
 		p.Log.Error("error getting a list of modules in PR", "repo", pr.BaseRepository.Name, "pr", pr.Number, "error", err)
 		return
@@ -133,18 +144,12 @@ func (p *Planner) processPullRequest(ctx context.Context, pr *pr, kubeModuleList
 	}
 
 	// ensure plan requests
-	p.ensurePlanRequests(ctx, pr, prModules, skipCommitRun)
+	p.ensurePlanRequests(ctx, pr, commitsInfo, prModules, skipCommitRun)
 
 	p.uploadRequestOutput(ctx, pr)
 }
 
-func (p *Planner) getPRModuleList(pr *pr, kubeModules *tfaplv1beta1.ModuleList) ([]types.NamespacedName, error) {
-	var pathList []string
-
-	for _, file := range pr.Files.Nodes {
-		pathList = append(pathList, file.Path)
-	}
-
+func (p *Planner) getPRModuleList(pr *pr, commitsInfo []mirror.CommitInfo, kubeModules *tfaplv1beta1.ModuleList) ([]types.NamespacedName, error) {
 	var modulesUpdated []types.NamespacedName
 
 	for _, kubeModule := range kubeModules.Items {
@@ -152,7 +157,15 @@ func (p *Planner) getPRModuleList(pr *pr, kubeModules *tfaplv1beta1.ModuleList) 
 			continue
 		}
 
-		if !pathBelongsToModule(pathList, &kubeModule) {
+		updated := false
+		for _, commit := range commitsInfo {
+			if isModuleUpdated(&kubeModule, commit) {
+				updated = true
+				break
+			}
+		}
+
+		if !updated {
 			continue
 		}
 
@@ -168,8 +181,8 @@ func (p *Planner) getPRModuleList(pr *pr, kubeModules *tfaplv1beta1.ModuleList) 
 	return modulesUpdated, nil
 }
 
-func pathBelongsToModule(pathList []string, module *tfaplv1beta1.Module) bool {
-	for _, path := range pathList {
+func isModuleUpdated(module *tfaplv1beta1.Module, commit mirror.CommitInfo) bool {
+	for _, path := range commit.ChangedFiles {
 		if strings.HasPrefix(path, module.Spec.Path) {
 			return true
 		}
