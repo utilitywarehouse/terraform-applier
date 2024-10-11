@@ -24,6 +24,11 @@ baseRepository {
 number
 headRefName
 isDraft
+closed
+merged
+mergeCommit {
+  oid
+}
 author {
   login
 }
@@ -94,9 +99,12 @@ type pr struct {
 	BaseRepository prRepo `json:"baseRepository"`
 	HeadRefName    string `json:"headRefName"`
 	IsDraft        bool   `json:"isDraft"`
+	Closed         bool   `json:"closed"`
+	Merged         bool   `json:"merged"`
+	MergeCommit    Commit `json:"mergeCommit"`
 	Author         author `json:"author"`
 	Commits        struct {
-		Nodes []prCommit `json:"nodes"`
+		Nodes []prCommitNode `json:"nodes"`
 	} `json:"commits"`
 	Comments struct {
 		Nodes []prComment `json:"nodes"`
@@ -118,10 +126,12 @@ type prRepo struct {
 	} `json:"owner"`
 }
 
-type prCommit struct {
-	Commit struct {
-		Oid string `json:"oid"`
-	} `json:"commit"`
+type prCommitNode struct {
+	Commit Commit `json:"commit"`
+}
+
+type Commit struct {
+	Oid string `json:"oid"`
 }
 
 type prComment struct {
@@ -146,9 +156,18 @@ type GitHubWebhook struct {
 		URL string `json:"html_url"`
 	} `json:"repository"`
 
+	PullRequest struct {
+		Number         int    `json:"number"`
+		State          string `json:"state"`
+		Draft          bool   `json:"draft"`
+		Merged         bool   `json:"merged"`
+		MergeCommitSHA string `json:"merge_commit_sha"`
+	} `json:"pull_request"`
+
 	// only for comments
 	Issue struct {
-		Number int `json:"number"`
+		Number int  `json:"number"`
+		Draft  bool `json:"draft"`
 	} `json:"issue"`
 
 	Comment struct {

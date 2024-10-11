@@ -26,7 +26,7 @@ func generateMockPR(num int, ref string, hash, comments, paths []string) *pr {
 	}
 
 	for _, v := range hash {
-		pc := prCommit{}
+		pc := prCommitNode{}
 		pc.Commit.Oid = v
 		p.Commits.Nodes = append(p.Commits.Nodes, pc)
 	}

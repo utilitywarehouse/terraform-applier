@@ -2,17 +2,11 @@ package prplanner
 
 import (
 	"context"
-	"regexp"
 	"strings"
 
 	"github.com/redis/go-redis/v9"
 	"github.com/utilitywarehouse/git-mirror/pkg/giturl"
 	tfaplv1beta1 "github.com/utilitywarehouse/terraform-applier/api/v1beta1"
-)
-
-var (
-	mergePRRegex     = regexp.MustCompile(`Merge pull request #(\d+) from`)
-	prNumSuffixRegex = regexp.MustCompile(`\(#(\d+)\)$`)
 )
 
 func (p *Planner) uploadRequestOutput(ctx context.Context, pr *pr) {

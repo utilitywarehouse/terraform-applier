@@ -55,36 +55,37 @@ func (p *Planner) handleWebhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Verify event and action
-	if (event == "pull_request" && payload.Action == "opened") ||
-		(event == "pull_request" && payload.Action == "synchronize") ||
-		(event == "pull_request" && payload.Action == "reopened") {
-
-		go p.processPRWebHookEvent(payload, payload.Number)
-		w.WriteHeader(http.StatusOK)
-		return
-	}
-
-	if event == "pull_request" && payload.Action == "closed" {
-		// TODO:clean-up: remove run from Redis
-		w.WriteHeader(http.StatusOK)
-		return
-	}
-
-	if event == "issue_comment" && payload.Action == "created" ||
-		event == "issue_comment" && payload.Action == "edited" {
-		if isSelfComment(payload.Comment.Body) {
-			w.WriteHeader(http.StatusOK)
+	if event == "pull_request" {
+		if payload.PullRequest.Draft {
 			return
 		}
-		// we know the body, but we still need to know the module user is requesting
-		// plan run for belongs to this PR hence we need to do full reconcile of PR
-		go p.processPRWebHookEvent(payload, payload.Issue.Number)
-		w.WriteHeader(http.StatusOK)
-		return
+
+		switch payload.Action {
+		case "opened", "synchronize", "reopened":
+			go p.processPRWebHookEvent(payload, payload.Number)
+		case "closed":
+			if !payload.PullRequest.Merged {
+				return
+			}
+			go p.processPRWebHookEvent(payload, payload.Number)
+		}
 	}
 
-	w.WriteHeader(http.StatusOK)
+	if event == "issue_comment" {
+		if payload.Issue.Draft {
+			return
+		}
+		if isSelfComment(payload.Comment.Body) {
+			return
+		}
+
+		switch payload.Action {
+		case "created", "edited":
+			// we know the body, but we still need to know the module user is requesting
+			// plan run for belongs to this PR hence we need to do full reconcile of PR
+			go p.processPRWebHookEvent(payload, payload.Issue.Number)
+		}
+	}
 }
 
 func (p *Planner) processPRWebHookEvent(event GitHubWebhook, prNumber int) {
