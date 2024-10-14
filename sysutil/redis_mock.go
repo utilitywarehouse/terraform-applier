@@ -36,6 +36,20 @@ func (m *MockRedisInterface) EXPECT() *MockRedisInterfaceMockRecorder {
 	return m.recorder
 }
 
+// CleanupPRKeys mocks base method.
+func (m *MockRedisInterface) CleanupPRKeys(arg0 context.Context, arg1 types.NamespacedName, arg2 int, arg3 string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CleanupPRKeys", arg0, arg1, arg2, arg3)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// CleanupPRKeys indicates an expected call of CleanupPRKeys.
+func (mr *MockRedisInterfaceMockRecorder) CleanupPRKeys(arg0, arg1, arg2, arg3 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CleanupPRKeys", reflect.TypeOf((*MockRedisInterface)(nil).CleanupPRKeys), arg0, arg1, arg2, arg3)
+}
+
 // DefaultApply mocks base method.
 func (m *MockRedisInterface) DefaultApply(arg0 context.Context, arg1 types.NamespacedName) (*v1beta1.Run, error) {
 	m.ctrl.T.Helper()

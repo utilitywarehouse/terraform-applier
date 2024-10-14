@@ -97,7 +97,7 @@ func (p *Planner) processRedisKeySetMsg(ctx context.Context, ch <-chan *redis.Me
 		var module tfaplv1beta1.Module
 		err = p.ClusterClt.Get(ctx, run.Module, &module)
 		if err != nil {
-			p.Log.Error("unable to get module", "module", run.Module, "error", err)
+			p.Log.Error("unable to get module", "module", run.Module, "pr", prNum, "error", err)
 			continue
 		}
 
@@ -107,15 +107,21 @@ func (p *Planner) processRedisKeySetMsg(ctx context.Context, ch <-chan *redis.Me
 
 		repo, err := giturl.Parse(module.Spec.RepoURL)
 		if err != nil {
-			p.Log.Error("unable to parse repo url", "module", run.Module, "error", err)
+			p.Log.Error("unable to parse repo url", "module", run.Module, "pr", prNum, "error", err)
 			continue
 		}
 
 		_, err = p.github.postComment(repo.Path, strings.TrimSuffix(repo.Repo, ".git"), CommentID, prNum, comment)
 		if err != nil {
-			p.Log.Error("error posting PR comment:", "error", err)
+			p.Log.Error("error posting PR comment:", "module", run.Module, "pr", prNum, "error", err)
 			continue
 		}
+
 		p.Log.Info("run output posted", "module", run.Module, "pr", prNum)
+
+		if err := p.RedisClient.CleanupPRKeys(ctx, run.Module, prNum, run.CommitHash); err != nil {
+			p.Log.Error("error cleaning PR keys:", "module", run.Module, "pr", prNum, "error", err)
+			continue
+		}
 	}
 }

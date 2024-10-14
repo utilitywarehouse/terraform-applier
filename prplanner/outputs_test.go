@@ -86,6 +86,9 @@ func Test_processRedisKeySetMsg(t *testing.T) {
 		testGithub.EXPECT().postComment("utilitywarehouse", "terraform-applier", 123, 4, gomock.Any()).
 			Return(123, nil)
 
+		testRedis.EXPECT().CleanupPRKeys(gomock.Any(), types.NamespacedName{Namespace: "foo", Name: "admins"}, 4, "hash1").
+			Return(nil)
+
 		ch <- &redis.Message{Channel: "__keyevent@0__:set", Payload: key}
 		time.Sleep(2 * time.Second)
 	})
@@ -100,6 +103,29 @@ func Test_processRedisKeySetMsg(t *testing.T) {
 		testGithub.EXPECT().postComment("utilitywarehouse", "terraform-applier", 123, 4, gomock.Any()).
 			Return(123, nil)
 
+		testRedis.EXPECT().CleanupPRKeys(gomock.Any(), types.NamespacedName{Namespace: "foo", Name: "users"}, 4, "hash1").
+			Return(nil)
+
+		ch <- &redis.Message{Channel: "__keyevent@0__:set", Payload: key}
+		time.Sleep(2 * time.Second)
+	})
+
+	t.Run("valid apply key", func(t *testing.T) {
+		key := "foo:admins:default:lastRun"
+
+		testRedis.EXPECT().Run(gomock.Any(), key).
+			Return(&tfaplv1beta1.Run{Module: types.NamespacedName{Namespace: "foo", Name: "admins"}, Request: &tfaplv1beta1.Request{}, CommitHash: "hash1", CommitMsg: "some commit msg... (#4)", Output: "terraform apply output"}, nil)
+
+		testRedis.EXPECT().PendingApplyUploadPR(gomock.Any(), types.NamespacedName{Namespace: "foo", Name: "admins"}, "hash1").
+			Return("4", nil)
+
+		// mock github API Call adding new request info
+		testGithub.EXPECT().postComment("utilitywarehouse", "terraform-applier", 0, 4, gomock.Any()).
+			Return(123, nil)
+
+		testRedis.EXPECT().CleanupPRKeys(gomock.Any(), types.NamespacedName{Namespace: "foo", Name: "admins"}, 4, "hash1").
+			Return(nil)
+
 		ch <- &redis.Message{Channel: "__keyevent@0__:set", Payload: key}
 		time.Sleep(2 * time.Second)
 	})
@@ -109,6 +135,22 @@ func Test_processRedisKeySetMsg(t *testing.T) {
 		// not expecting any other calls
 		// hence no mock call EXPECT()
 		ch <- &redis.Message{Channel: "__keyevent@1__:set", Payload: key}
+		time.Sleep(2 * time.Second)
+	})
+
+	t.Run("invalid key", func(t *testing.T) {
+		key := "foo:admins:default:lastApply"
+		// not expecting any other calls
+		// hence no mock call EXPECT()
+		ch <- &redis.Message{Channel: "__keyevent@0__:set", Payload: key}
+		time.Sleep(2 * time.Second)
+	})
+
+	t.Run("invalid key 2", func(t *testing.T) {
+		key := "pending:apply_upload:foo:admins:hash:xxx"
+		// not expecting any other calls
+		// hence no mock call EXPECT()
+		ch <- &redis.Message{Channel: "__keyevent@0__:set", Payload: key}
 		time.Sleep(2 * time.Second)
 	})
 

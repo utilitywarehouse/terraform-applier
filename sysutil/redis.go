@@ -34,6 +34,8 @@ type RedisInterface interface {
 	SetDefaultApply(ctx context.Context, run *tfaplv1beta1.Run) error
 	SetPRRun(ctx context.Context, run *tfaplv1beta1.Run) error
 	SetPendingApplyUpload(ctx context.Context, module types.NamespacedName, commit string, prNumber int) error
+
+	CleanupPRKeys(ctx context.Context, module types.NamespacedName, pr int, commit string) error
 }
 
 type Redis struct {
@@ -92,6 +94,17 @@ func (r Redis) Runs(ctx context.Context, module types.NamespacedName, patternSuf
 		runs = append(runs, run)
 	}
 	return runs, nil
+}
+
+func (r Redis) CleanupPRKeys(ctx context.Context, module types.NamespacedName, pr int, commit string) error {
+	keys, err := r.Client.Keys(ctx, keyPrefix(module)+fmt.Sprintf("PR:%d:*", pr)).Result()
+	if err != nil && err != redis.Nil {
+		return fmt.Errorf("unable to get module pr keys err:%w", err)
+	}
+
+	keys = append(keys, PendingApplyRunOutputUploadKey(module, commit))
+
+	return r.Client.Del(ctx, keys...).Err()
 }
 
 func (r Redis) PendingApplyUploadPR(ctx context.Context, module types.NamespacedName, commit string) (string, error) {
