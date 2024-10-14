@@ -86,9 +86,6 @@ func Test_processRedisKeySetMsg(t *testing.T) {
 		testGithub.EXPECT().postComment("utilitywarehouse", "terraform-applier", 123, 4, gomock.Any()).
 			Return(123, nil)
 
-		testRedis.EXPECT().CleanupPRKeys(gomock.Any(), types.NamespacedName{Namespace: "foo", Name: "admins"}, 4, "hash1").
-			Return(nil)
-
 		ch <- &redis.Message{Channel: "__keyevent@0__:set", Payload: key}
 		time.Sleep(2 * time.Second)
 	})
@@ -102,9 +99,6 @@ func Test_processRedisKeySetMsg(t *testing.T) {
 		// mock github API Call adding new request info
 		testGithub.EXPECT().postComment("utilitywarehouse", "terraform-applier", 123, 4, gomock.Any()).
 			Return(123, nil)
-
-		testRedis.EXPECT().CleanupPRKeys(gomock.Any(), types.NamespacedName{Namespace: "foo", Name: "users"}, 4, "hash1").
-			Return(nil)
 
 		ch <- &redis.Message{Channel: "__keyevent@0__:set", Payload: key}
 		time.Sleep(2 * time.Second)
