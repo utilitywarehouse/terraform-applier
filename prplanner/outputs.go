@@ -81,7 +81,8 @@ func (p *Planner) processRedisKeySetMsg(ctx context.Context, ch <-chan *redis.Me
 
 		// if its not a PR run then also
 		// check if there is pending task for output upload
-		if prNum == 0 {
+		// only process `default:lastRun` to process output only once
+		if prNum == 0 && strings.Contains(msg.Payload, "default:lastRun") {
 			if pr, err := p.RedisClient.PendingApplyUploadPR(ctx, run.Module, run.CommitHash); err == nil {
 				prNum, _ = strconv.Atoi(pr)
 			}
