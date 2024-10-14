@@ -256,7 +256,7 @@ func (r *Runner) process(run *tfaplv1beta1.Run, cancelChan <-chan struct{}, envs
 
 	if module.Spec.VaultRequests != nil {
 		if module.Spec.VaultRequests.AWS != nil {
-			err = r.generateVaultAWSCreds(ctx, module, jwt, envs)
+			err = r.generateVaultAWSCreds(module, jwt, envs)
 			if err != nil {
 				msg := fmt.Sprintf("unable to generate vault aws secrets: err:%s", err)
 				log.Error(msg)

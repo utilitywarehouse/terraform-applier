@@ -340,7 +340,7 @@ func validate(c *cli.Context) {
 //   - If 'path' is set, try to use that
 //   - Otherwise, download the release indicated by 'version'
 //   - If the version isn't defined, download the latest release
-func findTerraformExecPath(ctx context.Context, path, ver string) (string, func(), error) {
+func findTerraformExecPath(path, ver string) (string, func(), error) {
 	cleanup := func() {}
 	i := hcinstall.NewInstaller()
 	var execPath string
@@ -377,7 +377,7 @@ func findTerraformExecPath(ctx context.Context, path, ver string) (string, func(
 
 // terraformVersionString returns the terraform version from the terraform binary
 // indicated by execPath
-func terraformVersionString(ctx context.Context, execPath string) (string, error) {
+func terraformVersionString(execPath string) (string, error) {
 	tmpDir, err := os.MkdirTemp("", "tfversion")
 	if err != nil {
 		return "", err
@@ -583,13 +583,13 @@ func run(c *cli.Context) {
 
 	// Find the requested version of terraform and log the version
 	// information
-	execPath, cleanup, err := findTerraformExecPath(ctx, terraformPath, terraformVersion)
+	execPath, cleanup, err := findTerraformExecPath(terraformPath, terraformVersion)
 	defer cleanup()
 	if err != nil {
 		logger.Error("error finding terraform", "err", err)
 		os.Exit(1)
 	}
-	version, err := terraformVersionString(ctx, execPath)
+	version, err := terraformVersionString(execPath)
 	if err != nil {
 		logger.Error("error getting terraform version", "err", err)
 		os.Exit(1)

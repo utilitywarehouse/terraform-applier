@@ -104,7 +104,7 @@ func fetchEnvVars(ctx context.Context, client kubernetes.Interface, module *tfap
 	return kvPairs, nil
 }
 
-func (r *Runner) generateVaultAWSCreds(ctx context.Context, module *tfaplv1beta1.Module, jwt string, envs map[string]string) error {
+func (r *Runner) generateVaultAWSCreds(module *tfaplv1beta1.Module, jwt string, envs map[string]string) error {
 
 	creds, err := r.AWSSecretsEngineConfig.GenerateCreds(jwt, module.Spec.VaultRequests.AWS)
 	if err != nil {
