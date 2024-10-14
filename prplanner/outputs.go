@@ -57,6 +57,11 @@ func (p *Planner) processRedisKeySetMsg(ctx context.Context, ch <-chan *redis.Me
 			continue
 		}
 
+		// skip non run related keys
+		if strings.HasPrefix(msg.Payload, "pending:apply_upload:") {
+			continue
+		}
+
 		run, err := p.RedisClient.Run(ctx, msg.Payload)
 		if err != nil {
 			p.Log.Error("unable to get run output", "key", msg.Payload, "err", err)

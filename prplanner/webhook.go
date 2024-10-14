@@ -143,24 +143,25 @@ func (p *Planner) processPRCloseEvent(e GitHubWebhook) {
 	}
 
 	for _, module := range kubeModuleList.Items {
+		// make sure there was actually plan runs on the PR
+		// this is to avoid uploading apply output on filtered PR
+		runs, _ := p.RedisClient.Runs(ctx, module.NamespacedName(), fmt.Sprintf("PR:%d:*", e.Number))
+		if len(runs) == 0 {
+			continue
+		}
+
 		for _, commit := range commitsInfo {
 			if !isModuleUpdated(&module, commit) {
-				continue
-			}
-
-			// this commit is PR merge commit before posting output to the
-			// PR make sure there was actually plan runs on the PR
-			// this is to avoid uploading apply output on filtered PR
-			runs, _ := p.RedisClient.Runs(ctx, module.NamespacedName(), fmt.Sprintf("PR:%d:*", e.Number))
-			if len(runs) == 0 {
 				continue
 			}
 
 			err := p.RedisClient.SetPendingApplyUpload(ctx, module.NamespacedName(), commit.Hash, e.Number)
 			if err != nil {
 				p.Log.Error("unable to set pending apply upload", "module", module.NamespacedName(), "repo", e.Repository.URL, "pr", e.Number, "mergeCommit", e.PullRequest.MergeCommitSHA, "error", err)
-				continue
+				break
 			}
+			// only process 1 latest commit /module
+			break
 		}
 	}
 

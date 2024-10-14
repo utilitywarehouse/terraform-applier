@@ -57,7 +57,7 @@ func DefaultPRLastRunsKey(module types.NamespacedName, pr int, hash string) stri
 }
 
 func PendingApplyRunOutputUploadKey(module types.NamespacedName, hash string) string {
-	return fmt.Sprintf("%spending:apply_upload:hash:%s", keyPrefix(module), hash)
+	return fmt.Sprintf("pending:apply_upload:%shash:%s", keyPrefix(module), hash)
 }
 
 // DefaultLastRun will return last run result for the default branch
