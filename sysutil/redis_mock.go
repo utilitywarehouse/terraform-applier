@@ -96,6 +96,21 @@ func (mr *MockRedisInterfaceMockRecorder) PRRun(arg0, arg1, arg2, arg3 interface
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PRRun", reflect.TypeOf((*MockRedisInterface)(nil).PRRun), arg0, arg1, arg2, arg3)
 }
 
+// PendingApplyUploadPR mocks base method.
+func (m *MockRedisInterface) PendingApplyUploadPR(arg0 context.Context, arg1 types.NamespacedName, arg2 string) (string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "PendingApplyUploadPR", arg0, arg1, arg2)
+	ret0, _ := ret[0].(string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// PendingApplyUploadPR indicates an expected call of PendingApplyUploadPR.
+func (mr *MockRedisInterfaceMockRecorder) PendingApplyUploadPR(arg0, arg1, arg2 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PendingApplyUploadPR", reflect.TypeOf((*MockRedisInterface)(nil).PendingApplyUploadPR), arg0, arg1, arg2)
+}
+
 // Run mocks base method.
 func (m *MockRedisInterface) Run(arg0 context.Context, arg1 string) (*v1beta1.Run, error) {
 	m.ctrl.T.Helper()
@@ -166,4 +181,18 @@ func (m *MockRedisInterface) SetPRRun(arg0 context.Context, arg1 *v1beta1.Run) e
 func (mr *MockRedisInterfaceMockRecorder) SetPRRun(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetPRRun", reflect.TypeOf((*MockRedisInterface)(nil).SetPRRun), arg0, arg1)
+}
+
+// SetPendingApplyUpload mocks base method.
+func (m *MockRedisInterface) SetPendingApplyUpload(arg0 context.Context, arg1 types.NamespacedName, arg2 string, arg3 int) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SetPendingApplyUpload", arg0, arg1, arg2, arg3)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// SetPendingApplyUpload indicates an expected call of SetPendingApplyUpload.
+func (mr *MockRedisInterfaceMockRecorder) SetPendingApplyUpload(arg0, arg1, arg2, arg3 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetPendingApplyUpload", reflect.TypeOf((*MockRedisInterface)(nil).SetPendingApplyUpload), arg0, arg1, arg2, arg3)
 }

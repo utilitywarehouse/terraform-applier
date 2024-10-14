@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 
@@ -67,7 +68,7 @@ func (p *Planner) handleWebhook(w http.ResponseWriter, r *http.Request) {
 			if !payload.PullRequest.Merged {
 				return
 			}
-			go p.processPRWebHookEvent(payload, payload.Number)
+			go p.processPRCloseEvent(payload)
 		}
 	}
 
@@ -111,6 +112,58 @@ func (p *Planner) processPRWebHookEvent(event GitHubWebhook, prNumber int) {
 
 	p.Log.Debug("processing PR event", "pr", prNumber)
 	p.processPullRequest(ctx, pr, kubeModuleList)
+}
+
+func (p *Planner) processPRCloseEvent(e GitHubWebhook) {
+	ctx := context.Background()
+
+	if e.Action != "closed" ||
+		e.PullRequest.Draft ||
+		!e.PullRequest.Merged {
+		return
+	}
+
+	err := p.Repos.Mirror(ctx, e.Repository.URL)
+	if err != nil {
+		p.Log.Error("unable to mirror repository", "url", e.Repository.URL, "pr", e.Number, "err", err)
+		return
+	}
+
+	kubeModuleList := &tfaplv1beta1.ModuleList{}
+	if err := p.ClusterClt.List(ctx, kubeModuleList); err != nil {
+		p.Log.Error("error retrieving list of modules", "pr", e.Number, "error", err)
+		return
+	}
+
+	// get list of commits and changed file for the merged commit
+	commitsInfo, err := p.Repos.MergeCommits(ctx, e.Repository.URL, e.PullRequest.MergeCommitSHA)
+	if err != nil {
+		p.Log.Error("unable to commit info", "repo", e.Repository.URL, "pr", e.Number, "mergeCommit", e.PullRequest.MergeCommitSHA, "error", err)
+		return
+	}
+
+	for _, module := range kubeModuleList.Items {
+		for _, commit := range commitsInfo {
+			if !isModuleUpdated(&module, commit) {
+				continue
+			}
+
+			// this commit is PR merge commit before posting output to the
+			// PR make sure there was actually plan runs on the PR
+			// this is to avoid uploading apply output on filtered PR
+			runs, _ := p.RedisClient.Runs(ctx, module.NamespacedName(), fmt.Sprintf("PR:%d:*", e.Number))
+			if len(runs) == 0 {
+				continue
+			}
+
+			err := p.RedisClient.SetPendingApplyUpload(ctx, module.NamespacedName(), commit.Hash, e.Number)
+			if err != nil {
+				p.Log.Error("unable to set pending apply upload", "module", module.NamespacedName(), "repo", e.Repository.URL, "pr", e.Number, "mergeCommit", e.PullRequest.MergeCommitSHA, "error", err)
+				continue
+			}
+		}
+	}
+
 }
 
 func (p *Planner) isValidSignature(r *http.Request, message []byte, secret string) bool {

@@ -2,6 +2,7 @@ package prplanner
 
 import (
 	"context"
+	"strconv"
 	"strings"
 
 	"github.com/redis/go-redis/v9"
@@ -71,6 +72,14 @@ func (p *Planner) processRedisKeySetMsg(ctx context.Context, ch <-chan *redis.Me
 		if run.Request.PR != nil {
 			prNum = run.Request.PR.Number
 			CommentID = run.Request.PR.CommentID
+		}
+
+		// if its not a PR run then also
+		// check if there is pending task for output upload
+		if prNum == 0 {
+			if pr, err := p.RedisClient.PendingApplyUploadPR(ctx, run.Module, run.CommitHash); err == nil {
+				prNum, _ = strconv.Atoi(pr)
+			}
 		}
 
 		// this is required in case this run is not a PR run && not apply run

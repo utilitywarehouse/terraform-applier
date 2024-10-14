@@ -136,6 +136,12 @@ type GitHubWebhook struct {
 		Draft          bool   `json:"draft"`
 		Merged         bool   `json:"merged"`
 		MergeCommitSHA string `json:"merge_commit_sha"`
+		Head           struct {
+			Ref string `json:"ref"`
+		} `json:"head"`
+		Base struct {
+			Ref string `json:"ref"`
+		} `json:"base"`
 	} `json:"pull_request"`
 
 	// only for comments
