@@ -46,10 +46,10 @@ const (
 	ReasonPlanFailed           = "PlanFailed"
 	ReasonApplyFailed          = "ApplyFailed"
 
-	ReasonInitialised     = "Initialised"
-	ReasonDriftDetected   = "DriftDetected"
-	ReasonNoDriftDetected = "NoDriftDetected"
-	ReasonApplied         = "Applied"
+	ReasonInitialised           = "Initialised"
+	ReasonPlanOnlyDriftDetected = "PlanOnlyDriftDetected"
+	ReasonNoDriftDetected       = "NoDriftDetected"
+	ReasonApplied               = "Applied"
 )
 
 const (

@@ -342,7 +342,11 @@ func (r *Runner) runTF(
 
 	// return if plan only mode
 	if run.PlanOnly {
-		if err = r.SetRunFinishedStatus(run, module, tfaplv1beta1.ReasonDriftDetected, "PlanOnly/"+planStatus, r.Clock.Now()); err != nil {
+		reason := tfaplv1beta1.ReasonNoDriftDetected
+		if diffDetected {
+			reason = tfaplv1beta1.ReasonPlanOnlyDriftDetected
+		}
+		if err = r.SetRunFinishedStatus(run, module, reason, planStatus, r.Clock.Now()); err != nil {
 			log.Error("unable to set drift status", "err", err)
 			return false
 		}
@@ -416,7 +420,7 @@ func (r *Runner) SetRunFinishedStatus(run *tfaplv1beta1.Run, m *tfaplv1beta1.Mod
 
 	m.Status.StateReason = reason
 	m.Status.CurrentState = string(tfaplv1beta1.StatusOk)
-	if reason == tfaplv1beta1.ReasonDriftDetected {
+	if reason == tfaplv1beta1.ReasonPlanOnlyDriftDetected {
 		m.Status.CurrentState = string(tfaplv1beta1.StatusDriftDetected)
 	}
 
