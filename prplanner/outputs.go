@@ -57,16 +57,18 @@ func (p *Planner) processRedisKeySetMsg(ctx context.Context, ch <-chan *redis.Me
 			continue
 		}
 
+		key := msg.Payload
+
 		// skip non run related keys
 		// and process default output only once
-		if !strings.Contains(msg.Payload, ":default:lastRun") &&
-			!strings.Contains(msg.Payload, ":PR:") {
+		if !strings.Contains(key, ":default:lastRun") &&
+			!strings.Contains(key, ":PR:") {
 			continue
 		}
 
-		run, err := p.RedisClient.Run(ctx, msg.Payload)
+		run, err := p.RedisClient.Run(ctx, key)
 		if err != nil {
-			p.Log.Error("unable to get run output", "key", msg.Payload, "err", err)
+			p.Log.Error("unable to get run output", "key", key, "err", err)
 			continue
 		}
 
@@ -83,7 +85,7 @@ func (p *Planner) processRedisKeySetMsg(ctx context.Context, ch <-chan *redis.Me
 
 		// if its not a PR run then also
 		// check if there is pending task for output upload
-		if prNum == 0 && strings.Contains(msg.Payload, "default:lastRun") {
+		if prNum == 0 && strings.Contains(key, "default:lastRun") {
 			if pr, err := p.RedisClient.PendingApplyUploadPR(ctx, run.Module, run.CommitHash); err == nil {
 				prNum, _ = strconv.Atoi(pr)
 			}
@@ -119,9 +121,12 @@ func (p *Planner) processRedisKeySetMsg(ctx context.Context, ch <-chan *redis.Me
 
 		p.Log.Info("run output posted", "module", run.Module, "pr", prNum)
 
-		if err := p.RedisClient.CleanupPRKeys(ctx, run.Module, prNum, run.CommitHash); err != nil {
-			p.Log.Error("error cleaning PR keys:", "module", run.Module, "pr", prNum, "error", err)
-			continue
+		// if apply output is posted then clean up PR runs
+		if strings.Contains(key, "default:lastRun") {
+			if err := p.RedisClient.CleanupPRKeys(ctx, run.Module, prNum, run.CommitHash); err != nil {
+				p.Log.Error("error cleaning PR keys:", "module", run.Module, "pr", prNum, "error", err)
+				continue
+			}
 		}
 	}
 }
