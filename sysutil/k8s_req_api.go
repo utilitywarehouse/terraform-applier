@@ -26,7 +26,7 @@ func EnsureRequest(ctx context.Context, client client.Client, key types.Namespac
 		existingReq, err := module.PendingRunRequest()
 		// if valid req found then verify if its matching given req
 		if err == nil && existingReq != nil {
-			if req.RequestedAt == existingReq.RequestedAt {
+			if req.RequestedAt.Equal(existingReq.RequestedAt) {
 				return nil
 			} else {
 				return tfaplv1beta1.ErrRunRequestExist
@@ -71,7 +71,7 @@ func RemoveRequest(ctx context.Context, client client.Client, key types.Namespac
 				return tfaplv1beta1.ErrNoRunRequestFound
 			}
 
-			if req.RequestedAt != existingReq.RequestedAt {
+			if !req.RequestedAt.Equal(existingReq.RequestedAt) {
 				return tfaplv1beta1.ErrRunRequestMismatch
 			}
 		}
