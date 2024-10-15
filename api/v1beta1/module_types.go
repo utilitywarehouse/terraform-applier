@@ -305,17 +305,15 @@ func (m *Module) NewRunRequest(reqType string) *Request {
 }
 
 // PendingRunRequest returns pending requests if any from module's annotation.
-func (m *Module) PendingRunRequest() (*Request, bool) {
+// function will return err if req is not json or not valid
+func (m *Module) PendingRunRequest() (*Request, error) {
 	valueString, exists := m.ObjectMeta.Annotations[RunRequestAnnotationKey]
 	if !exists {
-		return nil, false
+		return nil, nil
 	}
 	value := Request{}
 	if err := json.Unmarshal([]byte(valueString), &value); err != nil {
-		// unmarshal errors are ignored as it should not happen and if it does
-		// it can be treated as no request pending and module can override it
-		// with new valid request
-		return nil, false
+		return nil, err
 	}
-	return &value, true
+	return &value, value.Validate()
 }

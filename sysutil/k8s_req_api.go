@@ -23,9 +23,9 @@ func EnsureRequest(ctx context.Context, client client.Client, key types.Namespac
 			return err
 		}
 
-		existingReq, ok := module.PendingRunRequest()
-		if ok {
-			// if annotated request ID is matching then nothing to do
+		existingReq, err := module.PendingRunRequest()
+		// if valid req found then verify if its matching given req
+		if err == nil && existingReq != nil {
 			if req.RequestedAt == existingReq.RequestedAt {
 				return nil
 			} else {
@@ -65,13 +65,43 @@ func RemoveRequest(ctx context.Context, client client.Client, key types.Namespac
 			return err
 		}
 
-		existingReq, ok := module.PendingRunRequest()
-		if !ok {
-			return tfaplv1beta1.ErrNoRunRequestFound
+		existingReq, err := module.PendingRunRequest()
+		if err == nil {
+			if existingReq == nil {
+				return tfaplv1beta1.ErrNoRunRequestFound
+			}
+
+			if req.RequestedAt != existingReq.RequestedAt {
+				return tfaplv1beta1.ErrRunRequestMismatch
+			}
 		}
 
-		if req.RequestedAt != existingReq.RequestedAt {
-			return tfaplv1beta1.ErrRunRequestMismatch
+		delete(module.ObjectMeta.Annotations, tfaplv1beta1.RunRequestAnnotationKey)
+
+		// return err itself here (not wrapped inside another error)
+		// so that ExponentialBackoffWithContext can identify it correctly.
+		return client.Update(ctx, module)
+	}
+
+	err := CallWithBackOff(ctx, tryUpdate)
+	if err != nil {
+		return fmt.Errorf("unable to remove pending run request err:%w", err)
+	}
+
+	return nil
+}
+
+// RemoveCurrentRequest will try to remove current request without validation
+func RemoveCurrentRequest(ctx context.Context, client client.Client, key types.NamespacedName) error {
+	tryUpdate := func(ctx context.Context) error {
+		// refetch module on every try
+		module, err := GetModule(ctx, client, key)
+		if err != nil {
+			return err
+		}
+
+		if _, exists := module.ObjectMeta.Annotations[tfaplv1beta1.RunRequestAnnotationKey]; !exists {
+			return nil
 		}
 
 		delete(module.ObjectMeta.Annotations, tfaplv1beta1.RunRequestAnnotationKey)
