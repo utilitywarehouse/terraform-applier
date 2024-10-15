@@ -18,7 +18,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
-var cmpIgnoreRandFields = cmpopts.IgnoreFields(tfaplv1beta1.Request{}, "ID", "RequestedAt")
+var cmpIgnoreRandFields = cmpopts.IgnoreFields(tfaplv1beta1.Request{}, "RequestedAt")
 
 func generateMockPR(num int, ref string, comments []string) *pr {
 	p := &pr{
