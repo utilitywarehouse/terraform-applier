@@ -35,19 +35,19 @@ func (m *MockRepositories) EXPECT() *MockRepositoriesMockRecorder {
 	return m.recorder
 }
 
-// ChangedFiles mocks base method.
-func (m *MockRepositories) ChangedFiles(arg0 context.Context, arg1, arg2 string) ([]string, error) {
+// BranchCommits mocks base method.
+func (m *MockRepositories) BranchCommits(arg0 context.Context, arg1, arg2 string) ([]mirror.CommitInfo, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ChangedFiles", arg0, arg1, arg2)
-	ret0, _ := ret[0].([]string)
+	ret := m.ctrl.Call(m, "BranchCommits", arg0, arg1, arg2)
+	ret0, _ := ret[0].([]mirror.CommitInfo)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// ChangedFiles indicates an expected call of ChangedFiles.
-func (mr *MockRepositoriesMockRecorder) ChangedFiles(arg0, arg1, arg2 interface{}) *gomock.Call {
+// BranchCommits indicates an expected call of BranchCommits.
+func (mr *MockRepositoriesMockRecorder) BranchCommits(arg0, arg1, arg2 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ChangedFiles", reflect.TypeOf((*MockRepositories)(nil).ChangedFiles), arg0, arg1, arg2)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BranchCommits", reflect.TypeOf((*MockRepositories)(nil).BranchCommits), arg0, arg1, arg2)
 }
 
 // Clone mocks base method.
@@ -80,6 +80,21 @@ func (mr *MockRepositoriesMockRecorder) Hash(arg0, arg1, arg2, arg3 interface{})
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Hash", reflect.TypeOf((*MockRepositories)(nil).Hash), arg0, arg1, arg2, arg3)
 }
 
+// MergeCommits mocks base method.
+func (m *MockRepositories) MergeCommits(arg0 context.Context, arg1, arg2 string) ([]mirror.CommitInfo, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "MergeCommits", arg0, arg1, arg2)
+	ret0, _ := ret[0].([]mirror.CommitInfo)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// MergeCommits indicates an expected call of MergeCommits.
+func (mr *MockRepositoriesMockRecorder) MergeCommits(arg0, arg1, arg2 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MergeCommits", reflect.TypeOf((*MockRepositories)(nil).MergeCommits), arg0, arg1, arg2)
+}
+
 // Mirror mocks base method.
 func (m *MockRepositories) Mirror(arg0 context.Context, arg1 string) error {
 	m.ctrl.T.Helper()
@@ -92,35 +107,6 @@ func (m *MockRepositories) Mirror(arg0 context.Context, arg1 string) error {
 func (mr *MockRepositoriesMockRecorder) Mirror(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Mirror", reflect.TypeOf((*MockRepositories)(nil).Mirror), arg0, arg1)
-}
-
-// ObjectExists mocks base method.
-func (m *MockRepositories) ObjectExists(arg0 context.Context, arg1, arg2 string) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ObjectExists", arg0, arg1, arg2)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// ObjectExists indicates an expected call of ObjectExists.
-func (mr *MockRepositoriesMockRecorder) ObjectExists(arg0, arg1, arg2 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ObjectExists", reflect.TypeOf((*MockRepositories)(nil).ObjectExists), arg0, arg1, arg2)
-}
-
-// Repository mocks base method.
-func (m *MockRepositories) Repository(arg0 string) (*mirror.Repository, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Repository", arg0)
-	ret0, _ := ret[0].(*mirror.Repository)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// Repository indicates an expected call of Repository.
-func (mr *MockRepositoriesMockRecorder) Repository(arg0 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Repository", reflect.TypeOf((*MockRepositories)(nil).Repository), arg0)
 }
 
 // Subject mocks base method.

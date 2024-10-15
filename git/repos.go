@@ -12,11 +12,10 @@ import (
 // testing the full process of an apply run
 // mirror.RepoPool satisfies this interface and drop in replacement
 type Repositories interface {
-	ChangedFiles(ctx context.Context, remote, hash string) ([]string, error)
 	Clone(ctx context.Context, remote, dst, branch, pathspec string, rmGitDir bool) (string, error)
 	Hash(ctx context.Context, remote, ref, path string) (string, error)
 	Mirror(ctx context.Context, remote string) error
-	ObjectExists(ctx context.Context, remote, obj string) error
-	Repository(remote string) (*mirror.Repository, error)
 	Subject(ctx context.Context, remote, hash string) (string, error)
+	BranchCommits(ctx context.Context, remote, branch string) ([]mirror.CommitInfo, error)
+	MergeCommits(ctx context.Context, remote, mergeCommitHash string) ([]mirror.CommitInfo, error)
 }

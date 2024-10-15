@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 
@@ -55,36 +56,37 @@ func (p *Planner) handleWebhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Verify event and action
-	if (event == "pull_request" && payload.Action == "opened") ||
-		(event == "pull_request" && payload.Action == "synchronize") ||
-		(event == "pull_request" && payload.Action == "reopened") {
-
-		go p.processPRWebHookEvent(payload, payload.Number)
-		w.WriteHeader(http.StatusOK)
-		return
-	}
-
-	if event == "pull_request" && payload.Action == "closed" {
-		// TODO:clean-up: remove run from Redis
-		w.WriteHeader(http.StatusOK)
-		return
-	}
-
-	if event == "issue_comment" && payload.Action == "created" ||
-		event == "issue_comment" && payload.Action == "edited" {
-		if isSelfComment(payload.Comment.Body) {
-			w.WriteHeader(http.StatusOK)
+	if event == "pull_request" {
+		if payload.PullRequest.Draft {
 			return
 		}
-		// we know the body, but we still need to know the module user is requesting
-		// plan run for belongs to this PR hence we need to do full reconcile of PR
-		go p.processPRWebHookEvent(payload, payload.Issue.Number)
-		w.WriteHeader(http.StatusOK)
-		return
+
+		switch payload.Action {
+		case "opened", "synchronize", "reopened":
+			go p.processPRWebHookEvent(payload, payload.Number)
+		case "closed":
+			if !payload.PullRequest.Merged {
+				return
+			}
+			go p.processPRCloseEvent(payload)
+		}
 	}
 
-	w.WriteHeader(http.StatusOK)
+	if event == "issue_comment" {
+		if payload.Issue.Draft {
+			return
+		}
+		if isSelfComment(payload.Comment.Body) {
+			return
+		}
+
+		switch payload.Action {
+		case "created", "edited":
+			// we know the body, but we still need to know the module user is requesting
+			// plan run for belongs to this PR hence we need to do full reconcile of PR
+			go p.processPRWebHookEvent(payload, payload.Issue.Number)
+		}
+	}
 }
 
 func (p *Planner) processPRWebHookEvent(event GitHubWebhook, prNumber int) {
@@ -110,6 +112,59 @@ func (p *Planner) processPRWebHookEvent(event GitHubWebhook, prNumber int) {
 
 	p.Log.Debug("processing PR event", "pr", prNumber)
 	p.processPullRequest(ctx, pr, kubeModuleList)
+}
+
+func (p *Planner) processPRCloseEvent(e GitHubWebhook) {
+	ctx := context.Background()
+
+	if e.Action != "closed" ||
+		e.PullRequest.Draft ||
+		!e.PullRequest.Merged {
+		return
+	}
+
+	err := p.Repos.Mirror(ctx, e.Repository.URL)
+	if err != nil {
+		p.Log.Error("unable to mirror repository", "url", e.Repository.URL, "pr", e.Number, "err", err)
+		return
+	}
+
+	kubeModuleList := &tfaplv1beta1.ModuleList{}
+	if err := p.ClusterClt.List(ctx, kubeModuleList); err != nil {
+		p.Log.Error("error retrieving list of modules", "pr", e.Number, "error", err)
+		return
+	}
+
+	// get list of commits and changed file for the merged commit
+	commitsInfo, err := p.Repos.MergeCommits(ctx, e.Repository.URL, e.PullRequest.MergeCommitSHA)
+	if err != nil {
+		p.Log.Error("unable to commit info", "repo", e.Repository.URL, "pr", e.Number, "mergeCommit", e.PullRequest.MergeCommitSHA, "error", err)
+		return
+	}
+
+	for _, module := range kubeModuleList.Items {
+		// make sure there was actually plan runs on the PR
+		// this is to avoid uploading apply output on filtered PR
+		runs, _ := p.RedisClient.Runs(ctx, module.NamespacedName(), fmt.Sprintf("PR:%d:*", e.Number))
+		if len(runs) == 0 {
+			continue
+		}
+
+		for _, commit := range commitsInfo {
+			if !isModuleUpdated(&module, commit) {
+				continue
+			}
+
+			err := p.RedisClient.SetPendingApplyUpload(ctx, module.NamespacedName(), commit.Hash, e.Number)
+			if err != nil {
+				p.Log.Error("unable to set pending apply upload", "module", module.NamespacedName(), "repo", e.Repository.URL, "pr", e.Number, "mergeCommit", e.PullRequest.MergeCommitSHA, "error", err)
+				break
+			}
+			// only process 1 latest commit /module
+			break
+		}
+	}
+
 }
 
 func (p *Planner) isValidSignature(r *http.Request, message []byte, secret string) bool {

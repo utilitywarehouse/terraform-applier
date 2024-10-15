@@ -6,12 +6,13 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/utilitywarehouse/git-mirror/pkg/mirror"
 	tfaplv1beta1 "github.com/utilitywarehouse/terraform-applier/api/v1beta1"
 	"github.com/utilitywarehouse/terraform-applier/sysutil"
 	"k8s.io/apimachinery/pkg/types"
 )
 
-func (p *Planner) ensurePlanRequests(ctx context.Context, pr *pr, prModules []types.NamespacedName, skipCommitRun bool) {
+func (p *Planner) ensurePlanRequests(ctx context.Context, pr *pr, commitsInfo []mirror.CommitInfo, prModules []types.NamespacedName, skipCommitRun bool) {
 	for _, moduleName := range prModules {
 		// Check if module has a pending plan request
 		module, err := sysutil.GetModule(ctx, p.ClusterClt, moduleName)
@@ -25,7 +26,7 @@ func (p *Planner) ensurePlanRequests(ctx context.Context, pr *pr, prModules []ty
 			continue
 		}
 
-		req, err := p.ensurePlanRequest(ctx, pr, module, skipCommitRun)
+		req, err := p.ensurePlanRequest(ctx, pr, commitsInfo, module, skipCommitRun)
 		if err != nil {
 			p.Log.Error("unable to generate new plan request", "module", moduleName, "error", err)
 			continue
@@ -38,10 +39,10 @@ func (p *Planner) ensurePlanRequests(ctx context.Context, pr *pr, prModules []ty
 	}
 }
 
-func (p *Planner) ensurePlanRequest(ctx context.Context, pr *pr, module *tfaplv1beta1.Module, skipCommitRun bool) (*tfaplv1beta1.Request, error) {
+func (p *Planner) ensurePlanRequest(ctx context.Context, pr *pr, commitsInfo []mirror.CommitInfo, module *tfaplv1beta1.Module, skipCommitRun bool) (*tfaplv1beta1.Request, error) {
 	if !skipCommitRun {
 		// loop through commits from latest to oldest
-		req, err := p.checkPRCommits(ctx, pr, module)
+		req, err := p.checkPRCommits(ctx, pr, commitsInfo, module)
 		if err != nil {
 			return req, err
 		}
@@ -54,54 +55,38 @@ func (p *Planner) ensurePlanRequest(ctx context.Context, pr *pr, module *tfaplv1
 	return p.checkPRCommentsForPlanRequests(pr, module)
 }
 
-func (p *Planner) checkPRCommits(ctx context.Context, pr *pr, module *tfaplv1beta1.Module) (*tfaplv1beta1.Request, error) {
+func (p *Planner) checkPRCommits(ctx context.Context, pr *pr, commitsInfo []mirror.CommitInfo, module *tfaplv1beta1.Module) (*tfaplv1beta1.Request, error) {
 	// loop through commits to check if module path is updated
-	for i := len(pr.Commits.Nodes) - 1; i >= 0; i-- {
-		commit := pr.Commits.Nodes[i].Commit
-
-		// check if module path is updated in this commit
-		updated, err := p.isModuleUpdated(ctx, commit.Oid, module)
-		if err != nil {
-			return nil, err
-		}
-		if !updated {
+	for _, commit := range commitsInfo {
+		if !isModuleUpdated(module, commit) {
 			continue
 		}
 
 		// check if we have already processed (uploaded output) this commit
-		if isPlanOutputPostedForCommit(p.ClusterEnvName, pr, commit.Oid, module.Spec.Path, module.NamespacedName()) {
+		if isPlanOutputPostedForCommit(p.ClusterEnvName, pr, commit.Hash, module.Spec.Path, module.NamespacedName()) {
 			return nil, nil
 		}
 
-		if isPlanRequestAckPostedForCommit(p.ClusterEnvName, pr, commit.Oid, module.Spec.Path, module.NamespacedName()) {
+		if isPlanRequestAckPostedForCommit(p.ClusterEnvName, pr, commit.Hash, module.Spec.Path, module.NamespacedName()) {
 			return nil, nil
 		}
 
 		// check if run is already completed for this commit
-		runOutput, err := p.RedisClient.PRRun(ctx, module.NamespacedName(), pr.Number, commit.Oid)
+		runOutput, err := p.RedisClient.PRRun(ctx, module.NamespacedName(), pr.Number, commit.Hash)
 		if err != nil && !errors.Is(err, sysutil.ErrKeyNotFound) {
 			return nil, err
 		}
 
-		if runOutput != nil && runOutput.CommitHash == commit.Oid {
+		if runOutput != nil && runOutput.CommitHash == commit.Hash {
 			return nil, nil
 		}
 
 		// request run
 		p.Log.Info("triggering plan due to new commit", "module", module.NamespacedName(), "pr", pr.Number, "author", pr.Author.Login)
-		return p.addNewRequest(module, pr, commit.Oid)
+		return p.addNewRequest(module, pr, commit.Hash)
 	}
 
 	return nil, nil
-}
-
-func (p *Planner) isModuleUpdated(ctx context.Context, commitHash string, module *tfaplv1beta1.Module) (bool, error) {
-	filesChangedInCommit, err := p.Repos.ChangedFiles(ctx, module.Spec.RepoURL, commitHash)
-	if err != nil {
-		return false, fmt.Errorf("error getting commit info: %w", err)
-	}
-
-	return pathBelongsToModule(filesChangedInCommit, module), nil
 }
 
 func (p *Planner) checkPRCommentsForPlanRequests(pr *pr, module *tfaplv1beta1.Module) (*tfaplv1beta1.Request, error) {

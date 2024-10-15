@@ -13,8 +13,9 @@ import (
 )
 
 var (
-	PRKeyExpirationDur = 7 * 24 * time.Hour
-	ErrKeyNotFound     = errors.New("key not found")
+	PRKeyExpirationDur  = 7 * 24 * time.Hour
+	PRApplyUploadExpDur = time.Hour
+	ErrKeyNotFound      = errors.New("key not found")
 )
 
 //go:generate go run github.com/golang/mock/mockgen -package sysutil -destination redis_mock.go github.com/utilitywarehouse/terraform-applier/sysutil RedisInterface
@@ -27,10 +28,14 @@ type RedisInterface interface {
 	Run(ctx context.Context, key string) (*tfaplv1beta1.Run, error)
 	Runs(ctx context.Context, module types.NamespacedName, keySuffix string) ([]*tfaplv1beta1.Run, error)
 	GetCommitHash(ctx context.Context, key string) (string, error)
+	PendingApplyUploadPR(ctx context.Context, module types.NamespacedName, commit string) (string, error)
 
 	SetDefaultLastRun(ctx context.Context, run *tfaplv1beta1.Run) error
 	SetDefaultApply(ctx context.Context, run *tfaplv1beta1.Run) error
 	SetPRRun(ctx context.Context, run *tfaplv1beta1.Run) error
+	SetPendingApplyUpload(ctx context.Context, module types.NamespacedName, commit string, prNumber int) error
+
+	CleanupPRKeys(ctx context.Context, module types.NamespacedName, pr int, commit string) error
 }
 
 type Redis struct {
@@ -51,6 +56,10 @@ func defaultLastApplyKey(module types.NamespacedName) string {
 
 func DefaultPRLastRunsKey(module types.NamespacedName, pr int, hash string) string {
 	return fmt.Sprintf("%sPR:%d:%s", keyPrefix(module), pr, hash)
+}
+
+func PendingApplyRunOutputUploadKey(module types.NamespacedName, hash string) string {
+	return fmt.Sprintf("pending:apply_upload:%shash:%s", keyPrefix(module), hash)
 }
 
 // DefaultLastRun will return last run result for the default branch
@@ -87,6 +96,21 @@ func (r Redis) Runs(ctx context.Context, module types.NamespacedName, patternSuf
 	return runs, nil
 }
 
+func (r Redis) CleanupPRKeys(ctx context.Context, module types.NamespacedName, pr int, commit string) error {
+	keys, err := r.Client.Keys(ctx, keyPrefix(module)+fmt.Sprintf("PR:%d:*", pr)).Result()
+	if err != nil && err != redis.Nil {
+		return fmt.Errorf("unable to get module pr keys err:%w", err)
+	}
+
+	keys = append(keys, PendingApplyRunOutputUploadKey(module, commit))
+
+	return r.Client.Del(ctx, keys...).Err()
+}
+
+func (r Redis) PendingApplyUploadPR(ctx context.Context, module types.NamespacedName, commit string) (string, error) {
+	return r.Client.Get(ctx, PendingApplyRunOutputUploadKey(module, commit)).Result()
+}
+
 // SetDefaultLastRun puts given run in to cache with no expiration
 func (r Redis) SetDefaultLastRun(ctx context.Context, run *tfaplv1beta1.Run) error {
 	return r.setKV(ctx, defaultLastRunKey(run.Module), run, 0)
@@ -100,6 +124,10 @@ func (r Redis) SetDefaultApply(ctx context.Context, run *tfaplv1beta1.Run) error
 // SetPRRun puts given run in to cache with expiration
 func (r Redis) SetPRRun(ctx context.Context, run *tfaplv1beta1.Run) error {
 	return r.setKV(ctx, DefaultPRLastRunsKey(run.Module, run.Request.PR.Number, run.CommitHash), run, PRKeyExpirationDur)
+}
+
+func (r Redis) SetPendingApplyUpload(ctx context.Context, module types.NamespacedName, commit string, prNumber int) error {
+	return r.Client.Set(ctx, PendingApplyRunOutputUploadKey(module, commit), prNumber, PRApplyUploadExpDur).Err()
 }
 
 func (r Redis) setKV(ctx context.Context, key string, run *tfaplv1beta1.Run, exp time.Duration) error {

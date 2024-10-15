@@ -24,15 +24,13 @@ baseRepository {
 number
 headRefName
 isDraft
+closed
+merged
+mergeCommit {
+  oid
+}
 author {
   login
-}
-commits(last: 20) {
-  nodes {
-    commit {
-      oid
-    }
-  }
 }
 comments(last:50) {
   nodes {
@@ -41,11 +39,6 @@ comments(last:50) {
     author {
       login
     }
-  }
-}
-files(first: 100) {
-  nodes {
-    path
   }
 }
 `
@@ -94,16 +87,13 @@ type pr struct {
 	BaseRepository prRepo `json:"baseRepository"`
 	HeadRefName    string `json:"headRefName"`
 	IsDraft        bool   `json:"isDraft"`
+	Closed         bool   `json:"closed"`
+	Merged         bool   `json:"merged"`
+	MergeCommit    Commit `json:"mergeCommit"`
 	Author         author `json:"author"`
-	Commits        struct {
-		Nodes []prCommit `json:"nodes"`
-	} `json:"commits"`
-	Comments struct {
+	Comments       struct {
 		Nodes []prComment `json:"nodes"`
 	} `json:"comments"`
-	Files struct {
-		Nodes []prFiles `json:"nodes"`
-	} `json:"files"`
 }
 
 type author struct {
@@ -118,20 +108,14 @@ type prRepo struct {
 	} `json:"owner"`
 }
 
-type prCommit struct {
-	Commit struct {
-		Oid string `json:"oid"`
-	} `json:"commit"`
+type Commit struct {
+	Oid string `json:"oid"`
 }
 
 type prComment struct {
 	DatabaseID int    `json:"databaseId"`
 	Author     author `json:"author"`
 	Body       string `json:"body"`
-}
-
-type prFiles struct {
-	Path string `json:"path"`
 }
 
 type GitHubWebhook struct {
@@ -146,9 +130,24 @@ type GitHubWebhook struct {
 		URL string `json:"html_url"`
 	} `json:"repository"`
 
+	PullRequest struct {
+		Number         int    `json:"number"`
+		State          string `json:"state"`
+		Draft          bool   `json:"draft"`
+		Merged         bool   `json:"merged"`
+		MergeCommitSHA string `json:"merge_commit_sha"`
+		Head           struct {
+			Ref string `json:"ref"`
+		} `json:"head"`
+		Base struct {
+			Ref string `json:"ref"`
+		} `json:"base"`
+	} `json:"pull_request"`
+
 	// only for comments
 	Issue struct {
-		Number int `json:"number"`
+		Number int  `json:"number"`
+		Draft  bool `json:"draft"`
 	} `json:"issue"`
 
 	Comment struct {

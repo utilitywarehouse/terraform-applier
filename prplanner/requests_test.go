@@ -10,6 +10,7 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	"github.com/utilitywarehouse/git-mirror/pkg/mirror"
 	tfaplv1beta1 "github.com/utilitywarehouse/terraform-applier/api/v1beta1"
 	"github.com/utilitywarehouse/terraform-applier/git"
 	"github.com/utilitywarehouse/terraform-applier/sysutil"
@@ -19,23 +20,16 @@ import (
 
 var cmpIgnoreRandFields = cmpopts.IgnoreFields(tfaplv1beta1.Request{}, "ID", "RequestedAt")
 
-func generateMockPR(num int, ref string, hash, comments, paths []string) *pr {
+func generateMockPR(num int, ref string, comments []string) *pr {
 	p := &pr{
 		Number:      num,
 		HeadRefName: ref,
 	}
 
-	for _, v := range hash {
-		pc := prCommit{}
-		pc.Commit.Oid = v
-		p.Commits.Nodes = append(p.Commits.Nodes, pc)
-	}
 	for _, v := range comments {
 		p.Comments.Nodes = append(p.Comments.Nodes, prComment{1, author{}, v})
 	}
-	for _, v := range paths {
-		p.Files.Nodes = append(p.Files.Nodes, prFiles{v})
-	}
+
 	return p
 }
 
@@ -53,21 +47,6 @@ func TestCheckPRCommits(t *testing.T) {
 
 	slog.SetLogLoggerLevel(slog.LevelDebug)
 
-	// Mock Repo calls with files changed
-	testGit.EXPECT().ChangedFiles(gomock.Any(), gomock.Any(), gomock.Any()).
-		DoAndReturn(func(_ context.Context, _, hash string) ([]string, error) {
-			switch hash {
-			case "hash1":
-				return []string{"foo/one"}, nil
-			case "hash2":
-				return []string{"foo/two"}, nil
-			case "hash3":
-				return []string{"foo/two", "foo/three"}, nil
-			default:
-				return nil, fmt.Errorf("hash not found")
-			}
-		}).AnyTimes()
-
 	t.Run("generate req for updated module", func(t *testing.T) {
 		testRedis := sysutil.NewMockRedisInterface(goMockCtrl)
 		testGithub := NewMockGithubInterface(goMockCtrl)
@@ -75,10 +54,14 @@ func TestCheckPRCommits(t *testing.T) {
 		planner.RedisClient = testRedis
 
 		p := generateMockPR(123, "ref1",
-			[]string{"hash1", "hash2", "hash3"},
 			[]string{"random comment", "random comment", "random comment"},
-			nil,
 		)
+
+		commitsInfo := []mirror.CommitInfo{
+			{Hash: "hash3", ChangedFiles: []string{"foo/two", "foo/three"}},
+			{Hash: "hash2", ChangedFiles: []string{"foo/two"}},
+			{Hash: "hash1", ChangedFiles: []string{"foo/one"}},
+		}
 
 		module := &tfaplv1beta1.Module{
 			ObjectMeta: metav1.ObjectMeta{Namespace: "foo", Name: "one"},
@@ -104,7 +87,7 @@ func TestCheckPRCommits(t *testing.T) {
 			})
 
 		// Call Test function
-		gotReq, err := planner.checkPRCommits(ctx, p, module)
+		gotReq, err := planner.checkPRCommits(ctx, p, commitsInfo, module)
 		if err != nil {
 			t.Fatalf("unexpected error: %s", err)
 		}
@@ -130,10 +113,14 @@ func TestCheckPRCommits(t *testing.T) {
 		planner.RedisClient = testRedis
 
 		p := generateMockPR(123, "ref1",
-			[]string{"hash1", "hash2", "hash3"},
 			[]string{"random comment", "random comment", "random comment"},
-			nil,
 		)
+
+		commitsInfo := []mirror.CommitInfo{
+			{Hash: "hash3", ChangedFiles: []string{"foo/two", "foo/three"}},
+			{Hash: "hash2", ChangedFiles: []string{"foo/two"}},
+			{Hash: "hash1", ChangedFiles: []string{"foo/one"}},
+		}
 
 		module := &tfaplv1beta1.Module{
 			ObjectMeta: metav1.ObjectMeta{Namespace: "foo", Name: "two"},
@@ -159,7 +146,7 @@ func TestCheckPRCommits(t *testing.T) {
 			})
 
 		// Call Test function
-		gotReq, err := planner.checkPRCommits(ctx, p, module)
+		gotReq, err := planner.checkPRCommits(ctx, p, commitsInfo, module)
 		if err != nil {
 			t.Fatalf("unexpected error: %s", err)
 		}
@@ -185,10 +172,13 @@ func TestCheckPRCommits(t *testing.T) {
 		planner.RedisClient = testRedis
 
 		p := generateMockPR(123, "ref1",
-			[]string{"hash2", "hash3"},
 			[]string{"random comment", runOutputMsg("default", "foo/two", "foo/two", &tfaplv1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy.", Output: "some output"}), "random comment"},
-			nil,
 		)
+
+		commitsInfo := []mirror.CommitInfo{
+			{Hash: "hash3", ChangedFiles: []string{"foo/two", "foo/three"}},
+			{Hash: "hash2", ChangedFiles: []string{"foo/two"}},
+		}
 
 		module := &tfaplv1beta1.Module{
 			ObjectMeta: metav1.ObjectMeta{Namespace: "foo", Name: "one"},
@@ -199,7 +189,7 @@ func TestCheckPRCommits(t *testing.T) {
 		}
 
 		// Call Test function
-		gotReq, err := planner.checkPRCommits(ctx, p, module)
+		gotReq, err := planner.checkPRCommits(ctx, p, commitsInfo, module)
 		if err != nil {
 			t.Fatalf("unexpected error: %s", err)
 		}
@@ -218,11 +208,13 @@ func TestCheckPRCommits(t *testing.T) {
 		planner.RedisClient = testRedis
 
 		p := generateMockPR(123, "ref1",
-			[]string{"hash1", "hash2", "hash3"},
 			[]string{"random comment", runOutputMsg("default", "foo/two", "foo/two", &tfaplv1beta1.Run{CommitHash: "hash3", Summary: "Plan: x to add, x to change, x to destroy.", Output: "some output"}), "random comment"},
-
-			nil,
 		)
+		commitsInfo := []mirror.CommitInfo{
+			{Hash: "hash3", ChangedFiles: []string{"foo/two", "foo/three"}},
+			{Hash: "hash2", ChangedFiles: []string{"foo/two"}},
+			{Hash: "hash1", ChangedFiles: []string{"foo/one"}},
+		}
 
 		module := &tfaplv1beta1.Module{
 			ObjectMeta: metav1.ObjectMeta{Namespace: "foo", Name: "two"},
@@ -233,7 +225,7 @@ func TestCheckPRCommits(t *testing.T) {
 		}
 
 		// Call Test function
-		gotReq, err := planner.checkPRCommits(ctx, p, module)
+		gotReq, err := planner.checkPRCommits(ctx, p, commitsInfo, module)
 		if err != nil {
 			t.Fatalf("unexpected error: %s", err)
 		}
@@ -252,11 +244,13 @@ func TestCheckPRCommits(t *testing.T) {
 		planner.RedisClient = testRedis
 
 		p := generateMockPR(123, "ref1",
-			[]string{"hash1", "hash2", "hash3"},
 			[]string{"random comment", runOutputMsg("diff-cluster", "foo/two", "foo/two", &tfaplv1beta1.Run{CommitHash: "hash3", Summary: "Plan: x to add, x to change, x to destroy.", Output: "some output"}), "random comment"},
-
-			nil,
 		)
+		commitsInfo := []mirror.CommitInfo{
+			{Hash: "hash3", ChangedFiles: []string{"foo/two", "foo/three"}},
+			{Hash: "hash2", ChangedFiles: []string{"foo/two"}},
+			{Hash: "hash1", ChangedFiles: []string{"foo/one"}},
+		}
 
 		module := &tfaplv1beta1.Module{
 			ObjectMeta: metav1.ObjectMeta{Namespace: "foo", Name: "two"},
@@ -282,7 +276,7 @@ func TestCheckPRCommits(t *testing.T) {
 			})
 
 		// Call Test function
-		gotReq, err := planner.checkPRCommits(ctx, p, module)
+		gotReq, err := planner.checkPRCommits(ctx, p, commitsInfo, module)
 		if err != nil {
 			t.Fatalf("unexpected error: %s", err)
 		}
@@ -308,11 +302,13 @@ func TestCheckPRCommits(t *testing.T) {
 		planner.RedisClient = testRedis
 
 		p := generateMockPR(123, "ref1",
-			[]string{"hash1", "hash2", "hash3"},
 			[]string{"random comment", requestAcknowledgedMsg("default", "foo/two", "foo/two", "hash3", &metav1.Time{Time: time.Now()}), "random comment"},
-
-			nil,
 		)
+		commitsInfo := []mirror.CommitInfo{
+			{Hash: "hash3", ChangedFiles: []string{"foo/two", "foo/three"}},
+			{Hash: "hash2", ChangedFiles: []string{"foo/two"}},
+			{Hash: "hash1", ChangedFiles: []string{"foo/one"}},
+		}
 
 		module := &tfaplv1beta1.Module{
 			ObjectMeta: metav1.ObjectMeta{Namespace: "foo", Name: "two"},
@@ -323,7 +319,7 @@ func TestCheckPRCommits(t *testing.T) {
 		}
 
 		// Call Test function
-		gotReq, err := planner.checkPRCommits(ctx, p, module)
+		gotReq, err := planner.checkPRCommits(ctx, p, commitsInfo, module)
 		if err != nil {
 			t.Fatalf("unexpected error: %s", err)
 		}
@@ -342,11 +338,13 @@ func TestCheckPRCommits(t *testing.T) {
 		planner.RedisClient = testRedis
 
 		p := generateMockPR(123, "ref1",
-			[]string{"hash1", "hash2", "hash3"},
 			[]string{"random comment", requestAcknowledgedMsg("diff-cluster", "foo/two", "foo/two", "hash3", &metav1.Time{Time: time.Now()}), "random comment"},
-
-			nil,
 		)
+		commitsInfo := []mirror.CommitInfo{
+			{Hash: "hash3", ChangedFiles: []string{"foo/two", "foo/three"}},
+			{Hash: "hash2", ChangedFiles: []string{"foo/two"}},
+			{Hash: "hash1", ChangedFiles: []string{"foo/one"}},
+		}
 
 		module := &tfaplv1beta1.Module{
 			ObjectMeta: metav1.ObjectMeta{Namespace: "foo", Name: "two"},
@@ -372,7 +370,7 @@ func TestCheckPRCommits(t *testing.T) {
 			})
 
 		// Call Test function
-		gotReq, err := planner.checkPRCommits(ctx, p, module)
+		gotReq, err := planner.checkPRCommits(ctx, p, commitsInfo, module)
 		if err != nil {
 			t.Fatalf("unexpected error: %s", err)
 		}
@@ -398,10 +396,13 @@ func TestCheckPRCommits(t *testing.T) {
 		planner.RedisClient = testRedis
 
 		p := generateMockPR(123, "ref1",
-			[]string{"hash1", "hash2", "hash3"},
 			[]string{"random comment", runOutputMsg("default", "foo/two", "foo/two", &tfaplv1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy.", Output: "some output"}), "random comment"},
-			nil,
 		)
+		commitsInfo := []mirror.CommitInfo{
+			{Hash: "hash3", ChangedFiles: []string{"foo/two", "foo/three"}},
+			{Hash: "hash2", ChangedFiles: []string{"foo/two"}},
+			{Hash: "hash1", ChangedFiles: []string{"foo/one"}},
+		}
 
 		module := &tfaplv1beta1.Module{
 			ObjectMeta: metav1.ObjectMeta{Namespace: "foo", Name: "two"},
@@ -427,7 +428,7 @@ func TestCheckPRCommits(t *testing.T) {
 			})
 
 		// Call Test function
-		gotReq, err := planner.checkPRCommits(ctx, p, module)
+		gotReq, err := planner.checkPRCommits(ctx, p, commitsInfo, module)
 		if err != nil {
 			t.Fatalf("unexpected error: %s", err)
 		}
@@ -453,10 +454,13 @@ func TestCheckPRCommits(t *testing.T) {
 		planner.RedisClient = testRedis
 
 		p := generateMockPR(123, "ref1",
-			[]string{"hash1", "hash2", "hash3"},
 			[]string{"random comment", "random comment", "random comment"},
-			nil,
 		)
+		commitsInfo := []mirror.CommitInfo{
+			{Hash: "hash3", ChangedFiles: []string{"foo/two", "foo/three"}},
+			{Hash: "hash2", ChangedFiles: []string{"foo/two"}},
+			{Hash: "hash1", ChangedFiles: []string{"foo/one"}},
+		}
 
 		module := &tfaplv1beta1.Module{
 			ObjectMeta: metav1.ObjectMeta{Namespace: "foo", Name: "two"},
@@ -472,7 +476,7 @@ func TestCheckPRCommits(t *testing.T) {
 			Return(&tfaplv1beta1.Run{CommitHash: "hash3"}, nil)
 
 		// Call Test function
-		gotReq, err := planner.checkPRCommits(ctx, p, module)
+		gotReq, err := planner.checkPRCommits(ctx, p, commitsInfo, module)
 		if err != nil {
 			t.Fatalf("unexpected error: %s", err)
 		}
@@ -512,13 +516,11 @@ func Test_checkPRCommentsForPlanRequests(t *testing.T) {
 		// module might not be annotated by the time the loop checks it, which in this
 		// case would mean plan out is ready ot be posted and NOT run hasn't been requested yet
 		pr := generateMockPR(123, "ref1",
-			[]string{"hash1", "hash2", "hash3"},
 			[]string{
 				"@terraform-applier plan two",
 				requestAcknowledgedMsg("default", "foo/two", "path/foo/two", "hash2", mustParseMetaTime("2023-04-02T15:04:05Z")),
 				requestAcknowledgedMsg("default", "foo/three", "path/foo/three", "hash3", mustParseMetaTime("2023-04-02T15:04:05Z")),
 			},
-			nil,
 		)
 
 		gotReq, err := planner.checkPRCommentsForPlanRequests(pr, module)
@@ -537,13 +539,11 @@ func Test_checkPRCommentsForPlanRequests(t *testing.T) {
 		// module might not be annotated by the time the loop checks it, which in this
 		// case would mean plan out is ready ot be posted and NOT run hasn't been requested yet
 		pr := generateMockPR(123, "ref1",
-			[]string{"hash1", "hash2", "hash3"},
 			[]string{
 				"@terraform-applier plan path/foo/two",
 				requestAcknowledgedMsg("default", "foo/two", "path/foo/two", "hash2", mustParseMetaTime("2023-04-02T15:04:05Z")),
 				requestAcknowledgedMsg("default", "foo/three", "path/foo/three", "hash3", mustParseMetaTime("2023-04-02T15:04:05Z")),
 			},
-			nil,
 		)
 
 		gotReq, err := planner.checkPRCommentsForPlanRequests(pr, module)
@@ -558,13 +558,11 @@ func Test_checkPRCommentsForPlanRequests(t *testing.T) {
 
 	t.Run("plan out posted for module (by name)", func(t *testing.T) {
 		pr := generateMockPR(123, "ref1",
-			[]string{"hash1", "hash2", "hash3"},
 			[]string{
 				"@terraform-applier plan two",
 				runOutputMsg("default", "foo/two", "path/foo/two", &tfaplv1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy.", Output: "tf plan output"}),
 				runOutputMsg("default", "foo/three", "path/foo/three", &tfaplv1beta1.Run{CommitHash: "hash3", Summary: "Plan: x to add, x to change, x to destroy.", Output: "tf plan output"}),
 			},
-			nil,
 		)
 
 		gotReq, err := planner.checkPRCommentsForPlanRequests(pr, module)
@@ -579,13 +577,11 @@ func Test_checkPRCommentsForPlanRequests(t *testing.T) {
 
 	t.Run("plan out posted for module (by path)", func(t *testing.T) {
 		pr := generateMockPR(123, "ref1",
-			[]string{"hash1", "hash2", "hash3"},
 			[]string{
 				"@terraform-applier plan path/foo/two",
 				runOutputMsg("default", "foo/two", "path/foo/two", &tfaplv1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy.", Output: "tf plan output"}),
 				runOutputMsg("default", "foo/three", "path/foo/three", &tfaplv1beta1.Run{CommitHash: "hash3", Summary: "Plan: x to add, x to change, x to destroy.", Output: "tf plan output"}),
 			},
-			nil,
 		)
 
 		gotReq, err := planner.checkPRCommentsForPlanRequests(pr, module)
@@ -600,13 +596,11 @@ func Test_checkPRCommentsForPlanRequests(t *testing.T) {
 
 	t.Run("plan run is not requested for current module", func(t *testing.T) {
 		pr := generateMockPR(123, "ref1",
-			[]string{"hash1", "hash2", "hash3"},
 			[]string{
 				"@terraform-applier plan one",
 				"@terraform-applier plan path/foo/one",
 				"@terraform-applier plan path/foo/three",
 			},
-			nil,
 		)
 
 		gotReq, err := planner.checkPRCommentsForPlanRequests(pr, module)
@@ -624,29 +618,12 @@ func Test_checkPRCommentsForPlanRequests(t *testing.T) {
 		planner.github = testGithub
 
 		p := generateMockPR(123, "ref1",
-			[]string{"hash1", "hash2", "hash3"},
 			[]string{
 				"@terraform-applier plan foo/one",
 				"@terraform-applier plan path/foo/two",
 				"@terraform-applier plan foo/three",
 			},
-			nil,
 		)
-
-		// Mock Repo calls with files changed
-		testGit.EXPECT().ChangedFiles(gomock.Any(), gomock.Any(), gomock.Any()).
-			DoAndReturn(func(_ context.Context, _, hash string) ([]string, error) {
-				switch hash {
-				case "hash1":
-					return []string{"path/foo/one"}, nil
-				case "hash2":
-					return []string{"path/foo/two"}, nil
-				case "hash3":
-					return []string{"path/foo/one", "path/foo/three"}, nil
-				default:
-					return nil, fmt.Errorf("hash not found")
-				}
-			}).AnyTimes()
 
 		testGit.EXPECT().Hash(gomock.Any(), gomock.Any(), "ref1", "path/foo/two").
 			Return("hash1", nil)
@@ -677,7 +654,7 @@ func Test_checkPRCommentsForPlanRequests(t *testing.T) {
 		}
 
 		if diff := cmp.Diff(wantReq, gotReq, cmpIgnoreRandFields); diff != "" {
-			t.Errorf("checkPRCommits() mismatch (-want +got):\n%s", diff)
+			t.Errorf("checkPRCommentsForPlanRequests() mismatch (-want +got):\n%s", diff)
 		}
 	})
 
@@ -686,13 +663,11 @@ func Test_checkPRCommentsForPlanRequests(t *testing.T) {
 		planner.github = testGithub
 
 		p := generateMockPR(123, "ref1",
-			[]string{"hash1", "hash2", "hash3"},
 			[]string{
 				"@terraform-applier plan foo/one",
 				"@terraform-applier plan two",
 				"@terraform-applier plan three",
 			},
-			nil,
 		)
 
 		// mock github API Call adding new request info
@@ -724,7 +699,7 @@ func Test_checkPRCommentsForPlanRequests(t *testing.T) {
 		}
 
 		if diff := cmp.Diff(wantReq, gotReq, cmpIgnoreRandFields); diff != "" {
-			t.Errorf("checkPRCommits() mismatch (-want +got):\n%s", diff)
+			t.Errorf("checkPRCommentsForPlanRequests() mismatch (-want +got):\n%s", diff)
 		}
 	})
 
@@ -737,13 +712,11 @@ func Test_checkPRCommentsForPlanRequests(t *testing.T) {
 		// module might not be annotated by the time the loop checks it, which in this
 		// case would mean plan out is ready ot be posted and NOT run hasn't been requested yet
 		pr := generateMockPR(123, "ref1",
-			[]string{"hash1", "hash2", "hash3"},
 			[]string{
 				"@terraform-applier plan two",
 				requestAcknowledgedMsg("diff-cluster", "foo/two", "path/foo/two", "hash2", mustParseMetaTime("2023-04-02T15:04:05Z")),
 				requestAcknowledgedMsg("default", "foo/three", "path/foo/three", "hash3", mustParseMetaTime("2023-04-02T15:04:05Z")),
 			},
-			nil,
 		)
 
 		// mock github API Call adding new request info
@@ -774,7 +747,7 @@ func Test_checkPRCommentsForPlanRequests(t *testing.T) {
 		}
 
 		if diff := cmp.Diff(wantReq, gotReq, cmpIgnoreRandFields); diff != "" {
-			t.Errorf("checkPRCommits() mismatch (-want +got):\n%s", diff)
+			t.Errorf("checkPRCommentsForPlanRequests() mismatch (-want +got):\n%s", diff)
 		}
 	})
 
@@ -783,13 +756,11 @@ func Test_checkPRCommentsForPlanRequests(t *testing.T) {
 		planner.github = testGithub
 
 		pr := generateMockPR(123, "ref1",
-			[]string{"hash1", "hash2", "hash3"},
 			[]string{
 				"@terraform-applier plan two",
 				runOutputMsg("diff-cluster", "foo/two", "path/foo/two", &tfaplv1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy.", Output: "tf plan output"}),
 				runOutputMsg("default", "foo/three", "path/foo/three", &tfaplv1beta1.Run{CommitHash: "hash3", Summary: "Plan: x to add, x to change, x to destroy.", Output: "tf plan output"}),
 			},
-			nil,
 		)
 
 		// mock github API Call adding new request info
@@ -820,13 +791,12 @@ func Test_checkPRCommentsForPlanRequests(t *testing.T) {
 		}
 
 		if diff := cmp.Diff(wantReq, gotReq, cmpIgnoreRandFields); diff != "" {
-			t.Errorf("checkPRCommits() mismatch (-want +got):\n%s", diff)
+			t.Errorf("checkPRCommentsForPlanRequests() mismatch (-want +got):\n%s", diff)
 		}
 	})
 
 	t.Run("plan run is requested for module in different Namespace or diff path", func(t *testing.T) {
 		p := generateMockPR(123, "ref1",
-			[]string{"hash1", "hash2", "hash3"},
 			[]string{
 				"@terraform-applier plan foo/one",
 				"@terraform-applier plan bar/two",
@@ -834,7 +804,6 @@ func Test_checkPRCommentsForPlanRequests(t *testing.T) {
 				"@terraform-applier plan path/foo",
 				"@terraform-applier plan foo/three",
 			},
-			nil,
 		)
 
 		// Call Test function
@@ -853,13 +822,11 @@ func Test_checkPRCommentsForPlanRequests(t *testing.T) {
 		planner.github = testGithub
 
 		p := generateMockPR(123, "ref1",
-			[]string{"hash1", "hash2", "hash3"},
 			[]string{
 				"@terraform-applier plan foo/one",
 				"@terraform-applier plan two please",
 				"@terraform-applier plan three",
 			},
-			nil,
 		)
 
 		// Call Test function

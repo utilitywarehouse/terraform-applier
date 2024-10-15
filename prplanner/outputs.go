@@ -2,17 +2,12 @@ package prplanner
 
 import (
 	"context"
-	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/redis/go-redis/v9"
 	"github.com/utilitywarehouse/git-mirror/pkg/giturl"
 	tfaplv1beta1 "github.com/utilitywarehouse/terraform-applier/api/v1beta1"
-)
-
-var (
-	mergePRRegex     = regexp.MustCompile(`Merge pull request #(\d+) from`)
-	prNumSuffixRegex = regexp.MustCompile(`\(#(\d+)\)$`)
 )
 
 func (p *Planner) uploadRequestOutput(ctx context.Context, pr *pr) {
@@ -62,9 +57,18 @@ func (p *Planner) processRedisKeySetMsg(ctx context.Context, ch <-chan *redis.Me
 			continue
 		}
 
-		run, err := p.RedisClient.Run(ctx, msg.Payload)
+		key := msg.Payload
+
+		// skip non run related keys
+		// and process default output only once
+		if !strings.Contains(key, ":default:lastRun") &&
+			!strings.Contains(key, ":PR:") {
+			continue
+		}
+
+		run, err := p.RedisClient.Run(ctx, key)
 		if err != nil {
-			p.Log.Error("unable to get run output", "key", msg.Payload, "err", err)
+			p.Log.Error("unable to get run output", "key", key, "err", err)
 			continue
 		}
 
@@ -79,6 +83,14 @@ func (p *Planner) processRedisKeySetMsg(ctx context.Context, ch <-chan *redis.Me
 			CommentID = run.Request.PR.CommentID
 		}
 
+		// if its not a PR run then also
+		// check if there is pending task for output upload
+		if prNum == 0 && strings.Contains(key, "default:lastRun") {
+			if pr, err := p.RedisClient.PendingApplyUploadPR(ctx, run.Module, run.CommitHash); err == nil {
+				prNum, _ = strconv.Atoi(pr)
+			}
+		}
+
 		// this is required in case this run is not a PR run && not apply run
 		if prNum == 0 {
 			continue
@@ -87,7 +99,7 @@ func (p *Planner) processRedisKeySetMsg(ctx context.Context, ch <-chan *redis.Me
 		var module tfaplv1beta1.Module
 		err = p.ClusterClt.Get(ctx, run.Module, &module)
 		if err != nil {
-			p.Log.Error("unable to get module", "module", run.Module, "error", err)
+			p.Log.Error("unable to get module", "module", run.Module, "pr", prNum, "error", err)
 			continue
 		}
 
@@ -97,15 +109,24 @@ func (p *Planner) processRedisKeySetMsg(ctx context.Context, ch <-chan *redis.Me
 
 		repo, err := giturl.Parse(module.Spec.RepoURL)
 		if err != nil {
-			p.Log.Error("unable to parse repo url", "module", run.Module, "error", err)
+			p.Log.Error("unable to parse repo url", "module", run.Module, "pr", prNum, "error", err)
 			continue
 		}
 
 		_, err = p.github.postComment(repo.Path, strings.TrimSuffix(repo.Repo, ".git"), CommentID, prNum, comment)
 		if err != nil {
-			p.Log.Error("error posting PR comment:", "error", err)
+			p.Log.Error("error posting PR comment:", "module", run.Module, "pr", prNum, "error", err)
 			continue
 		}
+
 		p.Log.Info("run output posted", "module", run.Module, "pr", prNum)
+
+		// if apply output is posted then clean up PR runs
+		if strings.Contains(key, "default:lastRun") {
+			if err := p.RedisClient.CleanupPRKeys(ctx, run.Module, prNum, run.CommitHash); err != nil {
+				p.Log.Error("error cleaning PR keys:", "module", run.Module, "pr", prNum, "error", err)
+				continue
+			}
+		}
 	}
 }
