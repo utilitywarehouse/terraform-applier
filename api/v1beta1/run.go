@@ -62,7 +62,7 @@ type PullRequest struct {
 func (req *Request) Validate() error {
 
 	if req.RequestedAt.IsZero() {
-		return fmt.Errorf("valid timestamp is required for 'RequestedAt'")
+		return fmt.Errorf("'reqAt' is required and must be in the '2006-01-02T15:04:05Z' format")
 	}
 
 	switch req.Type {
