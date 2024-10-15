@@ -298,7 +298,6 @@ func (m *Module) IsPlanOnly() bool {
 func (m *Module) NewRunRequest(reqType string) *Request {
 	req := Request{
 		RequestedAt: &metav1.Time{Time: time.Now()},
-		ID:          NewRequestID(),
 		Type:        reqType,
 	}
 

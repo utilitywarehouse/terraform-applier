@@ -1,8 +1,6 @@
 package v1beta1
 
 import (
-	"crypto/rand"
-	"encoding/base64"
 	"fmt"
 	"time"
 
@@ -50,7 +48,6 @@ func NewRun(module *Module, req *Request) Run {
 
 // Request represents terraform run request
 type Request struct {
-	ID          string       `json:"id,omitempty"`
 	RequestedAt *metav1.Time `json:"reqAt,omitempty"`
 	Type        string       `json:"type,omitempty"`
 	PR          *PullRequest `json:"pr,omitempty"`
@@ -118,11 +115,4 @@ func (req *Request) RepoRef(module *Module) string {
 	}
 
 	return module.Spec.RepoRef
-}
-
-// NewRequestID generates random string as ID
-func NewRequestID() string {
-	b := make([]byte, 6)
-	rand.Read(b)
-	return base64.StdEncoding.EncodeToString(b)
 }

@@ -26,7 +26,7 @@ func EnsureRequest(ctx context.Context, client client.Client, key types.Namespac
 		existingReq, ok := module.PendingRunRequest()
 		if ok {
 			// if annotated request ID is matching then nothing to do
-			if req.ID == existingReq.ID {
+			if req.RequestedAt == existingReq.RequestedAt {
 				return nil
 			} else {
 				return tfaplv1beta1.ErrRunRequestExist
@@ -70,7 +70,7 @@ func RemoveRequest(ctx context.Context, client client.Client, key types.Namespac
 			return tfaplv1beta1.ErrNoRunRequestFound
 		}
 
-		if req.ID != existingReq.ID {
+		if req.RequestedAt != existingReq.RequestedAt {
 			return tfaplv1beta1.ErrRunRequestMismatch
 		}
 
