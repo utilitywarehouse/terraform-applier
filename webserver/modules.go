@@ -47,8 +47,7 @@ func createNamespaceMap(ctx context.Context, modules []tfaplv1beta1.Module, redi
 		module.Runs = slices.CompactFunc(module.Runs, func(a *tfaplv1beta1.Run, b *tfaplv1beta1.Run) bool {
 			if a != nil && b != nil &&
 				a.StartedAt != nil && b.StartedAt != nil {
-				return a.Request.ID == b.Request.ID &&
-					a.StartedAt.Compare(b.StartedAt.Time) == 0
+				return a.StartedAt.Compare(b.StartedAt.Time) == 0
 			}
 			return false
 		})

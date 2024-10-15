@@ -113,13 +113,17 @@ func (r *ModuleReconciler) Reconcile(ctx context.Context, req reconcile.Request)
 	// case 1:
 	// check for run triggers
 	//
-	runReq, ok := module.PendingRunRequest()
-	if ok {
+	runReq, err := module.PendingRunRequest()
+	if err != nil {
+		log.Error("removing invalid run request", "err", err)
+		sysutil.RemoveCurrentRequest(ctx, r.Client, module.NamespacedName())
+		return ctrl.Result{RequeueAfter: pollIntervalDuration}, nil
+	}
+	if runReq != nil {
 		log.Debug("processing pending run request", "req", runReq, "delay", time.Since(runReq.RequestedAt.Time))
 		// use next poll internal as minimum queue duration as status change will not trigger Reconcile
 		r.triggerRun(ctx, module, runReq)
 		return ctrl.Result{RequeueAfter: pollIntervalDuration}, nil
-
 	}
 
 	// case 2:
