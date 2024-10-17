@@ -1,0 +1,36 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: terraform-applier-ci
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: terraform-applier-ci
+rules:
+  - apiGroups:
+      - terraform-applier.uw.systems
+    resources:
+      - modules
+    verbs:
+      - patch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: terraform-applier-ci
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: terraform-applier-ci
+subjects:
+  - kind: ServiceAccount
+    name: terraform-applier-ci
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  annotations:
+    kubernetes.io/service-account.name: terraform-applier-ci
+  name: terraform-applier-ci-token
+type: kubernetes.io/service-account-token
