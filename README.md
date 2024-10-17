@@ -313,3 +313,72 @@ In addition to the [controller-runtime](https://book.kubebuilder.io/reference/me
 - `terraform_applier_git_last_mirror_timestamp` - (tags: `repo`) A Gauge that captures the Timestamp of the last successful git sync per repo.
 - `terraform_applier_git_mirror_count` - (tags: `repo`,`success`) A Counter for each repo sync, incremented with each sync attempt and tagged with the result (`success=true|false`)
 - `terraform_applier_git_mirror_latency_seconds` - (tags: `repo`) A Summary that keeps track of the git sync latency per repo.
+
+
+## Github Actions
+
+`terraform-applier` provides github action to [trigger runs on managed modules](.github/actions/trigger-run/action.yaml).
+`action` uses kubernetes API calls to trigger runs, For authentication it uses service account
+token with access to the modules.
+
+The [ci-rbac](manifests/base/ci-rbac) base can be imported in namespace to provide min required permission
+to trigger runs on any modules in the namespace.
+base will create `terraform-applier-ci` service account and corresponding secret.
+
+
+Import `ci-rbac` base to create required sa and secret
+```yaml
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - github.com/utilitywarehouse/terraform-applier//manifests/base/ci-rbac?ref=master
+```
+
+To get the bearer token you can find the Secret in k8s. 
+this token should be added to `Repository secrets` of the repo.
+```sh
+kubectl --context <environment> -n <namespace> get secrets terraform-applier-ci-token -o json | jq -r '.data.token' | base64 -d
+```
+
+### Github Workflow
+
+Following workflow will trigger apply run on `hello` module from `default` namespace
+on push to `master` branch.
+```yaml
+name: trigger-terraform-run
+
+on:
+  push:
+    branches:
+      - master
+      - main
+
+jobs:
+  trigger-terraform-run:
+    runs-on: ubuntu-latest # or internal runner if k8s is on private network
+    steps:
+      - name: Trigger Terraform Apply
+        uses: utilitywarehouse/terraform-applier/.github/actions/trigger-run@master
+        env:
+          # The address and port of the Kubernetes API server (required)
+          TFA_K8S_API_SERVER: https://k8s-api-server-url
+          
+          # Bearer token for authentication to the API server (required)
+          # if ci base is used then this is the token from 'terraform-applier-ci-token' secret
+          TFA_K8S_TOKEN: ${{ secrets.K8S_TOKEN }}
+          
+          # The namespace of the module (required)
+          TFA_NAMESPACE: default
+
+          # The name of the module to trigger run (required)
+          TFA_MODULE: hello
+
+          # Type of the run to trigger valid options are 'ForcedApply' or 'ForcedPlan'.
+          # (optional) default: ForcedApply
+          TFA_RUN_TYPE: ForcedApply
+
+          # Allow insecure server connections (optional)
+          # default: false
+          TFA_INSECURE: true
+```

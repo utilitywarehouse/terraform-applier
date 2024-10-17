@@ -1,0 +1,71 @@
+name: "Trigger Terraform Run"
+description: "Trigger terraform run on terraform-applier managed modules."
+
+# Action Envs
+# TFA_K8S_API_SERVER: The address and port of the Kubernetes API server (required)
+
+# TFA_K8S_TOKEN: Bearer token for authentication to the API server (required)
+
+# TFA_NAMESPACE: The namespace of the module" (required)
+
+# TFA_MODULE: The name of the module to trigger run (required)
+
+# TFA_RUN_TYPE: Type of the run to trigger valid options are 'ForcedApply' or 'ForcedPlan' (optional)
+# default: ForcedApply
+
+# TFA_INSECURE: Allow insecure server connections (optional)
+# default: false
+
+runs:
+  using: "composite"
+  steps:
+    - name: Check inputs
+      shell: bash
+      run: |
+        # check all required envs
+        if [[ -z "$TFA_K8S_API_SERVER" ]]; then
+            echo "'TFA_K8S_API_SERVER' env not set, the Kubernetes API server address is required" >&2
+            fail=true
+        fi
+        if [[ -z "$TFA_K8S_TOKEN" ]]; then
+            echo "'TFA_K8S_TOKEN' env not set, the Kubernetes API token is required" >&2
+            fail=true
+        fi
+        if [[ -z "$TFA_NAMESPACE" ]]; then
+            echo "'TFA_NAMESPACE' env not set, the module's namespace name is required" >&2
+            fail=true
+        fi
+        if [[ -z "$TFA_MODULE" ]]; then
+            echo "'TFA_MODULE' env not set, the module's name is required" >&2
+            fail=true
+        fi
+
+        # set default value if not set and validate
+        if [[ -z "$TFA_RUN_TYPE" ]]; then
+            TFA_RUN_TYPE=ForcedApply
+        elif [[ $TFA_RUN_TYPE != "ForcedApply" && $TFA_RUN_TYPE != "ForcedPlan" ]]; then
+            echo "'TFA_RUN_TYPE=$TFA_RUN_TYPE' invalid value set, only 'ForcedApply' or 'ForcedPlan' are allowed as run type" >&2
+            fail=true
+        fi
+
+        if [[ $fail ]]; then
+            exit 1
+        fi
+
+    - name: Trigger Run
+      shell: bash
+      run: |
+        k8s_url="$TFA_K8S_API_SERVER/apis/terraform-applier.uw.systems/v1beta1/namespaces/$TFA_NAMESPACE/modules/$TFA_MODULE"
+        plan_req=$(printf '{\\"reqAt\\":\\"%s\\",\\"type\\":\\"%s\\"}' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" $TFA_RUN_TYPE) 
+        k8s_payload=$(printf '{"metadata": {"annotations": {"terraform-applier.uw.systems/run-request": "%s"}}}' "$plan_req")
+
+        curl -s --show-error --fail \
+            -o /dev/null \
+            -w '%{http_code}'\
+            --connect-timeout 60 \
+            -X PATCH \
+            $(if [[ $TFA_INSECURE == "true" ]]; then printf -- '--insecure'; fi) \
+            -d "$k8s_payload" \
+            -H 'Content-Type: application/merge-patch+json' \
+            -H "Authorization: Bearer $TFA_K8S_TOKEN" \
+            $k8s_url
