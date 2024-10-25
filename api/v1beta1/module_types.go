@@ -20,7 +20,6 @@ import (
 	"encoding/json"
 	"time"
 
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
@@ -117,15 +116,15 @@ type ModuleSpec struct {
 	// List of backend config attributes passed to the Terraform init
 	// for terraform backend configuration
 	// +optional
-	Backend []corev1.EnvVar `json:"backend,omitempty"`
+	Backend []EnvVar `json:"backend,omitempty"`
 
 	// List of environment variables passed to the Terraform execution.
 	// +optional
-	Env []corev1.EnvVar `json:"env,omitempty"`
+	Env []EnvVar `json:"env,omitempty"`
 
 	// List of input variables passed to the Terraform execution.
 	// +optional
-	Var []corev1.EnvVar `json:"var,omitempty"`
+	Var []EnvVar `json:"var,omitempty"`
 
 	// VaultRequests specifies credential generate requests from the vault
 	// configured on the controller
@@ -282,6 +281,49 @@ type Subject struct {
 	// Name of the object being referenced. For "User" kind value should be email
 	// +required
 	Name string `json:"name,omitempty"`
+}
+
+// mirrored from k8s.io/api/core/v1 to restrict EnvVarSource only
+// configMap and Secrets. other sources are not yet implemented
+
+// EnvVar represents an environment variable present in a Module.
+type EnvVar struct {
+	// Name of the environment variable. Must be a C_IDENTIFIER.
+	Name string `json:"name"`
+
+	// The value for the env, either value or valueFrom must be specified but not both
+	// Defaults to "".
+	// +optional
+	Value string `json:"value,omitempty"`
+	// Source for the environment variable's value. Cannot be used if value is not empty.
+	// +optional
+	ValueFrom *EnvVarSource `json:"valueFrom,omitempty"`
+}
+
+// EnvVarSource represents a source for the value of an EnvVar.
+type EnvVarSource struct {
+	// Selects a key of a ConfigMap.
+	// +optional
+	ConfigMapKeyRef *ConfigMapKeySelector `json:"configMapKeyRef,omitempty"`
+	// Selects a key of a secret in the pod's namespace
+	// +optional
+	SecretKeyRef *SecretKeySelector `json:"secretKeyRef,omitempty"`
+}
+
+// Selects a key from a ConfigMap.
+type ConfigMapKeySelector struct {
+	// Name of the referent.
+	Name string `json:"name"`
+	// The key of the configMap to select from.  Must be a valid configMap key.
+	Key string `json:"key"`
+}
+
+// SecretKeySelector selects a key of a Secret.
+type SecretKeySelector struct {
+	// Name of the referent.
+	Name string `json:"name"`
+	// The key of the secret to select from.  Must be a valid secret key.
+	Key string `json:"key"`
 }
 
 func (m *Module) NamespacedName() types.NamespacedName {

@@ -74,11 +74,15 @@ func inClusterDelegatedConfig(token string) (*rest.Config, error) {
 	}, nil
 }
 
-func fetchEnvVars(ctx context.Context, client kubernetes.Interface, module *tfaplv1beta1.Module, envVars []corev1.EnvVar) (map[string]string, error) {
+func fetchEnvVars(ctx context.Context, client kubernetes.Interface, module *tfaplv1beta1.Module, envVars []tfaplv1beta1.EnvVar) (map[string]string, error) {
 	kvPairs := make(map[string]string)
 	for _, env := range envVars {
-		// its ok to copy value from env.value if not set it will be overridden
-		kvPairs[env.Name] = env.Value
+
+		// use value str if specified and skip other checks
+		if env.Value != "" {
+			kvPairs[env.Name] = env.Value
+			continue
+		}
 
 		if env.ValueFrom == nil {
 			continue

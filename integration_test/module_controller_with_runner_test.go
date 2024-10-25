@@ -107,7 +107,7 @@ var _ = Describe("Module controller with Runner", func() {
 					Schedule: "50 * * * *",
 					RepoURL:  repoURL,
 					Path:     path,
-					Env: []corev1.EnvVar{
+					Env: []tfaplv1beta1.EnvVar{
 						{Name: "TF_APPLIER_STRONGBOX_KEYRING", Value: string(sbKeyringData)},
 						{Name: "TF_APPLIER_STRONGBOX_IDENTITY", Value: string(sbIdentityData)},
 					},
@@ -196,7 +196,7 @@ var _ = Describe("Module controller with Runner", func() {
 					RepoURL:  repoURL,
 					Path:     path,
 					PlanOnly: &boolTrue,
-					Env: []corev1.EnvVar{
+					Env: []tfaplv1beta1.EnvVar{
 						{Name: "TF_APPLIER_STRONGBOX_KEYRING", Value: string(sbKeyringData)},
 						{Name: "TF_APPLIER_STRONGBOX_IDENTITY", Value: string(sbIdentityData)},
 					},
@@ -283,31 +283,31 @@ var _ = Describe("Module controller with Runner", func() {
 					Schedule: "50 * * * *",
 					RepoURL:  repoURL,
 					Path:     path,
-					Backend: []corev1.EnvVar{
+					Backend: []tfaplv1beta1.EnvVar{
 						{Name: "path", Value: testStateFilePath},
 					},
-					Env: []corev1.EnvVar{
+					Env: []tfaplv1beta1.EnvVar{
 						{Name: "TF_APPLIER_STRONGBOX_KEYRING", Value: string(sbKeyringData)},
 						{Name: "TF_APPLIER_STRONGBOX_IDENTITY", Value: string(sbIdentityData)},
 						{Name: "TF_ENV_1", Value: "ENV-VALUE1"},
-						{Name: "TF_ENV_2", ValueFrom: &corev1.EnvVarSource{
-							ConfigMapKeyRef: &corev1.ConfigMapKeySelector{
-								LocalObjectReference: corev1.LocalObjectReference{Name: "test-configmap"}, Key: "TF_ENV_2"},
+						{Name: "TF_ENV_2", ValueFrom: &tfaplv1beta1.EnvVarSource{
+							ConfigMapKeyRef: &tfaplv1beta1.ConfigMapKeySelector{
+								Name: "test-configmap", Key: "TF_ENV_2"},
 						}},
-						{Name: "TF_ENV_3", ValueFrom: &corev1.EnvVarSource{
-							SecretKeyRef: &corev1.SecretKeySelector{
-								LocalObjectReference: corev1.LocalObjectReference{Name: "test-secret"}, Key: "TF_ENV_3"},
+						{Name: "TF_ENV_3", ValueFrom: &tfaplv1beta1.EnvVarSource{
+							SecretKeyRef: &tfaplv1beta1.SecretKeySelector{
+								Name: "test-secret", Key: "TF_ENV_3"},
 						}},
 					},
-					Var: []corev1.EnvVar{
+					Var: []tfaplv1beta1.EnvVar{
 						{Name: "variable1", Value: "VAR-VALUE1"},
-						{Name: "variable2", ValueFrom: &corev1.EnvVarSource{
-							ConfigMapKeyRef: &corev1.ConfigMapKeySelector{
-								LocalObjectReference: corev1.LocalObjectReference{Name: "test-configmap"}, Key: "variable2"},
+						{Name: "variable2", ValueFrom: &tfaplv1beta1.EnvVarSource{
+							ConfigMapKeyRef: &tfaplv1beta1.ConfigMapKeySelector{
+								Name: "test-configmap", Key: "variable2"},
 						}},
-						{Name: "variable3", ValueFrom: &corev1.EnvVarSource{
-							SecretKeyRef: &corev1.SecretKeySelector{
-								LocalObjectReference: corev1.LocalObjectReference{Name: "test-secret"}, Key: "variable3"},
+						{Name: "variable3", ValueFrom: &tfaplv1beta1.EnvVarSource{
+							SecretKeyRef: &tfaplv1beta1.SecretKeySelector{
+								Name: "test-secret", Key: "variable3"},
 						}},
 					},
 				},
@@ -433,7 +433,7 @@ var _ = Describe("Module controller with Runner", func() {
 					RepoURL:       repoURL,
 					Path:          path,
 					VaultRequests: &vaultReq,
-					Env: []corev1.EnvVar{
+					Env: []tfaplv1beta1.EnvVar{
 						{Name: "TF_APPLIER_STRONGBOX_KEYRING", Value: string(sbKeyringData)},
 						{Name: "TF_APPLIER_STRONGBOX_IDENTITY", Value: string(sbIdentityData)},
 					},
