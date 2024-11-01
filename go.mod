@@ -29,7 +29,7 @@ require (
 	k8s.io/client-go v0.31.2
 	sigs.k8s.io/controller-runtime v0.19.1
 	sigs.k8s.io/controller-runtime/tools/setup-envtest v0.0.0-20241011141221-469837099f73
-	sigs.k8s.io/controller-tools v0.16.4
+	sigs.k8s.io/controller-tools v0.16.5
 )
 
 require (
@@ -45,7 +45,7 @@ require (
 	github.com/emicklei/go-restful/v3 v3.12.1 // indirect
 	github.com/evanphx/json-patch v5.6.0+incompatible // indirect
 	github.com/evanphx/json-patch/v5 v5.9.0 // indirect
-	github.com/fatih/color v1.17.0 // indirect
+	github.com/fatih/color v1.18.0 // indirect
 	github.com/fsnotify/fsnotify v1.7.0 // indirect
 	github.com/fxamacker/cbor/v2 v2.7.0 // indirect
 	github.com/go-jose/go-jose/v4 v4.0.4 // indirect
@@ -115,7 +115,7 @@ require (
 	gopkg.in/evanphx/json-patch.v4 v4.12.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-	k8s.io/apiextensions-apiserver v0.31.1 // indirect
+	k8s.io/apiextensions-apiserver v0.31.2 // indirect
 	k8s.io/klog/v2 v2.130.1 // indirect
 	k8s.io/kube-openapi v0.0.0-20241009091222-67ed5848f094 // indirect
 	k8s.io/utils v0.0.0-20240921022957-49e7df575cb6 // indirect
