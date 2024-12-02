@@ -47,7 +47,7 @@ type Runner struct {
 	Metrics                metrics.PrometheusInterface
 	TerraformExecPath      string
 	TerminationGracePeriod time.Duration
-	AWSSecretsEngineConfig vault.AWSSecretsEngineInterface
+	AWSSecretsEngineConfig vault.ProviderInterface
 	RunStatus              *sysutil.RunStatus
 	GlobalENV              map[string]string
 	pluginCacheEnabled     bool

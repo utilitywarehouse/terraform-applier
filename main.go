@@ -661,9 +661,9 @@ func run(c *cli.Context) {
 		Metrics:                metrics,
 		TerraformExecPath:      execPath,
 		TerminationGracePeriod: gracefulShutdownTimeout,
-		AWSSecretsEngineConfig: &vault.AWSSecretsEngineConfig{
-			SecretsEngPath: c.String("vault-aws-secret-engine-path"),
-			AuthPath:       c.String("vault-kube-auth-path"),
+		AWSSecretsEngineConfig: &vault.Provider{
+			AWSSecretsEngPath: c.String("vault-aws-secret-engine-path"),
+			AuthPath:          c.String("vault-kube-auth-path"),
 		},
 		GlobalENV:    globalRunEnv,
 		RunStatus:    runStatus,

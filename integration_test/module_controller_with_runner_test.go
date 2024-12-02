@@ -449,7 +449,7 @@ var _ = Describe("Module controller with Runner", func() {
 			testDelegate.EXPECT().DelegateToken(gomock.Any(), gomock.Any(), gomock.Any()).Return("token.X4", nil)
 			testDelegate.EXPECT().SetupDelegation(gomock.Any(), "token.X4").Return(fakeClient, nil)
 
-			testVaultAWSConf.EXPECT().GenerateCreds("token.X4", gomock.Any()).
+			testVaultAWSConf.EXPECT().GenerateAWSCreds("token.X4", gomock.Any()).
 				Return(&vault.AWSCredentials{AccessKeyID: "AWS_KEY_ABCD1234", SecretAccessKey: "secret", Token: "token"}, nil)
 
 			By("By making sure job was sent to jobQueue when commit hash is changed")
