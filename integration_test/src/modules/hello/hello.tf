@@ -85,10 +85,14 @@ resource "null_resource" "echo_AWS_KEY" {
   ]
 }
 
-data "google_client_openid_userinfo" "sa" {}
+resource "null_resource" "verify_gcp_token" {
+  provisioner "local-exec" {
+    command = "wget -q -O - \"https://oauth2.googleapis.com/tokeninfo?access_token=$GOOGLE_OAUTH_ACCESS_TOKEN\""
+  }
 
-output "google_sa_email" {
-  value = data.google_client_openid_userinfo.sa.email
+  depends_on = [
+    null_resource.echo_AWS_KEY
+  ]
 }
 
 resource "null_resource" "slow_provider" {
