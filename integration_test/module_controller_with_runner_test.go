@@ -482,6 +482,9 @@ var _ = Describe("Module controller with Runner", func() {
 
 			Expect(fetchedModule.Status.CurrentState).Should(Equal(string(tfaplv1beta1.StatusOk)))
 
+			// runner does clean up before updating redis
+			time.Sleep(5 * time.Second)
+
 			// make sure all values are there in output
 			Expect(lastRun.Output).Should(ContainSubstring("AWS_KEY_ABCD1234"))
 			Expect(lastApplyRun.Output).Should(ContainSubstring("AWS_KEY_ABCD1234"))
