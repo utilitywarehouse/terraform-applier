@@ -151,6 +151,9 @@ var _ = Describe("Module controller with Runner", func() {
 
 			Expect(fetchedModule.Status.CurrentState).Should(Equal(string(tfaplv1beta1.StatusOk)))
 
+			// runner does clean up before updating redis
+			time.Sleep(5 * time.Second)
+
 			// Make sure LastDriftInfo & LastApplyInfo is also set
 			Expect(lastRun.Output).Should(ContainSubstring("Plan:"))
 
@@ -239,6 +242,10 @@ var _ = Describe("Module controller with Runner", func() {
 			}, time.Second*30, interval).Should(Not(Equal("Running")))
 
 			Expect(fetchedModule.Status.CurrentState).Should(Equal(string(tfaplv1beta1.StatusDriftDetected)))
+
+			// runner does clean up before updating redis
+			time.Sleep(5 * time.Second)
+
 			Expect(lastRun.Output).Should(ContainSubstring("Plan:"))
 
 			// Make sure LastApplyInfo is also set
@@ -370,7 +377,8 @@ var _ = Describe("Module controller with Runner", func() {
 			}, time.Second*30, interval).Should(Not(Equal("Running")))
 
 			Expect(fetchedModule.Status.CurrentState).Should(Equal(string(tfaplv1beta1.StatusOk)))
-
+			// runner does clean up before updating redis
+			time.Sleep(5 * time.Second)
 			Expect(lastRun.Output).Should(ContainSubstring("Plan:"))
 
 			Expect(fetchedModule.Status.LastAppliedCommitHash).Should(Equal(commitHash))
