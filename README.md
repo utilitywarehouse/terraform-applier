@@ -242,6 +242,7 @@ PR Planner feature is enabled by default, but can be disabled either for a speci
 - `(VAULT_CACERT)` - (default: `""`) The path to a PEM-encoded CA certificate file.
 - `(VAULT_CAPATH)` - (default: `""`) The Path to a directory of PEM-encoded CA certificate files on the local disk.
 - `--vault-aws-secret-engine-path (VAULT_AWS_SEC_ENG_PATH)` - (default: `/aws`) The path where AWS secrets engine is enabled.
+- `--vault-gcp-secret-engine-path (VAULT_GCP_SEC_ENG_PATH)` - (default: `/gcp`) The path where GCP secrets engine is enabled.
 - `--vault-kube-auth-path (VAULT_KUBE_AUTH_PATH)` - (default: `/auth/kubernetes`) The path where kubernetes auth method is mounted.
 
 ---
@@ -279,19 +280,45 @@ spec:
 
 ## Vault integration
 
-terraform-applier supports fetching (generating) secrets from the vault. Module's delegated service account's jwt (secret:terraform-applier-delegate-token) will be used for vault login for given `vaultRole`. at the moment only aws secrets engine is supported.
+terraform-applier supports fetching (generating) secrets for AWS & GCP Secrets from the vault.
+Only kubernetes auth method is supported using module's delegated service account's jwt (secret:terraform-applier-delegate-token) for vault login. 
+For AWS creds given `vaultRole` will be used as `authRole` and in GCP it will be name of the `roleset` or `account`.
+For GCP only [OAuth2 access token](https://developer.hashicorp.com/vault/docs/secrets/gcp#access-tokens) is supported.
+[access-token are better then keys for frequent repetitive tasks.](https://developer.hashicorp.com/vault/docs/secrets/gcp#access-tokens-vs-service-account-keys)
 
 ```yaml
 spec:
   vaultRequests:
+    # If aws specified, controller will request AWS creds from vault and set
+    # AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY and AWS_SESSION_TOKEN envs during
+    # terraform run.
     aws:
-      // VaultRole Specifies the name of the vault role to generate credentials against.
+      # VaultRole Specifies the name of the vault role to generate credentials against.
       vaultRole: dev_aws_some-vault-role
-      // Must be one of iam_user, assumed_role, or federation_token.
+      
+      # Must be one of iam_user, assumed_role, or federation_token.
       credentialType: assumed_role
-      // The ARN of the role to assume if credential_type on the Vault role is assumed_role.
-      // Optional if the Vault role only allows a single AWS role ARN.
+      
+      # The ARN of the role to assume if credential_type on the Vault role is assumed_role.
+      # Optional if the Vault role only allows a single AWS role ARN.
       roleARN: arn:aws:iam::00000000:role/sys-tf-applier-example
+    
+    # If gcp specified, controller will request OAuth2 access token and
+    # sets GOOGLE_OAUTH_ACCESS_TOKEN envs during terraform runs
+    # one of roleset, staticAccount or impersonatedAccount must be set
+     gcp:
+       # roleset Specifies the name of an roleset with secret type access_token 
+       # to generate access_token under.
+       roleset: gcp_proj_roleset
+      
+       # staticAccount Specifies the name name of the static account with secret 
+       # type access_token to generate access_token under.
+       staticAccount: gcp_proj_static-account
+      
+       # impersonatedAccount Specifies the name of the impersonated account to 
+       # generate access_token under.
+       impersonatedAccount: gcp_proj_impersonate-account
+
 ```
 
 ## Monitoring
