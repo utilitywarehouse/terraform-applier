@@ -18,15 +18,15 @@ func (p *Provider) GenerateGCPToken(jwt string, gcpReq *tfaplv1beta1.VaultGCPReq
 	switch {
 	case gcpReq.Roleset != "":
 		vaultAccount = gcpReq.Roleset
-		path = p.AWSSecretsEngPath + "/roleset/" + vaultAccount + "/token"
+		path = p.GCPSecretsEngPath + "/roleset/" + vaultAccount + "/token"
 
 	case gcpReq.StaticAccount != "":
 		vaultAccount = gcpReq.StaticAccount
-		path = p.AWSSecretsEngPath + "/static-account/" + vaultAccount + "/token"
+		path = p.GCPSecretsEngPath + "/static-account/" + vaultAccount + "/token"
 
 	case gcpReq.ImpersonatedAccount != "":
 		vaultAccount = gcpReq.ImpersonatedAccount
-		path = p.AWSSecretsEngPath + "/impersonated-account/" + vaultAccount + "/token"
+		path = p.GCPSecretsEngPath + "/impersonated-account/" + vaultAccount + "/token"
 
 	default:
 		return "", fmt.Errorf("one of 'roleset', 'staticAccount' or 'impersonatedAccount' must be set to generate GCP access_token")
