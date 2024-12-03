@@ -393,7 +393,7 @@ var _ = Describe("Module controller with Runner", func() {
 			Expect(k8sClient.Delete(ctx, module)).Should(Succeed())
 		})
 
-		FIt("Should send module to job queue on commit change and runner should generate vault creds", func() {
+		It("Should send module to job queue on commit change and runner should generate vault creds", func() {
 			const (
 				moduleName = "hello-with-vault-creds"
 				repoURL    = "https://host.xy/dummy/repo.git"
