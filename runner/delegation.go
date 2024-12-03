@@ -110,12 +110,22 @@ func fetchEnvVars(ctx context.Context, client kubernetes.Interface, module *tfap
 
 func (r *Runner) generateVaultAWSCreds(module *tfaplv1beta1.Module, jwt string, envs map[string]string) error {
 
-	creds, err := r.AWSSecretsEngineConfig.GenerateAWSCreds(jwt, module.Spec.VaultRequests.AWS)
+	creds, err := r.Vault.GenerateAWSCreds(jwt, module.Spec.VaultRequests.AWS)
 	if err != nil {
 		return err
 	}
 	envs["AWS_ACCESS_KEY_ID"] = creds.AccessKeyID
 	envs["AWS_SECRET_ACCESS_KEY"] = creds.SecretAccessKey
 	envs["AWS_SESSION_TOKEN"] = creds.Token
+	return nil
+}
+
+func (r *Runner) generateVaultGCPToken(module *tfaplv1beta1.Module, jwt string, envs map[string]string) error {
+
+	token, err := r.Vault.GenerateGCPToken(jwt, module.Spec.VaultRequests.GCP)
+	if err != nil {
+		return err
+	}
+	envs["GOOGLE_OAUTH_ACCESS_TOKEN"] = token
 	return nil
 }

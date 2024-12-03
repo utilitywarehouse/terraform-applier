@@ -47,7 +47,7 @@ type Runner struct {
 	Metrics                metrics.PrometheusInterface
 	TerraformExecPath      string
 	TerminationGracePeriod time.Duration
-	AWSSecretsEngineConfig vault.ProviderInterface
+	Vault                  vault.ProviderInterface
 	RunStatus              *sysutil.RunStatus
 	GlobalENV              map[string]string
 	pluginCacheEnabled     bool
@@ -259,6 +259,16 @@ func (r *Runner) process(run *tfaplv1beta1.Run, cancelChan <-chan struct{}, envs
 			err = r.generateVaultAWSCreds(module, jwt, envs)
 			if err != nil {
 				msg := fmt.Sprintf("unable to generate vault aws secrets: err:%s", err)
+				log.Error(msg)
+				r.setFailedStatus(run, module, tfaplv1beta1.ReasonRunPreparationFailed, msg)
+				return false
+			}
+		}
+
+		if module.Spec.VaultRequests.GCP != nil {
+			err = r.generateVaultGCPToken(module, jwt, envs)
+			if err != nil {
+				msg := fmt.Sprintf("unable to generate vault gcp access token: err:%s", err)
 				log.Error(msg)
 				r.setFailedStatus(run, module, tfaplv1beta1.ReasonRunPreparationFailed, msg)
 				return false

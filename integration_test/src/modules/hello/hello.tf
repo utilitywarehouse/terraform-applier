@@ -85,6 +85,12 @@ resource "null_resource" "echo_AWS_KEY" {
   ]
 }
 
+data "google_client_openid_userinfo" "sa" {}
+
+output "google_sa_email" {
+  value = data.google_client_openid_userinfo.sa.email
+}
+
 resource "null_resource" "slow_provider" {
   provisioner "local-exec" {
     command = "echo progressing...;sleep ${var.sleep};echo done"

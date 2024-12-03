@@ -393,9 +393,9 @@ var _ = Describe("Module controller with Runner", func() {
 			Expect(k8sClient.Delete(ctx, module)).Should(Succeed())
 		})
 
-		It("Should send module to job queue on commit change and runner should generate aws vault creds", func() {
+		FIt("Should send module to job queue on commit change and runner should generate vault creds", func() {
 			const (
-				moduleName = "hello-with-aws-creds"
+				moduleName = "hello-with-vault-creds"
 				repoURL    = "https://host.xy/dummy/repo.git"
 				path       = "hello"
 			)
@@ -417,6 +417,9 @@ var _ = Describe("Module controller with Runner", func() {
 			vaultReq := tfaplv1beta1.VaultRequests{
 				AWS: &tfaplv1beta1.VaultAWSRequest{
 					VaultRole: "aws-vault-role",
+				},
+				GCP: &tfaplv1beta1.VaultGCPRequest{
+					StaticAccount: "gcp-vault-static-account",
 				},
 			}
 			module := &tfaplv1beta1.Module{
@@ -451,6 +454,8 @@ var _ = Describe("Module controller with Runner", func() {
 
 			testVaultAWSConf.EXPECT().GenerateAWSCreds("token.X4", gomock.Any()).
 				Return(&vault.AWSCredentials{AccessKeyID: "AWS_KEY_ABCD1234", SecretAccessKey: "secret", Token: "token"}, nil)
+			testVaultAWSConf.EXPECT().GenerateGCPToken("token.X4", gomock.Any()).
+				Return("ya29.c.c0ASRK0GZ2fzoXHQakYwhwQhSJZ3gFQT5V0Ro_E94zL3fo", nil)
 
 			By("By making sure job was sent to jobQueue when commit hash is changed")
 			Eventually(func() string {

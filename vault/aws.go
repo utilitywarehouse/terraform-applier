@@ -28,6 +28,8 @@ func (p *Provider) GenerateAWSCreds(jwt string, awsReq *tfaplv1beta1.VaultAWSReq
 		return nil, err
 	}
 
+	// when https://github.com/utilitywarehouse/vault-kube-cloud-credentials is used
+	// to create vault secret then the name of the auth role is same as vault secret role/account.
 	err = login(client, p.AuthPath, jwt, awsReq.VaultRole)
 	if err != nil {
 		return nil, err

@@ -223,7 +223,7 @@ var _ = BeforeSuite(func() {
 		Log:                    testLogger.With("logger", "runner"),
 		Metrics:                testMetrics,
 		TerraformExecPath:      execPath,
-		AWSSecretsEngineConfig: testVaultAWSConf,
+		Vault:                  testVaultAWSConf,
 		TerminationGracePeriod: 10 * time.Second,
 		RunStatus:              runStatus,
 		Redis:                  testRedis,

@@ -48,3 +48,18 @@ func (mr *MockProviderInterfaceMockRecorder) GenerateAWSCreds(arg0, arg1 interfa
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GenerateAWSCreds", reflect.TypeOf((*MockProviderInterface)(nil).GenerateAWSCreds), arg0, arg1)
 }
+
+// GenerateGCPToken mocks base method.
+func (m *MockProviderInterface) GenerateGCPToken(arg0 string, arg1 *v1beta1.VaultGCPRequest) (string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GenerateGCPToken", arg0, arg1)
+	ret0, _ := ret[0].(string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GenerateGCPToken indicates an expected call of GenerateGCPToken.
+func (mr *MockProviderInterfaceMockRecorder) GenerateGCPToken(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GenerateGCPToken", reflect.TypeOf((*MockProviderInterface)(nil).GenerateGCPToken), arg0, arg1)
+}
