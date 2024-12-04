@@ -7,11 +7,6 @@ import (
 	tfaplv1beta1 "github.com/utilitywarehouse/terraform-applier/api/v1beta1"
 )
 
-//go:generate go run github.com/golang/mock/mockgen -package vault -destination aws_mock.go github.com/utilitywarehouse/terraform-applier/vault AWSSecretsEngineInterface
-type AWSSecretsEngineInterface interface {
-	GenerateCreds(jwt string, awsReq *tfaplv1beta1.VaultAWSRequest) (*AWSCredentials, error)
-}
-
 // AWSCredentials are the credentials served by the API
 type AWSCredentials struct {
 	AccessKeyID     string
@@ -20,13 +15,8 @@ type AWSCredentials struct {
 	ARN             string
 }
 
-type AWSSecretsEngineConfig struct {
-	SecretsEngPath string
-	AuthPath       string
-}
-
 // GenerateCreds retrieves credentials from vault for the given vaulRole and aws role
-func (conf *AWSSecretsEngineConfig) GenerateCreds(jwt string, awsReq *tfaplv1beta1.VaultAWSRequest) (*AWSCredentials, error) {
+func (p *Provider) GenerateAWSCreds(jwt string, awsReq *tfaplv1beta1.VaultAWSRequest) (*AWSCredentials, error) {
 
 	if awsReq == nil || awsReq.VaultRole == "" {
 		return nil, fmt.Errorf("vault role is required to generate aws credentials")
@@ -38,7 +28,9 @@ func (conf *AWSSecretsEngineConfig) GenerateCreds(jwt string, awsReq *tfaplv1bet
 		return nil, err
 	}
 
-	err = login(client, conf.AuthPath, jwt, awsReq.VaultRole)
+	// when https://github.com/utilitywarehouse/vault-kube-cloud-credentials is used
+	// to create vault secret then the name of the auth role is same as vault secret role/account.
+	err = login(client, p.AuthPath, jwt, awsReq.VaultRole)
 	if err != nil {
 		return nil, err
 	}
@@ -51,9 +43,9 @@ func (conf *AWSSecretsEngineConfig) GenerateCreds(jwt string, awsReq *tfaplv1bet
 		}
 	}
 
-	path := conf.SecretsEngPath + "/sts/" + awsReq.VaultRole
+	path := p.AWSSecretsEngPath + "/sts/" + awsReq.VaultRole
 	if awsReq.CredentialType == "iam_user" {
-		path = conf.SecretsEngPath + "/creds/" + awsReq.VaultRole
+		path = p.AWSSecretsEngPath + "/creds/" + awsReq.VaultRole
 	}
 
 	secret, err := client.Logical().ReadWithData(path, secretData)

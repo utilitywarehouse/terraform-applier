@@ -198,6 +198,12 @@ var (
 			Usage:   "The path where AWS secrets engine is enabled.",
 		},
 		&cli.StringFlag{
+			Name:    "vault-gcp-secret-engine-path",
+			EnvVars: []string{"VAULT_GCP_SEC_ENG_PATH"},
+			Value:   "/gcp",
+			Usage:   "The path where GCP secrets engine is enabled.",
+		},
+		&cli.StringFlag{
 			Name:    "vault-kube-auth-path",
 			EnvVars: []string{"VAULT_KUBE_AUTH_PATH"},
 			Value:   "/auth/kubernetes",
@@ -661,9 +667,10 @@ func run(c *cli.Context) {
 		Metrics:                metrics,
 		TerraformExecPath:      execPath,
 		TerminationGracePeriod: gracefulShutdownTimeout,
-		AWSSecretsEngineConfig: &vault.AWSSecretsEngineConfig{
-			SecretsEngPath: c.String("vault-aws-secret-engine-path"),
-			AuthPath:       c.String("vault-kube-auth-path"),
+		Vault: &vault.Provider{
+			AWSSecretsEngPath: c.String("vault-aws-secret-engine-path"),
+			GCPSecretsEngPath: c.String("vault-gcp-secret-engine-path"),
+			AuthPath:          c.String("vault-kube-auth-path"),
 		},
 		GlobalENV:    globalRunEnv,
 		RunStatus:    runStatus,

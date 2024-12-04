@@ -85,7 +85,7 @@ var (
 	testMockRunner1  *runner.MockRunnerInterface //only used for controller behaviour testing without runner
 	testMockRunner2  *runner.MockRunnerInterface //only used for controller behaviour testing without runner
 	testReconciler   *controllers.ModuleReconciler
-	testVaultAWSConf *vault.MockAWSSecretsEngineInterface
+	testVaultAWSConf *vault.MockProviderInterface
 )
 
 func TestAPIs(t *testing.T) {
@@ -167,7 +167,7 @@ var _ = BeforeSuite(func() {
 	testMockRunner2 = runner.NewMockRunnerInterface(goMockCtrl)
 	testRedis = sysutil.NewMockRedisInterface(goMockCtrl)
 
-	testVaultAWSConf = vault.NewMockAWSSecretsEngineInterface(goMockCtrl)
+	testVaultAWSConf = vault.NewMockProviderInterface(goMockCtrl)
 
 	testReconciler = &controllers.ModuleReconciler{
 		Client:                 k8sManager.GetClient(),
@@ -223,7 +223,7 @@ var _ = BeforeSuite(func() {
 		Log:                    testLogger.With("logger", "runner"),
 		Metrics:                testMetrics,
 		TerraformExecPath:      execPath,
-		AWSSecretsEngineConfig: testVaultAWSConf,
+		Vault:                  testVaultAWSConf,
 		TerminationGracePeriod: 10 * time.Second,
 		RunStatus:              runStatus,
 		Redis:                  testRedis,

@@ -244,6 +244,14 @@ type VaultRequests struct {
 	// 'VAULT_AWS_ENG_PATH' env set on controller will be used as credential path
 	// +optional
 	AWS *VaultAWSRequest `json:"aws,omitempty"`
+
+	// gcp specifies vault credential generation request for GCP secrets engine
+	// If specified, controller will request OAuth2 access token and
+	// sets GOOGLE_OAUTH_ACCESS_TOKEN envs during terraform runs
+	// 'VAULT_AWS_ENG_PATH' env set on controller will be used as credential path
+	// one of roleset, staticAccount or impersonatedAccount must be set
+	// +optional
+	GCP *VaultGCPRequest `json:"gcp,omitempty"`
 }
 
 type VaultAWSRequest struct {
@@ -262,6 +270,18 @@ type VaultAWSRequest struct {
 	// Optional if the Vault role only allows a single AWS role ARN.
 	// +optional
 	RoleARN string `json:"roleARN,omitempty"`
+}
+
+type VaultGCPRequest struct {
+	// roleset Specifies the name of an roleset with secret type access_token to generate access_token under.
+	// +optional
+	Roleset string `json:"roleset,omitempty"`
+	// staticAccount Specifies the name name of the static account with secret type access_token to generate access_token under.
+	// +optional
+	StaticAccount string `json:"staticAccount,omitempty"`
+	// impersonatedAccount Specifies the name of the impersonated account to generate access_token under.
+	// +optional
+	ImpersonatedAccount string `json:"impersonatedAccount,omitempty"`
 }
 
 type RBAC struct {

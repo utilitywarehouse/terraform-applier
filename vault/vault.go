@@ -5,7 +5,20 @@ import (
 	"os"
 
 	vaultapi "github.com/hashicorp/vault/api"
+	tfaplv1beta1 "github.com/utilitywarehouse/terraform-applier/api/v1beta1"
 )
+
+//go:generate go run github.com/golang/mock/mockgen -package vault -destination vault_mock.go github.com/utilitywarehouse/terraform-applier/vault ProviderInterface
+type ProviderInterface interface {
+	GenerateAWSCreds(jwt string, awsReq *tfaplv1beta1.VaultAWSRequest) (*AWSCredentials, error)
+	GenerateGCPToken(jwt string, gcpReq *tfaplv1beta1.VaultGCPRequest) (string, error)
+}
+
+type Provider struct {
+	AWSSecretsEngPath string
+	GCPSecretsEngPath string
+	AuthPath          string
+}
 
 // newClient returns pre configured vault api client
 // since vault secrets is set on the client, runner should get new client on Each run
@@ -42,11 +55,11 @@ func newClient() (*vaultapi.Client, error) {
 	return vaultClient, nil
 }
 
-func login(client *vaultapi.Client, kubeAuthPath, jwt, vaultRole string) error {
+func login(client *vaultapi.Client, kubeAuthPath, jwt, authRole string) error {
 	loginPath := kubeAuthPath + "/login"
 	secret, err := client.Logical().Write(loginPath, map[string]interface{}{
 		"jwt":  jwt,
-		"role": vaultRole,
+		"role": authRole,
 	})
 	if err != nil {
 		return err

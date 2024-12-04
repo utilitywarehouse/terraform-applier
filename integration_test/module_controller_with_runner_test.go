@@ -151,6 +151,9 @@ var _ = Describe("Module controller with Runner", func() {
 
 			Expect(fetchedModule.Status.CurrentState).Should(Equal(string(tfaplv1beta1.StatusOk)))
 
+			// runner does clean up before updating redis
+			time.Sleep(5 * time.Second)
+
 			// Make sure LastDriftInfo & LastApplyInfo is also set
 			Expect(lastRun.Output).Should(ContainSubstring("Plan:"))
 
@@ -239,6 +242,10 @@ var _ = Describe("Module controller with Runner", func() {
 			}, time.Second*30, interval).Should(Not(Equal("Running")))
 
 			Expect(fetchedModule.Status.CurrentState).Should(Equal(string(tfaplv1beta1.StatusDriftDetected)))
+
+			// runner does clean up before updating redis
+			time.Sleep(5 * time.Second)
+
 			Expect(lastRun.Output).Should(ContainSubstring("Plan:"))
 
 			// Make sure LastApplyInfo is also set
@@ -370,7 +377,8 @@ var _ = Describe("Module controller with Runner", func() {
 			}, time.Second*30, interval).Should(Not(Equal("Running")))
 
 			Expect(fetchedModule.Status.CurrentState).Should(Equal(string(tfaplv1beta1.StatusOk)))
-
+			// runner does clean up before updating redis
+			time.Sleep(5 * time.Second)
 			Expect(lastRun.Output).Should(ContainSubstring("Plan:"))
 
 			Expect(fetchedModule.Status.LastAppliedCommitHash).Should(Equal(commitHash))
@@ -393,9 +401,9 @@ var _ = Describe("Module controller with Runner", func() {
 			Expect(k8sClient.Delete(ctx, module)).Should(Succeed())
 		})
 
-		It("Should send module to job queue on commit change and runner should generate aws vault creds", func() {
+		It("Should send module to job queue on commit change and runner should generate vault creds", func() {
 			const (
-				moduleName = "hello-with-aws-creds"
+				moduleName = "hello-with-vault-creds"
 				repoURL    = "https://host.xy/dummy/repo.git"
 				path       = "hello"
 			)
@@ -417,6 +425,9 @@ var _ = Describe("Module controller with Runner", func() {
 			vaultReq := tfaplv1beta1.VaultRequests{
 				AWS: &tfaplv1beta1.VaultAWSRequest{
 					VaultRole: "aws-vault-role",
+				},
+				GCP: &tfaplv1beta1.VaultGCPRequest{
+					StaticAccount: "gcp-vault-static-account",
 				},
 			}
 			module := &tfaplv1beta1.Module{
@@ -449,8 +460,10 @@ var _ = Describe("Module controller with Runner", func() {
 			testDelegate.EXPECT().DelegateToken(gomock.Any(), gomock.Any(), gomock.Any()).Return("token.X4", nil)
 			testDelegate.EXPECT().SetupDelegation(gomock.Any(), "token.X4").Return(fakeClient, nil)
 
-			testVaultAWSConf.EXPECT().GenerateCreds("token.X4", gomock.Any()).
+			testVaultAWSConf.EXPECT().GenerateAWSCreds("token.X4", gomock.Any()).
 				Return(&vault.AWSCredentials{AccessKeyID: "AWS_KEY_ABCD1234", SecretAccessKey: "secret", Token: "token"}, nil)
+			testVaultAWSConf.EXPECT().GenerateGCPToken("token.X4", gomock.Any()).
+				Return("ya29.c.c0ASRK0GZ2fzoXHQakYwhwQhSJZ3gFQT5V0Ro_E94zL3fo", nil)
 
 			By("By making sure job was sent to jobQueue when commit hash is changed")
 			Eventually(func() string {
@@ -476,6 +489,9 @@ var _ = Describe("Module controller with Runner", func() {
 			}, time.Second*30, interval).Should(Not(Equal("Running")))
 
 			Expect(fetchedModule.Status.CurrentState).Should(Equal(string(tfaplv1beta1.StatusOk)))
+
+			// runner does clean up before updating redis
+			time.Sleep(5 * time.Second)
 
 			// make sure all values are there in output
 			Expect(lastRun.Output).Should(ContainSubstring("AWS_KEY_ABCD1234"))

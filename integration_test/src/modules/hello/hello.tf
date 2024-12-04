@@ -85,6 +85,16 @@ resource "null_resource" "echo_AWS_KEY" {
   ]
 }
 
+resource "null_resource" "verify_gcp_token" {
+  provisioner "local-exec" {
+    command = "if wget -q -O - https://oauth2.googleapis.com/tokeninfo?access_token=$GOOGLE_OAUTH_ACCESS_TOKEN; then echo success; else echo fail; fi"
+  }
+
+  depends_on = [
+    null_resource.echo_AWS_KEY
+  ]
+}
+
 resource "null_resource" "slow_provider" {
   provisioner "local-exec" {
     command = "echo progressing...;sleep ${var.sleep};echo done"

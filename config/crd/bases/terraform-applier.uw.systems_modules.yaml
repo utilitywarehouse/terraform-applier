@@ -3,7 +3,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.16.4
+    controller-gen.kubebuilder.io/version: v0.16.5
   name: modules.terraform-applier.uw.systems
 spec:
   group: terraform-applier.uw.systems
@@ -340,6 +340,28 @@ spec:
                         type: string
                     required:
                     - vaultRole
+                    type: object
+                  gcp:
+                    description: |-
+                      gcp specifies vault credential generation request for GCP secrets engine
+                      If specified, controller will request OAuth2 access token and
+                      sets GOOGLE_OAUTH_ACCESS_TOKEN envs during terraform runs
+                      'VAULT_AWS_ENG_PATH' env set on controller will be used as credential path
+                      one of roleset, staticAccount or impersonatedAccount must be set
+                    properties:
+                      impersonatedAccount:
+                        description: impersonatedAccount Specifies the name of the
+                          impersonated account to generate access_token under.
+                        type: string
+                      roleset:
+                        description: roleset Specifies the name of an roleset with
+                          secret type access_token to generate access_token under.
+                        type: string
+                      staticAccount:
+                        description: staticAccount Specifies the name name of the
+                          static account with secret type access_token to generate
+                          access_token under.
+                        type: string
                     type: object
                 type: object
             required:
