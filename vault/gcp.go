@@ -1,14 +1,16 @@
 package vault
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
+	"github.com/hashicorp/vault/api"
 	tfaplv1beta1 "github.com/utilitywarehouse/terraform-applier/api/v1beta1"
 )
 
 // GenerateCreds retrieves credentials from vault for the given vaulRole and aws role
-func (p *Provider) GenerateGCPToken(jwt string, gcpReq *tfaplv1beta1.VaultGCPRequest) (string, error) {
+func (p *Provider) GenerateGCPToken(ctx context.Context, jwt string, gcpReq *tfaplv1beta1.VaultGCPRequest) (string, error) {
 
 	if gcpReq == nil {
 		return "", fmt.Errorf("one of 'roleset', 'staticAccount' or 'impersonatedAccount' must be set to generate GCP access_token")
@@ -32,23 +34,34 @@ func (p *Provider) GenerateGCPToken(jwt string, gcpReq *tfaplv1beta1.VaultGCPReq
 		return "", fmt.Errorf("one of 'roleset', 'staticAccount' or 'impersonatedAccount' must be set to generate GCP access_token")
 	}
 
-	// get vault client and login using provided service account's jwt
-	client, err := newClient()
-	if err != nil {
+	var secret *api.Secret
+	tryRead := func(ctx context.Context) error {
+
+		// get vault client and login using provided service account's jwt
+		// create new client to hot reload CA Cert
+		client, err := newClient()
+		if err != nil {
+			return err
+		}
+
+		// when https://github.com/utilitywarehouse/vault-kube-cloud-credentials is used
+		// to create vault secret then the name of the auth role is same as vault secret role/account name.
+		err = login(client, p.AuthPath, jwt, vaultAccount)
+		if err != nil {
+			return err
+		}
+
+		secret, err = client.Logical().Read(path)
+		if err != nil {
+			return err
+		}
+		return nil
+	}
+
+	if err := callWithBackOff(ctx, tryRead); err != nil {
 		return "", err
 	}
 
-	// when https://github.com/utilitywarehouse/vault-kube-cloud-credentials is used
-	// to create vault secret then the name of the auth role is same as vault secret role/account name.
-	err = login(client, p.AuthPath, jwt, vaultAccount)
-	if err != nil {
-		return "", err
-	}
-
-	secret, err := client.Logical().Read(path)
-	if err != nil {
-		return "", err
-	}
 	if secret == nil {
 		return "", errors.New("secret returned by vault client is nil")
 	}

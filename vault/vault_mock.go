@@ -5,6 +5,7 @@
 package vault
 
 import (
+	context "context"
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
@@ -35,31 +36,31 @@ func (m *MockProviderInterface) EXPECT() *MockProviderInterfaceMockRecorder {
 }
 
 // GenerateAWSCreds mocks base method.
-func (m *MockProviderInterface) GenerateAWSCreds(arg0 string, arg1 *v1beta1.VaultAWSRequest) (*AWSCredentials, error) {
+func (m *MockProviderInterface) GenerateAWSCreds(arg0 context.Context, arg1 string, arg2 *v1beta1.VaultAWSRequest) (*AWSCredentials, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GenerateAWSCreds", arg0, arg1)
+	ret := m.ctrl.Call(m, "GenerateAWSCreds", arg0, arg1, arg2)
 	ret0, _ := ret[0].(*AWSCredentials)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GenerateAWSCreds indicates an expected call of GenerateAWSCreds.
-func (mr *MockProviderInterfaceMockRecorder) GenerateAWSCreds(arg0, arg1 interface{}) *gomock.Call {
+func (mr *MockProviderInterfaceMockRecorder) GenerateAWSCreds(arg0, arg1, arg2 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GenerateAWSCreds", reflect.TypeOf((*MockProviderInterface)(nil).GenerateAWSCreds), arg0, arg1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GenerateAWSCreds", reflect.TypeOf((*MockProviderInterface)(nil).GenerateAWSCreds), arg0, arg1, arg2)
 }
 
 // GenerateGCPToken mocks base method.
-func (m *MockProviderInterface) GenerateGCPToken(arg0 string, arg1 *v1beta1.VaultGCPRequest) (string, error) {
+func (m *MockProviderInterface) GenerateGCPToken(arg0 context.Context, arg1 string, arg2 *v1beta1.VaultGCPRequest) (string, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GenerateGCPToken", arg0, arg1)
+	ret := m.ctrl.Call(m, "GenerateGCPToken", arg0, arg1, arg2)
 	ret0, _ := ret[0].(string)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GenerateGCPToken indicates an expected call of GenerateGCPToken.
-func (mr *MockProviderInterfaceMockRecorder) GenerateGCPToken(arg0, arg1 interface{}) *gomock.Call {
+func (mr *MockProviderInterfaceMockRecorder) GenerateGCPToken(arg0, arg1, arg2 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GenerateGCPToken", reflect.TypeOf((*MockProviderInterface)(nil).GenerateGCPToken), arg0, arg1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GenerateGCPToken", reflect.TypeOf((*MockProviderInterface)(nil).GenerateGCPToken), arg0, arg1, arg2)
 }
