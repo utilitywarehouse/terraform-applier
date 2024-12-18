@@ -108,9 +108,9 @@ func fetchEnvVars(ctx context.Context, client kubernetes.Interface, module *tfap
 	return kvPairs, nil
 }
 
-func (r *Runner) generateVaultAWSCreds(module *tfaplv1beta1.Module, jwt string, envs map[string]string) error {
+func (r *Runner) generateVaultAWSCreds(ctx context.Context, module *tfaplv1beta1.Module, jwt string, envs map[string]string) error {
 
-	creds, err := r.Vault.GenerateAWSCreds(jwt, module.Spec.VaultRequests.AWS)
+	creds, err := r.Vault.GenerateAWSCreds(ctx, jwt, module.Spec.VaultRequests.AWS)
 	if err != nil {
 		return err
 	}
@@ -120,9 +120,9 @@ func (r *Runner) generateVaultAWSCreds(module *tfaplv1beta1.Module, jwt string, 
 	return nil
 }
 
-func (r *Runner) generateVaultGCPToken(module *tfaplv1beta1.Module, jwt string, envs map[string]string) error {
+func (r *Runner) generateVaultGCPToken(ctx context.Context, module *tfaplv1beta1.Module, jwt string, envs map[string]string) error {
 
-	token, err := r.Vault.GenerateGCPToken(jwt, module.Spec.VaultRequests.GCP)
+	token, err := r.Vault.GenerateGCPToken(ctx, jwt, module.Spec.VaultRequests.GCP)
 	if err != nil {
 		return err
 	}

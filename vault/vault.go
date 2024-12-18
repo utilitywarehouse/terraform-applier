@@ -1,17 +1,21 @@
 package vault
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"os"
+	"time"
 
 	vaultapi "github.com/hashicorp/vault/api"
 	tfaplv1beta1 "github.com/utilitywarehouse/terraform-applier/api/v1beta1"
+	"k8s.io/apimachinery/pkg/util/wait"
 )
 
 //go:generate go run github.com/golang/mock/mockgen -package vault -destination vault_mock.go github.com/utilitywarehouse/terraform-applier/vault ProviderInterface
 type ProviderInterface interface {
-	GenerateAWSCreds(jwt string, awsReq *tfaplv1beta1.VaultAWSRequest) (*AWSCredentials, error)
-	GenerateGCPToken(jwt string, gcpReq *tfaplv1beta1.VaultGCPRequest) (string, error)
+	GenerateAWSCreds(ctx context.Context, jwt string, awsReq *tfaplv1beta1.VaultAWSRequest) (*AWSCredentials, error)
+	GenerateGCPToken(ctx context.Context, jwt string, gcpReq *tfaplv1beta1.VaultGCPRequest) (string, error)
 }
 
 type Provider struct {
@@ -74,4 +78,47 @@ func login(client *vaultapi.Client, kubeAuthPath, jwt, authRole string) error {
 	client.SetToken(secret.Auth.ClientToken)
 
 	return nil
+}
+
+var retriableError = func(err error) bool {
+	var respErr *vaultapi.ResponseError
+	if errors.As(err, &respErr) {
+		//https://developer.hashicorp.com/vault/api-docs#http-status-codes
+		if respErr.StatusCode == 400 ||
+			respErr.StatusCode == 403 ||
+			respErr.StatusCode == 404 {
+			return false
+		}
+	}
+	// re-try on all other error
+	return true
+}
+
+// callWithBackOff uses wait.ExponentialBackoffWithContext to call given function exponentially
+// on recoverable error
+func callWithBackOff(ctx context.Context, fn func(ctx context.Context) error) error {
+
+	var retry = wait.Backoff{
+		Steps:    5,
+		Duration: 5 * time.Second,
+		Factor:   2,
+		Jitter:   0.5,
+	}
+
+	var apiErr error
+	err := wait.ExponentialBackoffWithContext(ctx, retry, func(ctx context.Context) (bool, error) {
+		apiErr = fn(ctx)
+		switch {
+		case apiErr == nil:
+			return true, nil
+		case retriableError(apiErr):
+			return false, nil
+		default:
+			return false, apiErr
+		}
+	})
+	if wait.Interrupted(err) {
+		err = apiErr
+	}
+	return err
 }

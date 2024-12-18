@@ -256,7 +256,7 @@ func (r *Runner) process(run *tfaplv1beta1.Run, cancelChan <-chan struct{}, envs
 
 	if module.Spec.VaultRequests != nil {
 		if module.Spec.VaultRequests.AWS != nil {
-			err = r.generateVaultAWSCreds(module, jwt, envs)
+			err = r.generateVaultAWSCreds(ctx, module, jwt, envs)
 			if err != nil {
 				msg := fmt.Sprintf("unable to generate vault aws secrets: err:%s", err)
 				log.Error(msg)
@@ -266,7 +266,7 @@ func (r *Runner) process(run *tfaplv1beta1.Run, cancelChan <-chan struct{}, envs
 		}
 
 		if module.Spec.VaultRequests.GCP != nil {
-			err = r.generateVaultGCPToken(module, jwt, envs)
+			err = r.generateVaultGCPToken(ctx, module, jwt, envs)
 			if err != nil {
 				msg := fmt.Sprintf("unable to generate vault gcp access token: err:%s", err)
 				log.Error(msg)
