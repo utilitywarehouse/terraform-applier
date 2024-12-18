@@ -55,7 +55,7 @@ func (p *Planner) Init(ctx context.Context, token string, ch <-chan *redis.Messa
 
 func (p *Planner) StartPRPoll(ctx context.Context) {
 	p.Log.Info("starting PR Poller")
-	defer p.Log.Info("stopping PR Poller")
+	defer p.Log.Error("stopping PR Poller")
 
 	ticker := time.NewTicker(p.Interval)
 	defer ticker.Stop()

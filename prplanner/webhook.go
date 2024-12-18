@@ -19,6 +19,8 @@ func (p *Planner) startWebhook() {
 	if err := http.ListenAndServe(p.ListenAddress, nil); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		p.Log.Error("unable to start server", "err", err)
 	}
+
+	p.Log.Error("webhook listener stopped")
 }
 
 func (p *Planner) handleWebhook(w http.ResponseWriter, r *http.Request) {
