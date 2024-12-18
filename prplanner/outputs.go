@@ -43,7 +43,7 @@ func (p *Planner) uploadRequestOutput(ctx context.Context, pr *pr) {
 			p.Log.Error("error posting PR comment:", "error", err)
 			continue
 		}
-		p.Log.Info("run output posted", "module", moduleNamespacedName, "pr", pr)
+		p.Log.Info("run output uploaded", "module", moduleNamespacedName, "pr", pr)
 	}
 }
 
