@@ -49,7 +49,7 @@ func (p *Planner) uploadRequestOutput(ctx context.Context, pr *pr) {
 
 func (p *Planner) processRedisKeySetMsg(ctx context.Context, ch <-chan *redis.Message) {
 	p.Log.Info("starting redis update watcher")
-	defer p.Log.Info("stopping redis update watcher")
+	defer p.Log.Error("stopping redis update watcher")
 
 	for msg := range ch {
 		// make sure we only process `set` keyevent
