@@ -28,6 +28,9 @@ var staticFiles embed.FS
 //go:embed templates/status.html
 var statusHTML string
 
+//go:embed templates/module.html
+var moduleHTML string
+
 var log *slog.Logger
 
 // WebServer struct
@@ -79,7 +82,7 @@ func (s *StatusPageHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result := createNamespaceMap(r.Context(), modules, s.Redis)
+	result := createNamespaceMap(modules)
 
 	if err := s.Template.ExecuteTemplate(w, "index", result); err != nil {
 		http.Error(w, "Error: Unable to execute HTML template", http.StatusInternalServerError)
@@ -87,6 +90,61 @@ func (s *StatusPageHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.Log.Log(r.Context(), trace, "Request completed successfully")
+}
+
+// ModulePageHandler implements the http.Handler interface and serves a module info page with run outputs.
+type ModulePageHandler struct {
+	Template      *template.Template
+	Authenticator *oidc.Authenticator
+	ClusterClt    client.Client
+	Redis         sysutil.RedisInterface
+	Log           *slog.Logger
+}
+
+// ServeHTTP populates the status page template with data and serves it when there is a request.
+func (m *ModulePageHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if m.Authenticator != nil {
+		_, err := m.Authenticator.Authenticate(r.Context(), w, r)
+		if errors.Is(err, oidc.ErrRedirectRequired) {
+			return
+		}
+		if err != nil {
+			http.Error(w, "Error: Authentication failed", http.StatusInternalServerError)
+			m.Log.Error("Authentication failed", "error", err)
+			return
+		}
+	}
+
+	if m.Template == nil {
+		http.Error(w, "Error: Unable to load HTML template", http.StatusInternalServerError)
+		m.Log.Error("Request failed, no template found")
+		return
+	}
+
+	payload, err := parseBody(r.Body)
+	if err != nil {
+		m.Log.Error("error parsing request", "error", err)
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	namespacedName := types.NamespacedName{
+		Namespace: payload["namespace"],
+		Name:      payload["module"],
+	}
+
+	module, err := moduleWithRunsInfo(r.Context(), m.ClusterClt, m.Redis, namespacedName)
+	if err != nil {
+		http.Error(w, "Error: unable to get modules", http.StatusInternalServerError)
+		log.Error("unable to get modules", "err", err)
+		return
+	}
+
+	if err := m.Template.ExecuteTemplate(w, "module", module); err != nil {
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		log.Error("Unable to execute HTML template", "err", err)
+		return
+	}
 }
 
 // ForceRunHandler implements the http.Handle interface and serves an API
@@ -136,29 +194,11 @@ func (f *ForceRunHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	payload := map[string]string{}
-
-	body, err := io.ReadAll(r.Body)
+	payload, err := parseBody(r.Body)
 	if err != nil {
 		data.Result = "error"
-		data.Message = "unable to read body"
+		data.Message = "error parsing request"
 		f.Log.Error(data.Message, "error", err)
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-
-	if err := json.Unmarshal(body, &payload); err != nil {
-		data.Result = "error"
-		data.Message = "unable to parse body"
-		f.Log.Error(data.Message, "error", err)
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-
-	if payload["namespace"] == "" || payload["module"] == "" {
-		data.Result = "error"
-		data.Message = "namespace and module name required"
-		f.Log.Error(data.Message)
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -252,13 +292,36 @@ func (f *ForceRunHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func parseBody(respBody io.ReadCloser) (map[string]string, error) {
+	payload := map[string]string{}
+
+	body, err := io.ReadAll(respBody)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := json.Unmarshal(body, &payload); err != nil {
+		return nil, err
+	}
+
+	if payload["namespace"] == "" || payload["module"] == "" {
+		return nil, fmt.Errorf("namespace and module name required")
+	}
+
+	return payload, nil
+}
+
 // Start starts the webserver using the given port, and sets up handlers for:
 // 1. Status page
 // 2. Static content
 func (ws *WebServer) Start(ctx context.Context) error {
 	ws.Log.Info("Launching webserver")
 
-	template, err := createTemplate(statusHTML)
+	statusTempt, err := createTemplate(statusHTML)
+	if err != nil {
+		return err
+	}
+	moduleTempt, err := createTemplate(moduleHTML)
 	if err != nil {
 		return err
 	}
@@ -266,7 +329,14 @@ func (ws *WebServer) Start(ctx context.Context) error {
 	m := mux.NewRouter()
 	addStatusEndpoints(m)
 	statusPageHandler := &StatusPageHandler{
-		template,
+		statusTempt,
+		ws.Authenticator,
+		ws.ClusterClt,
+		ws.Redis,
+		ws.Log,
+	}
+	modulePageHandler := &ModulePageHandler{
+		moduleTempt,
 		ws.Authenticator,
 		ws.ClusterClt,
 		ws.Redis,
@@ -281,6 +351,7 @@ func (ws *WebServer) Start(ctx context.Context) error {
 	}
 	m.PathPrefix("/static/").Handler(http.FileServer(http.FS(staticFiles)))
 	m.PathPrefix("/api/v1/forceRun").Handler(forceRunHandler)
+	m.PathPrefix("/module").Handler(modulePageHandler)
 	m.PathPrefix("/").Handler(statusPageHandler)
 
 	return http.ListenAndServe(ws.ListenAddress, m)

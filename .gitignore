@@ -4,5 +4,5 @@ terraform-applier
 bin
 # test state files
 *.tfstate
-webserver/index.html
+webserver/testRenders
 plugin-cache-main
