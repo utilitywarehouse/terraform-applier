@@ -24,6 +24,27 @@ func getMetaTime(h, m, s int) *metav1.Time {
 }
 
 func Test_ExecuteTemplate(t *testing.T) {
+	statusHTML, err := os.ReadFile("templates/status.html")
+	if err != nil {
+		t.Errorf("error reading template: %v\n", err)
+		return
+	}
+	statusTempt, err := createTemplate(string(statusHTML))
+	if err != nil {
+		t.Errorf("error parsing template: %v\n", err)
+		return
+	}
+	moduleHTML, err := os.ReadFile("templates/module.html")
+	if err != nil {
+		t.Errorf("error reading template: %v\n", err)
+		return
+	}
+	moduleTempt, err := createTemplate(string(moduleHTML))
+	if err != nil {
+		t.Errorf("error parsing template: %v\n", err)
+		return
+	}
+
 	testRedis := sysutil.NewMockRedisInterface(gomock.NewController(t))
 
 	modules := []tfaplv1beta1.Module{
@@ -298,30 +319,36 @@ Plan: 7 to add, 0 to change, 0 to destroy.`,
 			}
 		}).AnyTimes()
 
-	result := createNamespaceMap(context.Background(), modules, testRedis)
-
-	statusHTML, err := os.ReadFile("templates/status.html")
-	if err != nil {
-		t.Errorf("error reading template: %v\n", err)
-		return
-	}
-
-	templt, err := createTemplate(string(statusHTML))
-	if err != nil {
-		t.Errorf("error parsing template: %v\n", err)
-		return
-	}
+	result := createNamespaceMap(modules)
 
 	rendered := &bytes.Buffer{}
-	err = templt.ExecuteTemplate(rendered, "index", result)
+	err = statusTempt.ExecuteTemplate(rendered, "index", result)
 	if err != nil {
 		t.Errorf("error executing template: %v\n", err)
 		return
 	}
 
 	// open index.html in browser to view test output
-	if err := os.WriteFile("index.html", rendered.Bytes(), 0666); err != nil {
+	if err := os.WriteFile("testRenders/index.html", rendered.Bytes(), 0666); err != nil {
 		t.Errorf("error reading test file:  %v\n", err)
 		return
+	}
+
+	for i, m := range modules {
+		module := &Module{Module: m}
+		module.Runs = runInfo(context.Background(), testRedis, m.NamespacedName())
+
+		rendered := &bytes.Buffer{}
+		err = moduleTempt.ExecuteTemplate(rendered, "module", module)
+		if err != nil {
+			t.Errorf("error executing template: %v\n", err)
+			return
+		}
+
+		// open index.html in browser to view test output
+		if err := os.WriteFile(fmt.Sprintf("testRenders/module%d.html", i), rendered.Bytes(), 0666); err != nil {
+			t.Errorf("error reading test file:  %v\n", err)
+			return
+		}
 	}
 }
