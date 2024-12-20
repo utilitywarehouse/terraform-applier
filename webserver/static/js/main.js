@@ -68,13 +68,15 @@ function forceRun(namespace, module, planOnly) {
       planOnly: planOnly,
     }),
   })
-    .then((response) => response.json())
-    .then((data) => {
-      if (data.result == "success") {
-        showForceAlert(true, data.message)
-      } else {
-        showForceAlert(false, data.message)
+    .then(function (resp) {
+      if (!resp.ok) {
+        return resp.text().then(text => { throw new Error(text) })
       }
+      return resp.text();
+    })
+    .then((msg) => {
+
+      showForceAlert(true, msg)
 
       setForcedButtonDisabled(false)
 
@@ -84,7 +86,7 @@ function forceRun(namespace, module, planOnly) {
     .catch((err) => {
       showForceAlert(
         false,
-        "Error: " + err + "<br/>See container logs for more info."
+        err + "<br/>Check terraform-applier logs for more info."
       )
       setForcedButtonDisabled(true)
     })
@@ -118,8 +120,11 @@ function loadModule(namespace, module) {
       module: module
     }),
   })
-    .then(function (data) {
-      return data.text();
+    .then(function (resp) {
+      if (!resp.ok) {
+        return resp.text().then(text => { throw new Error(text) })
+      }
+      return resp.text();
     })
     .then((html) => {
       // update module template 
@@ -144,7 +149,7 @@ function loadModule(namespace, module) {
     .catch((err) => {
       showForceAlert(
         false,
-        "Error: " + err + "<br/>See container logs for more info."
+        err + "<br/>Check terraform-applier logs for more info."
       )
     })
 }
