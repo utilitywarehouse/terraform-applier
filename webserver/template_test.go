@@ -329,8 +329,8 @@ Plan: 7 to add, 0 to change, 0 to destroy.`,
 	}
 
 	// open index.html in browser to view test output
-	if err := os.WriteFile("testRenders/index.html", rendered.Bytes(), 0666); err != nil {
-		t.Errorf("error reading test file:  %v\n", err)
+	if err := os.WriteFile("test-data/index.html", rendered.Bytes(), 0666); err != nil {
+		t.Errorf("error writing test file:  %v\n", err)
 		return
 	}
 
@@ -346,8 +346,8 @@ Plan: 7 to add, 0 to change, 0 to destroy.`,
 		}
 
 		// open index.html in browser to view test output
-		if err := os.WriteFile(fmt.Sprintf("testRenders/module%d.html", i), rendered.Bytes(), 0666); err != nil {
-			t.Errorf("error reading test file:  %v\n", err)
+		if err := os.WriteFile(fmt.Sprintf("test-data/module%d.html", i), rendered.Bytes(), 0666); err != nil {
+			t.Errorf("error writing test file:  %v\n", err)
 			return
 		}
 	}
