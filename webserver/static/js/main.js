@@ -77,6 +77,9 @@ function forceRun(namespace, module, planOnly) {
       }
 
       setForcedButtonDisabled(false)
+
+      // load module after 10sec to update status
+      setTimeout(function () { reLoadModule(namespace, module) }, 10000);
     })
     .catch((err) => {
       showForceAlert(
@@ -87,9 +90,23 @@ function forceRun(namespace, module, planOnly) {
     })
 }
 
+function reLoadModule(namespace, module) {
+  // since this function is called recursively after wait its important to check if module 
+  // is still loaded.
+  if (document.getElementById("module-info").firstElementChild) {
+    const values = document.getElementById("module-info").firstElementChild.id.split("_")
+    if (values.length != 2 || values[0] !== namespace || values[1] !== module) {
+      return
+    }
+  }
+
+  return loadModule(namespace, module)
+}
+
 // Send an XHR request to the server to get module info including run outputs
 function loadModule(namespace, module) {
-  console.log("requesting module...", namespace, module)
+  closeOpenAlert()
+
   url = window.location.origin + "/module"
 
   fetch(url, {
@@ -117,7 +134,10 @@ function loadModule(namespace, module) {
       listStatusElm.innerText = state
       listStatusElm.setAttribute("module-state", state);
 
-      closeOpenAlert()
+      if (state === "Running") {
+        // re-load module after 10sec to update status
+        setTimeout(function () { reLoadModule(namespace, module) }, 10000);
+      }
     })
     .catch((err) => {
       showForceAlert(
