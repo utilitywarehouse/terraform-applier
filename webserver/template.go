@@ -28,7 +28,7 @@ func createTemplate(statusHTML string) (*template.Template, error) {
 
 // sanitizedUniqueName will return namespaceName with - instead of /
 func sanitizedUniqueName(m types.NamespacedName) string {
-	return m.Namespace + "-" + m.Name
+	return m.Namespace + "_" + m.Name
 }
 
 // FormattedTime returns the Time in the format "YYYY-MM-DD hh:mm:ss -0000 GMT"
