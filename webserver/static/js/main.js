@@ -134,6 +134,8 @@ function loadModule(namespace, module) {
       listStatusElm.innerText = state
       listStatusElm.setAttribute("module-state", state);
 
+      Prism.highlightAll();
+
       if (state === "Running") {
         // re-load module after 10sec to update status
         setTimeout(function () { reLoadModule(namespace, module) }, 10000);
