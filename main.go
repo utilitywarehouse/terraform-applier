@@ -776,16 +776,6 @@ func run(c *cli.Context) {
 			Log:            logger.With("logger", "pr-planner"),
 		}
 
-		// setup  Key event notifications for 'String' commands
-		// K     Keyspace events, published with __keyspace@<db>__ prefix.
-		// E     Keyevent events, published with __keyevent@<db>__ prefix.
-		// $     String commands
-		err := rdb.ConfigSet(ctx, "notify-keyspace-events", "E$").Err()
-		if err != nil {
-			logger.Error("unable to set notify-keyspace-events config", "error", err)
-			os.Exit(1)
-		}
-
 		// setup subscription for key set
 		sub := rdb.Subscribe(ctx, "__keyevent@0__:set")
 		_, err = sub.Receive(ctx)
