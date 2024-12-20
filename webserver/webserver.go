@@ -31,8 +31,6 @@ var statusHTML string
 //go:embed templates/module.html
 var moduleHTML string
 
-var log *slog.Logger
-
 // WebServer struct
 type WebServer struct {
 	ListenAddress string
@@ -63,30 +61,30 @@ func (s *StatusPageHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if err != nil {
-			http.Error(w, "Error: Authentication failed", http.StatusInternalServerError)
+			http.Error(w, "Authentication failed", http.StatusInternalServerError)
 			s.Log.Error("Authentication failed", "error", err)
 			return
 		}
 	}
 
 	if s.Template == nil {
-		http.Error(w, "Error: Unable to load HTML template", http.StatusInternalServerError)
-		log.Error("Request failed, no template found")
+		http.Error(w, "Unable to load HTML template", http.StatusInternalServerError)
+		s.Log.Error("Request failed, no template found")
 		return
 	}
 
 	modules, err := listModules(r.Context(), s.ClusterClt)
 	if err != nil {
-		http.Error(w, "Error: Unable to get modules", http.StatusInternalServerError)
-		log.Error("Request failed", "err", err)
+		http.Error(w, "unable to get modules", http.StatusInternalServerError)
+		s.Log.Error("Request failed", "err", err)
 		return
 	}
 
 	result := createNamespaceMap(modules)
 
 	if err := s.Template.ExecuteTemplate(w, "index", result); err != nil {
-		http.Error(w, "Error: Unable to execute HTML template", http.StatusInternalServerError)
-		log.Error("Request failed", "err", err)
+		http.Error(w, "Unable to execute HTML template", http.StatusInternalServerError)
+		s.Log.Error("Request failed", "err", err)
 		return
 	}
 	s.Log.Log(r.Context(), trace, "Request completed successfully")
@@ -109,14 +107,14 @@ func (m *ModulePageHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if err != nil {
-			http.Error(w, "Error: Authentication failed", http.StatusInternalServerError)
+			http.Error(w, "Authentication failed", http.StatusInternalServerError)
 			m.Log.Error("Authentication failed", "error", err)
 			return
 		}
 	}
 
 	if m.Template == nil {
-		http.Error(w, "Error: Unable to load HTML template", http.StatusInternalServerError)
+		http.Error(w, "Unable to load HTML template", http.StatusInternalServerError)
 		m.Log.Error("Request failed, no template found")
 		return
 	}
@@ -135,14 +133,14 @@ func (m *ModulePageHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	module, err := moduleWithRunsInfo(r.Context(), m.ClusterClt, m.Redis, namespacedName)
 	if err != nil {
-		http.Error(w, "Error: unable to get modules", http.StatusInternalServerError)
-		log.Error("unable to get modules", "err", err)
+		http.Error(w, "unable to get modules", http.StatusInternalServerError)
+		m.Log.Error("unable to get modules", "err", err)
 		return
 	}
 
 	if err := m.Template.ExecuteTemplate(w, "module", module); err != nil {
 		http.Error(w, "internal server error", http.StatusInternalServerError)
-		log.Error("Unable to execute HTML template", "err", err)
+		m.Log.Error("Unable to execute HTML template", "err", err)
 		return
 	}
 }
@@ -161,20 +159,9 @@ type ForceRunHandler struct {
 // runQueue, and writes a response including the result and a relevant message.
 func (f *ForceRunHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	f.Log.Debug("force run requested")
-	var data struct {
-		Result  string `json:"result"`
-		Message string `json:"message"`
-	}
-
-	defer func() {
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(data)
-	}()
 
 	if r.Method != "POST" {
-		data.Result = "error"
-		data.Message = "must be a POST request"
-		w.WriteHeader(http.StatusBadRequest)
+		http.Error(w, "must be a POST request", http.StatusBadRequest)
 		return
 	}
 
@@ -186,20 +173,16 @@ func (f *ForceRunHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if f.Authenticator != nil {
 		user, err = f.Authenticator.UserInfo(r.Context(), r)
 		if err != nil {
-			data.Result = "error"
-			data.Message = "not authenticated"
-			f.Log.Error(data.Message, "error", err)
-			w.WriteHeader(http.StatusForbidden)
+			f.Log.Error("not authenticated", "error", err)
+			http.Error(w, "not authenticated", http.StatusForbidden)
 			return
 		}
 	}
 
 	payload, err := parseBody(r.Body)
 	if err != nil {
-		data.Result = "error"
-		data.Message = "error parsing request"
-		f.Log.Error(data.Message, "error", err)
-		w.WriteHeader(http.StatusBadRequest)
+		f.Log.Error("error parsing request", "error", err)
+		http.Error(w, "error parsing request", http.StatusBadRequest)
 		return
 	}
 
@@ -211,10 +194,9 @@ func (f *ForceRunHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	var module tfaplv1beta1.Module
 	err = f.ClusterClt.Get(r.Context(), namespacedName, &module)
 	if err != nil {
-		data.Result = "error"
-		data.Message = fmt.Sprintf("cannot find module '%s'", namespacedName)
-		f.Log.Error(data.Message, "error", err)
-		w.WriteHeader(http.StatusBadRequest)
+		message := fmt.Sprintf("cannot find module '%s'", namespacedName)
+		f.Log.Error(message, "error", err)
+		http.Error(w, message, http.StatusBadRequest)
 		return
 	}
 
@@ -223,29 +205,25 @@ func (f *ForceRunHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if f.Authenticator != nil {
 		// this should not happen but just in case
 		if user == nil {
-			data.Result = "error"
-			data.Message = "logged in user's details not found"
-			f.Log.Error(data.Message, "module", namespacedName)
-			w.WriteHeader(http.StatusForbidden)
+			f.Log.Error("logged in user's details not found", "module", namespacedName)
+			http.Error(w, "logged in user's details not found", http.StatusForbidden)
 			return
 		}
 
 		// just to give useful error message to user
 		if len(module.Spec.RBAC) == 0 {
-			data.Result = "error"
-			data.Message = fmt.Sprintf("force run is not allowed because RBAC is not set on module %s", namespacedName)
 			f.Log.Error("RBAC is not set", "module", namespacedName)
-			w.WriteHeader(http.StatusForbidden)
+			http.Error(w, "force run is not allowed because RBAC is not set on module", http.StatusForbidden)
 			return
 		}
 
 		// check if logged in user allowed to do force run on the module
 		hasAccess := tfaplv1beta1.CanForceRun(user.Email, user.Groups, &module)
 		if !hasAccess {
-			data.Result = "error"
-			data.Message = fmt.Sprintf("user %s is not allowed to force run module %s", user.Email, namespacedName)
 			f.Log.Error("force run denied", "module", namespacedName, "user", user.Email)
-			w.WriteHeader(http.StatusForbidden)
+			http.Error(w,
+				fmt.Sprintf("user %s is not allowed to force run module", user.Email),
+				http.StatusForbidden)
 			return
 		}
 
@@ -255,10 +233,8 @@ func (f *ForceRunHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// make sure module is not already running
 	_, ok := f.RunStatus.Load(namespacedName.String())
 	if ok {
-		data.Result = "error"
-		data.Message = fmt.Sprintf("module %s is currently running", namespacedName)
 		f.Log.Error("force run rejected as module is already running", "module", namespacedName)
-		w.WriteHeader(http.StatusBadRequest)
+		http.Error(w, "module is currently running", http.StatusBadRequest)
 		return
 	}
 
@@ -272,22 +248,18 @@ func (f *ForceRunHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	err = sysutil.EnsureRequest(r.Context(), f.ClusterClt, module.NamespacedName(), req)
 	switch {
 	case err == nil:
-		data.Result = "success"
-		data.Message = "Run queued"
 		f.Log.Info("force run requested", "module", namespacedName, "req", req)
-		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, "Run queued")
 		return
 	case errors.Is(err, tfaplv1beta1.ErrRunRequestExist):
-		data.Result = "error"
-		data.Message = "Unable to request run as another request is pending"
 		f.Log.Error("unable to request force run", "module", namespacedName, "err", err)
-		w.WriteHeader(http.StatusConflict)
+		http.Error(w,
+			"Unable to request run as another request is pending",
+			http.StatusConflict)
 		return
 	default:
-		data.Result = "error"
-		data.Message = "internal error"
 		f.Log.Error("unable to request force run", "module", namespacedName, "err", err)
-		w.WriteHeader(http.StatusInternalServerError)
+		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 }
