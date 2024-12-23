@@ -54,8 +54,6 @@ function forceRun(namespace, module, planOnly) {
   // Disable the buttons and close existing alert
   setForcedButtonDisabled(true)
 
-  closeOpenAlert()
-
   url = window.location.origin + "/api/v1/forceRun"
 
   fetch(url, {
@@ -107,7 +105,17 @@ function reLoadModule(namespace, module) {
 
 // Send an XHR request to the server to get module info including run outputs
 function loadModule(namespace, module) {
-  closeOpenAlert()
+  const moduleElm = document.getElementById("module-info")
+
+  moduleElm.innerHTML = `
+  <div class="card">
+    <div class="card-body">
+      <div class="d-flex align-items-center justify-content-center" style="color: #550091;">
+        <div class="spinner-border mx-4" role="status" aria-hidden="true"></div>
+        <strong>Loading...</strong>
+      </div>
+    </div>
+  </div>`
 
   url = window.location.origin + "/module"
 
@@ -128,7 +136,6 @@ function loadModule(namespace, module) {
     })
     .then((html) => {
       // update module template 
-      const moduleElm = document.getElementById("module-info")
       moduleElm.innerHTML = html;
 
       // get current state value to update state in modules list as well
@@ -147,10 +154,12 @@ function loadModule(namespace, module) {
       }
     })
     .catch((err) => {
-      showForceAlert(
-        false,
-        err + "<br/>Check terraform-applier logs for more info."
-      )
+      moduleElm.innerHTML = `
+      <div class="card">
+        <div class="card-body text-danger">`
+        + err + `<br/>Check terraform-applier logs for more info.
+        </div>
+      </div>`
     })
 }
 
@@ -166,6 +175,8 @@ function showForceAlert(success, message) {
   ].join("")
 
   alertPlaceholder.append(wrapper)
+  // auto close alert
+  setTimeout(function () { closeOpenAlert() }, 10000);
 }
 
 function closeOpenAlert() {
