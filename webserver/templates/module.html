@@ -2,8 +2,7 @@
 {{define "module"}}
 {{$m := .}}
 <div id="{{sanitizedUniqueName .Module.NamespacedName}}">
-    <div class='card {{if eq .Module.Status.CurrentState "Running"}}border-info{{end}}' class="d-none"
-        style="max-height: 90vh;">
+    <div class='card {{if eq .Module.Status.CurrentState "Running"}}border-info{{end}}' style="max-height: 90vh;">
         <div class="card-header bg-transparent">
             <div href="#{{ sanitizedUniqueName .Module.NamespacedName}}-info">
                 <div class="d-flex justify-content-between align-items-center mb-1">
