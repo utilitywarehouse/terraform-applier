@@ -3,7 +3,6 @@ package sysutil
 import (
 	"context"
 	"fmt"
-	"io"
 	"os"
 	"os/exec"
 	"path"
@@ -24,8 +23,6 @@ func RemoveAll(dir string) error {
 // CopyFile copies a file
 func CopyFile(src, dst string, withReplace bool) error {
 	var err error
-	var srcFileDescriptor *os.File
-	var dstFileDescriptor *os.File
 	var srcInfo os.FileInfo
 
 	if srcInfo, err = os.Stat(src); err != nil {
@@ -42,20 +39,8 @@ func CopyFile(src, dst string, withReplace bool) error {
 		}
 	}
 
-	if srcFileDescriptor, err = os.Open(src); err != nil {
-		return err
-	}
-	defer srcFileDescriptor.Close()
-
-	if dstFileDescriptor, err = os.Create(dst); err != nil {
-		return err
-	}
-	defer dstFileDescriptor.Close()
-
-	if _, err = io.Copy(dstFileDescriptor, srcFileDescriptor); err != nil {
-		return err
-	}
-	return os.Chmod(dst, srcInfo.Mode())
+	// create hard link to save cpu/mem/disk io
+	return os.Link(src, dst)
 }
 
 // CopyDir copies a dir recursively
