@@ -74,7 +74,7 @@ func (pcp *pluginCache) new() string {
 	pcp.RLock()
 	defer pcp.RUnlock()
 
-	if err := sysutil.CopyDir(ctx, pcp.main, tmpPC, true); err != nil {
+	if err := sysutil.CopyDirWithHardLinks(ctx, pcp.main, tmpPC); err != nil {
 		pcp.log.Error("unable to create copy providers to plugin cache dir", "err", err)
 		sysutil.RemoveAll(tmpPC)
 		return ""
@@ -94,7 +94,7 @@ func (pcp *pluginCache) done(tmpPC string) {
 	pcp.Lock()
 	defer pcp.Unlock()
 
-	if err := sysutil.CopyDir(ctx, tmpPC, pcp.main, false); err != nil {
+	if err := sysutil.CopyDirWithHardLinks(ctx, tmpPC, pcp.main); err != nil {
 		pcp.log.Error("unable to create copy tmp to main dir", "err", err)
 	}
 }

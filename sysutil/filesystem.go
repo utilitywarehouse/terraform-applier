@@ -20,8 +20,8 @@ func RemoveAll(dir string) error {
 	return cmd.Run()
 }
 
-// CopyFile copies a file
-func CopyFile(src, dst string, withReplace bool) error {
+// HardLinkFile creates hard link if dst doesn't exits
+func HardLinkFile(src, dst string) error {
 	var err error
 	var srcInfo os.FileInfo
 
@@ -29,22 +29,20 @@ func CopyFile(src, dst string, withReplace bool) error {
 		return err
 	}
 
-	if !withReplace {
-		// skip if dst file already exits
-		if dstInfo, err := os.Stat(dst); err == nil {
-			if srcInfo.Name() == dstInfo.Name() &&
-				srcInfo.Size() == dstInfo.Size() {
-				return nil
-			}
+	// skip if dst file already exits
+	if dstInfo, err := os.Stat(dst); err == nil {
+		if srcInfo.Name() == dstInfo.Name() {
+			return nil
 		}
 	}
 
-	// create hard link to save cpu/mem/disk io
+	// once plugin binary is downloaded it will not be modified hence
+	// we can use hard link instead of copy to save resources and time.
 	return os.Link(src, dst)
 }
 
-// CopyDir copies a dir recursively
-func CopyDir(ctx context.Context, src string, dst string, withReplace bool) error {
+// CopyDirWithHardLinks creates hard links of files from src recursively at dst
+func CopyDirWithHardLinks(ctx context.Context, src string, dst string) error {
 	var err error
 	var fileDescriptors []os.DirEntry
 	var srcInfo os.FileInfo
@@ -66,17 +64,12 @@ func CopyDir(ctx context.Context, src string, dst string, withReplace bool) erro
 		dstPath := path.Join(dst, fd.Name())
 
 		if fd.IsDir() {
-			if err := CopyDir(ctx, srcPath, dstPath, withReplace); err != nil {
+			if err := CopyDirWithHardLinks(ctx, srcPath, dstPath); err != nil {
 				return err
 			}
 		} else {
-			select {
-			case <-ctx.Done():
-				return ctx.Err()
-			default:
-				if err := CopyFile(srcPath, dstPath, withReplace); err != nil {
-					return err
-				}
+			if err := HardLinkFile(srcPath, dstPath); err != nil {
+				return err
 			}
 		}
 	}

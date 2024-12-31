@@ -48,7 +48,7 @@ func TestCopyDirWithReplace(t *testing.T) {
 	}
 
 	// Copy the directory.
-	err := CopyDir(context.TODO(), srcDir, dstDir, true)
+	err := CopyDirWithHardLinks(context.TODO(), srcDir, dstDir)
 	if err != nil {
 		t.Fatalf("error copying directory: %v", err)
 	}
@@ -123,7 +123,7 @@ func TestCopyDirWithoutReplace(t *testing.T) {
 	}
 
 	// Copy the directory.
-	err := CopyDir(context.TODO(), srcDir, dstDir, false)
+	err := CopyDirWithHardLinks(context.TODO(), srcDir, dstDir)
 	if err != nil {
 		t.Fatalf("error copying directory: %v", err)
 	}
