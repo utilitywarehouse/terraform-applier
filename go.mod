@@ -13,7 +13,7 @@ require (
 	github.com/hashicorp/hc-install v0.9.0
 	github.com/hashicorp/terraform-exec v0.21.0
 	github.com/hashicorp/vault/api v1.15.0
-	github.com/onsi/ginkgo/v2 v2.22.1
+	github.com/onsi/ginkgo/v2 v2.22.2
 	github.com/onsi/gomega v1.36.2
 	github.com/prometheus/client_golang v1.20.5
 	github.com/redis/go-redis/v9 v9.7.0
