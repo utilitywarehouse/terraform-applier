@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
+	"net/http"
 	"os"
 	"time"
 
@@ -31,6 +33,7 @@ func newClient() (*vaultapi.Client, error) {
 
 	var envCACert string
 	var envCAPath string
+	var envCACertBytes []byte
 
 	if v := os.Getenv(vaultapi.EnvVaultCACert); v != "" {
 		envCACert = v
@@ -40,11 +43,25 @@ func newClient() (*vaultapi.Client, error) {
 		envCAPath = v
 	}
 
+	if v := os.Getenv("VAULT_CAURL"); v != "" {
+		resp, err := http.Get(v)
+		if err != nil {
+			return nil, err
+		}
+		defer resp.Body.Close()
+
+		envCACertBytes, err = io.ReadAll(resp.Body)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	// use custom cert if set
-	if envCACert != "" || envCAPath != "" {
+	if envCACert != "" || envCAPath != "" || len(envCACertBytes) != 0 {
 		err := vaultConfig.ConfigureTLS(&vaultapi.TLSConfig{
-			CACert: envCACert,
-			CAPath: envCAPath,
+			CACert:      envCACert,
+			CACertBytes: envCACertBytes,
+			CAPath:      envCAPath,
 		})
 		if err != nil {
 			return nil, err
