@@ -10,7 +10,7 @@ require (
 	github.com/gorilla/mux v1.8.1
 	github.com/gorilla/securecookie v1.1.2
 	github.com/hashicorp/go-version v1.7.0
-	github.com/hashicorp/hc-install v0.9.0
+	github.com/hashicorp/hc-install v0.9.1
 	github.com/hashicorp/terraform-exec v0.21.0
 	github.com/hashicorp/vault/api v1.15.0
 	github.com/onsi/ginkgo/v2 v2.22.2
