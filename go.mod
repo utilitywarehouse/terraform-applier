@@ -22,7 +22,7 @@ require (
 	github.com/utilitywarehouse/git-mirror v0.2.5
 	github.com/utilitywarehouse/go-operational v0.0.0-20220413104526-79ce40a50281
 	golang.org/x/exp v0.0.0-20241217172543-b2144cdd0a67
-	golang.org/x/oauth2 v0.24.0
+	golang.org/x/oauth2 v0.27.0
 	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/api v0.32.2
 	k8s.io/apimachinery v0.32.2
