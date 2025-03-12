@@ -168,7 +168,7 @@ func isPlanRequestAckPostedForCommit(cluster string, pr *pr, commitID, modulePat
 }
 
 func (p *Planner) addNewRequest(module *tfaplv1beta1.Module, pr *pr, commitID string) (*tfaplv1beta1.Request, error) {
-	req := module.NewRunRequest(tfaplv1beta1.PRPlan)
+	req := module.NewRunRequest(tfaplv1beta1.PRPlan, "")
 
 	commentBody := prComment{
 		Body: requestAcknowledgedMsg(p.ClusterEnvName, module.NamespacedName().String(), module.Spec.Path, commitID, req.RequestedAt),

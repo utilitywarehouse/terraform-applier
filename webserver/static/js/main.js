@@ -19,33 +19,32 @@ function initialise() {
 }
 
 function filterModulesList(hash) {
-
-  const namespaceList = document.getElementById("namespace-list");
-  const moduleList = document.getElementById("module-list");
+  const namespaceList = document.getElementById("namespace-list")
+  const moduleList = document.getElementById("module-list")
 
   for (const namespace of namespaceList.children) {
-    namespace.classList.remove("active");
+    namespace.classList.remove("active")
     // hash can be namespaced name of the module in that case
     // filter all modules of that namespace
     if (hash.startsWith(namespace.dataset.filter)) {
-      namespace.classList.add("active");
+      namespace.classList.add("active")
     }
   }
 
   for (const modules of moduleList.children) {
-    modules.classList.add("d-none");
-    modules.classList.remove("d-block");
-    modules.classList.remove("active");
+    modules.classList.add("d-none")
+    modules.classList.remove("d-block")
+    modules.classList.remove("active")
     // hash can be namespaced name of the module in that case
     // filter all modules of that namespace
     if (hash.startsWith(modules.dataset.filter) || hash === "") {
-      modules.classList.add("d-block");
-      modules.classList.remove("d-none");
+      modules.classList.add("d-block")
+      modules.classList.remove("d-none")
     }
   }
 
   if (document.getElementById(hash + "-list")) {
-    document.getElementById(hash + "-list").classList.add("active");
+    document.getElementById(hash + "-list").classList.add("active")
   }
 }
 
@@ -68,18 +67,21 @@ function forceRun(namespace, module, planOnly) {
   })
     .then(function (resp) {
       if (!resp.ok) {
-        return resp.text().then(text => { throw new Error(text) })
+        return resp.text().then((text) => {
+          throw new Error(text)
+        })
       }
-      return resp.text();
+      return resp.text()
     })
     .then((msg) => {
-
       showForceAlert(true, msg)
 
       setForcedButtonDisabled(false)
 
       // load module after 10sec to update status
-      setTimeout(function () { reLoadModule(namespace, module) }, 10000);
+      setTimeout(function () {
+        reLoadModule(namespace, module)
+      }, 10000)
     })
     .catch((err) => {
       showForceAlert(
@@ -91,10 +93,12 @@ function forceRun(namespace, module, planOnly) {
 }
 
 function reLoadModule(namespace, module) {
-  // since this function is called recursively after wait its important to check if module 
+  // since this function is called recursively after wait its important to check if module
   // is still loaded.
   if (document.getElementById("module-info").firstElementChild) {
-    const values = document.getElementById("module-info").firstElementChild.id.split("_")
+    const values = document
+      .getElementById("module-info")
+      .firstElementChild.id.split("_")
     if (values.length != 2 || values[0] !== namespace || values[1] !== module) {
       return
     }
@@ -125,42 +129,112 @@ function loadModule(namespace, module) {
 
     body: JSON.stringify({
       namespace: namespace,
-      module: module
+      module: module,
     }),
   })
     .then(function (resp) {
       if (!resp.ok) {
-        return resp.text().then(text => { throw new Error(text) })
+        return resp.text().then((text) => {
+          throw new Error(text)
+        })
       }
-      return resp.text();
+      return resp.text()
     })
     .then((html) => {
-      // update module template 
-      moduleElm.innerHTML = html;
+      // update module template
+      moduleElm.innerHTML = html
 
       // get current state value to update state in modules list as well
       const state = moduleElm.getElementsByClassName("moduleState")[0].innerText
 
       // update state in modules list as well
-      const listStatusElm = document.getElementById(namespace + "_" + module + "-list").getElementsByClassName("moduleStateList")[0]
+      const listStatusElm = document
+        .getElementById(namespace + "_" + module + "-list")
+        .getElementsByClassName("moduleStateList")[0]
       listStatusElm.innerText = state
-      listStatusElm.setAttribute("module-state", state);
+      listStatusElm.setAttribute("module-state", state)
 
-      Prism.highlightAll();
+      Prism.highlightAll()
 
       if (state === "Running") {
         // re-load module after 10sec to update status
-        setTimeout(function () { reLoadModule(namespace, module) }, 10000);
+        setTimeout(function () {
+          reLoadModule(namespace, module)
+        }, 10000)
       }
     })
     .catch((err) => {
-      moduleElm.innerHTML = `
+      moduleElm.innerHTML =
+        `
       <div class="card">
-        <div class="card-body text-danger">`
-        + err + `<br/>Check terraform-applier logs for more info.
+        <div class="card-body text-danger">` +
+        err +
+        `<br/>Check terraform-applier logs for more info.
         </div>
       </div>`
     })
+}
+
+function toggleLockIdInput() {
+  var container = document.getElementById("lockIdInputContainer")
+
+  if (container.style.display === "none") {
+    container.style.display = "flex"
+  } else {
+    container.style.display = "none"
+  }
+}
+
+// Send an XHR request to the server to unlock a state.
+function unlockState(namespace, module, output) {
+  // Disable the buttons and close existing alert
+  setForcedButtonDisabled(true)
+
+  // const lockID = getLockID(output)
+  const lockID = document.getElementById("lockIdInput").value
+  url = window.location.origin + "/api/v1/forceRun"
+
+  fetch(url, {
+    method: "post",
+    headers: { "Content-Type": "application/json" },
+
+    body: JSON.stringify({
+      namespace: namespace,
+      module: module,
+      lockID: lockID,
+      type: "force-unlock",
+    }),
+  })
+    .then(function (resp) {
+      if (!resp.ok) {
+        return resp.text().then((text) => {
+          throw new Error(text)
+        })
+      }
+      return resp.text()
+    })
+    .then((msg) => {
+      showForceAlert(true, msg)
+
+      setForcedButtonDisabled(false)
+
+      // load module after 10sec to update status
+      setTimeout(function () {
+        reLoadModule(namespace, module)
+      }, 10000)
+    })
+    .catch((err) => {
+      showForceAlert(
+        false,
+        err + "<br/>Check terraform-applier logs for more info."
+      )
+      setForcedButtonDisabled(true)
+    })
+}
+
+function getLockID(output) {
+  const match = output.match(/Lock Info:\s+ID:\s+([a-z0-9\-]+)/i)
+  return match ? match[1] : null
 }
 
 function showForceAlert(success, message) {
@@ -176,7 +250,9 @@ function showForceAlert(success, message) {
 
   alertPlaceholder.append(wrapper)
   // auto close alert
-  setTimeout(function () { closeOpenAlert() }, 10000);
+  setTimeout(function () {
+    closeOpenAlert()
+  }, 10000)
 }
 
 function closeOpenAlert() {
@@ -190,4 +266,3 @@ function setForcedButtonDisabled(disabled) {
     btn.disabled = disabled
   })
 }
-

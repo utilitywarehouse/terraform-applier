@@ -155,6 +155,16 @@ type ForceRunHandler struct {
 	Log           *slog.Logger
 }
 
+// UnlockStateHandler implements the http.Handle interface and serves an API
+// endpoint for unlocking terraform state.
+type UnlockStateHandler struct {
+	Authenticator *oidc.Authenticator
+	ClusterClt    client.Client
+	KubeClt       kubernetes.Interface
+	RunStatus     *sysutil.RunStatus
+	Log           *slog.Logger
+}
+
 // ServeHTTP handles requests for forcing a run by attempting to add to the
 // runQueue, and writes a response including the result and a relevant message.
 func (f *ForceRunHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -183,6 +193,12 @@ func (f *ForceRunHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		f.Log.Error("error parsing request", "error", err)
 		http.Error(w, "error parsing request", http.StatusBadRequest)
+		return
+	}
+
+	if payload["type"] == "force-unlock" && payload["lockID"] == "" {
+		f.Log.Error("lock ID is missing")
+		http.Error(w, "lock ID is missing", http.StatusBadRequest)
 		return
 	}
 
@@ -239,11 +255,17 @@ func (f *ForceRunHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	reqType := tfaplv1beta1.ForcedPlan
-	if payload["planOnly"] == "false" {
+	switch {
+	case payload["planOnly"] == "false":
 		reqType = tfaplv1beta1.ForcedApply
+	case payload["type"] == "force-unlock":
+		reqType = tfaplv1beta1.ForcedUnlock
 	}
 
-	req := module.NewRunRequest(reqType)
+	req := module.NewRunRequest(reqType, "")
+	if reqType == tfaplv1beta1.ForcedUnlock {
+		req = module.NewRunRequest(reqType, payload["lockID"])
+	}
 
 	err = sysutil.EnsureRequest(r.Context(), f.ClusterClt, module.NamespacedName(), req)
 	switch {
