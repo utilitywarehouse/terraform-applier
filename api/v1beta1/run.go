@@ -51,6 +51,7 @@ type Request struct {
 	RequestedAt *metav1.Time `json:"reqAt,omitempty"`
 	Type        string       `json:"type,omitempty"`
 	PR          *PullRequest `json:"pr,omitempty"`
+	LockID      string       `json:"lockID,omitempty"`
 }
 
 type PullRequest struct {
@@ -60,7 +61,6 @@ type PullRequest struct {
 }
 
 func (req *Request) Validate() error {
-
 	if req.RequestedAt.IsZero() {
 		return fmt.Errorf("'reqAt' is required and must be in the '2006-01-02T15:04:05Z' format")
 	}
