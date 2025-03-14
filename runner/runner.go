@@ -313,6 +313,11 @@ func (r *Runner) runTF(
 	log.Info("Initialised successfully")
 	r.Recorder.Event(module, corev1.EventTypeNormal, tfaplv1beta1.ReasonInitialised, "Initialised successfully")
 
+	// run `terraform force-unlock <lock-id>`
+	if run.Request.Type == tfaplv1beta1.ForcedUnlock {
+		te.forceUnlock(ctx, run.Request.LockID)
+	}
+
 	// if termination signal received its safe to return here
 	if isChannelClosed(cancelChan) {
 		msg := "unable to plan module: terraform run interrupted as runner is shutting down"
@@ -350,8 +355,8 @@ func (r *Runner) runTF(
 		return false
 	}
 
-	// return if plan only mode
-	if run.PlanOnly {
+	// return if plan only mode or force unlocked a state
+	if run.PlanOnly || run.Request.Type == tfaplv1beta1.ForcedUnlock {
 		reason := tfaplv1beta1.ReasonNoDriftDetected
 		if diffDetected {
 			reason = tfaplv1beta1.ReasonPlanOnlyDriftDetected

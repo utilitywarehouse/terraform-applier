@@ -63,6 +63,8 @@ const (
 	ForcedPlan = "ForcedPlan"
 	// ForcedApply indicates a forced (triggered on the UI) terraform apply.
 	ForcedApply = "ForcedApply"
+	// ForcedUnlock indicates a forced (triggered on the UI) terraform force-unlock.
+	ForcedUnlock = "ForcedUnlock"
 
 	// non-default run happens on PR branch instead
 	// PRPlan indicates terraform plan trigged by PullRequest on modules repo path.
@@ -357,10 +359,11 @@ func (m *Module) IsPlanOnly() bool {
 	return m.Spec.PlanOnly != nil && *m.Spec.PlanOnly
 }
 
-func (m *Module) NewRunRequest(reqType string) *Request {
+func (m *Module) NewRunRequest(reqType, lockID string) *Request {
 	req := Request{
 		RequestedAt: &metav1.Time{Time: time.Now()},
 		Type:        reqType,
+		LockID:      lockID,
 	}
 
 	return &req

@@ -18,6 +18,7 @@ func createTemplate(statusHTML string) (*template.Template, error) {
 			"commitURL":           commitURL,
 			"formattedTime":       formattedTime,
 			"duration":            duration,
+			"contains":            contains,
 		}).
 		Parse(statusHTML)
 	if err != nil {
@@ -60,4 +61,8 @@ func commitURL(remoteURL, hash string) string {
 		return fmt.Sprintf("https://%s", remoteURL)
 	}
 	return fmt.Sprintf("https://%s/commit/%s", remoteURL, hash)
+}
+
+func contains(str, substr string) bool {
+	return strings.Contains(str, substr)
 }

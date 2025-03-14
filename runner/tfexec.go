@@ -13,8 +13,10 @@ import (
 	"github.com/utilitywarehouse/terraform-applier/sysutil"
 )
 
-const strongBoxKeyRingEnv = "TF_APPLIER_STRONGBOX_KEYRING"
-const strongBoxIdentityEnv = "TF_APPLIER_STRONGBOX_IDENTITY"
+const (
+	strongBoxKeyRingEnv  = "TF_APPLIER_STRONGBOX_KEYRING"
+	strongBoxIdentityEnv = "TF_APPLIER_STRONGBOX_IDENTITY"
+)
 
 //go:generate go run github.com/golang/mock/mockgen -package runner -destination tfexec_mock.go github.com/utilitywarehouse/terraform-applier/runner TFExecuter
 
@@ -23,6 +25,7 @@ type TFExecuter interface {
 	plan(ctx context.Context) (bool, string, error)
 	showPlanFileRaw(ctx context.Context) (string, error)
 	apply(ctx context.Context) (string, error)
+	forceUnlock(ctx context.Context, lockID string) (string, error)
 	cleanUp()
 }
 
@@ -44,7 +47,6 @@ func (r *Runner) NewTFRunner(
 	envs map[string]string,
 	vars map[string]string,
 ) (te TFExecuter, err error) {
-
 	// create module temp root to copy repo path to a temporary directory
 	tmpRoot, err := os.MkdirTemp("", module.Namespace+"-"+module.Name+"-*")
 	if err != nil {
@@ -100,7 +102,7 @@ func (r *Runner) NewTFRunner(
 	// Set HOME to cwd, this means that SSH should not pick up any
 	// HOME is also used to setup git config in current dir
 	runEnv["HOME"] = tfr.workingDir
-	//setup SB home for terraform remote module
+	// setup SB home for terraform remote module
 	runEnv["STRONGBOX_HOME"] = tfr.workingDir
 
 	if strongboxKeyringData != "" || strongboxIdentityData != "" {
@@ -214,6 +216,16 @@ func (te *tfRunner) apply(ctx context.Context) (string, error) {
 	}
 
 	if err := te.tf.Apply(ctx, tfexec.DirOrPlan(planOut)); err != nil {
+		return out.String(), err
+	}
+
+	return out.String(), nil
+}
+
+func (te *tfRunner) forceUnlock(ctx context.Context, lockID string) (string, error) {
+	var out bytes.Buffer
+
+	if err := te.tf.ForceUnlock(ctx, lockID); err != nil {
 		return out.String(), err
 	}
 
