@@ -15,6 +15,11 @@
                         {{if index .Module.ObjectMeta.Annotations "terraform-applier.uw.systems/run-request"}}
                         <button type="button" class="btn btn-info" disabled>Queued</button>
                         {{else}}
+                        {{ if eq .Module.Status.CurrentState "Errored"}}
+                          <button type="button" class="btn btn-outline-danger" onclick="toggleLockIdInput()">
+                            Unlock State
+                          </button>
+                        {{ end }}
                         <button data-namespace="{{ .Module.Namespace }}" data-name="{{ .Module.Name }}"
                             data-plan-only="true" class="force-button force-module-button btn btn-info"
                             onclick="forceRun('{{.Module.Namespace}}','{{ .Module.Name }}','true')">
@@ -31,6 +36,13 @@
                             Refresh
                         </button>
                     </div>
+                </div>
+                <div id="lockIdInputContainer" class="align-items-center mt-2" style="display: none;">
+                  <input type="text" id="lockIdInput" class="form-control me-2" placeholder="Enter Lock ID">
+                  <button type="button" class="btn btn-outline-danger" style="white-space: nowrap;"
+                    onclick="forceRun('{{.Module.Namespace}}','{{ .Module.Name }}','true')">
+                    <strong>Force Unlock</strong>
+                  </button>
                 </div>
 
                 <dl>

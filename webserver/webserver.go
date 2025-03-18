@@ -227,7 +227,7 @@ func (f *ForceRunHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		f.Log.Info("requesting force run...", "module", namespacedName, "user", user.Email)
+		f.Log.Info("requesting force run...", "module", namespacedName, "user", user.Email, "lockID", payload["lockID"])
 	}
 
 	// make sure module is not already running
@@ -243,7 +243,7 @@ func (f *ForceRunHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		reqType = tfaplv1beta1.ForcedApply
 	}
 
-	req := module.NewRunRequest(reqType)
+	req := module.NewRunRequest(reqType, payload["lockID"])
 
 	err = sysutil.EnsureRequest(r.Context(), f.ClusterClt, module.NamespacedName(), req)
 	switch {

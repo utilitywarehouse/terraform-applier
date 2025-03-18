@@ -357,10 +357,11 @@ func (m *Module) IsPlanOnly() bool {
 	return m.Spec.PlanOnly != nil && *m.Spec.PlanOnly
 }
 
-func (m *Module) NewRunRequest(reqType string) *Request {
+func (m *Module) NewRunRequest(reqType, lockID string) *Request {
 	req := Request{
 		RequestedAt: &metav1.Time{Time: time.Now()},
 		Type:        reqType,
+		LockID:      lockID,
 	}
 
 	return &req

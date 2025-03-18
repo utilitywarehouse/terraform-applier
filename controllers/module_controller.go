@@ -132,7 +132,7 @@ func (r *ModuleReconciler) Reconcile(ctx context.Context, req reconcile.Request)
 	if module.Status.LastDefaultRunCommitHash == "" {
 		log.Debug("requesting initial run")
 		// use next poll internal as minimum queue duration as status change will not trigger Reconcile
-		r.triggerRun(ctx, module, module.NewRunRequest(tfaplv1beta1.PollingRun))
+		r.triggerRun(ctx, module, module.NewRunRequest(tfaplv1beta1.PollingRun, ""))
 		return ctrl.Result{RequeueAfter: pollIntervalDuration}, nil
 	}
 
@@ -151,7 +151,7 @@ func (r *ModuleReconciler) Reconcile(ctx context.Context, req reconcile.Request)
 	if hash != module.Status.LastDefaultRunCommitHash {
 		log.Debug("requesting run as revision is changed on module path", "lastRun", module.Status.LastDefaultRunCommitHash, "current", hash)
 		// use next poll internal as minimum queue duration as status change will not trigger Reconcile
-		r.triggerRun(ctx, module, module.NewRunRequest(tfaplv1beta1.PollingRun))
+		r.triggerRun(ctx, module, module.NewRunRequest(tfaplv1beta1.PollingRun, ""))
 		return ctrl.Result{RequeueAfter: pollIntervalDuration}, nil
 	}
 
@@ -178,7 +178,7 @@ func (r *ModuleReconciler) Reconcile(ctx context.Context, req reconcile.Request)
 	if numOfMissedRuns > 0 {
 		log.Debug("requesting scheduled run", "missed-runs", numOfMissedRuns)
 		// use next poll internal as minimum queue duration as status change will not trigger Reconcile
-		r.triggerRun(ctx, module, module.NewRunRequest(tfaplv1beta1.ScheduledRun))
+		r.triggerRun(ctx, module, module.NewRunRequest(tfaplv1beta1.ScheduledRun, ""))
 		return ctrl.Result{RequeueAfter: pollIntervalDuration}, nil
 	}
 
@@ -298,7 +298,6 @@ func (r *ModuleReconciler) triggerRun(ctx context.Context, m *tfaplv1beta1.Modul
 }
 
 func (r *ModuleReconciler) setFailedStatus(req ctrl.Request, module *tfaplv1beta1.Module, reason, msg string) {
-
 	module.Status.CurrentState = string(tfaplv1beta1.StatusErrored)
 	module.Status.StateReason = reason
 	module.Status.LastDefaultRunStartedAt = nil
