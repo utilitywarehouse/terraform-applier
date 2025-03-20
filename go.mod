@@ -16,7 +16,7 @@ require (
 	github.com/onsi/ginkgo/v2 v2.22.2
 	github.com/onsi/gomega v1.36.2
 	github.com/prometheus/client_golang v1.20.5
-	github.com/redis/go-redis/v9 v9.7.1
+	github.com/redis/go-redis/v9 v9.7.3
 	github.com/robfig/cron/v3 v3.0.1
 	github.com/urfave/cli/v2 v2.27.5
 	github.com/utilitywarehouse/git-mirror v0.2.5
