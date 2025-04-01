@@ -1,7 +1,6 @@
 module github.com/utilitywarehouse/terraform-applier
 
 go 1.24.1
-
 require (
 	filippo.io/age v1.2.1
 	github.com/go-logr/logr v1.4.2
@@ -15,7 +14,7 @@ require (
 	github.com/hashicorp/vault/api v1.16.0
 	github.com/onsi/ginkgo/v2 v2.22.2
 	github.com/onsi/gomega v1.36.2
-	github.com/prometheus/client_golang v1.20.5
+	github.com/prometheus/client_golang v1.21.1
 	github.com/redis/go-redis/v9 v9.7.3
 	github.com/robfig/cron/v3 v3.0.1
 	github.com/urfave/cli/v2 v2.27.5
@@ -88,7 +87,7 @@ require (
 	github.com/petermattis/goid v0.0.0-20241211131331-93ee7e083c43 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/prometheus/client_model v0.6.1 // indirect
-	github.com/prometheus/common v0.61.0 // indirect
+	github.com/prometheus/common v0.62.0 // indirect
 	github.com/prometheus/procfs v0.15.1 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/ryanuber/go-glob v1.0.0 // indirect
