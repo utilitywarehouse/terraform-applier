@@ -43,7 +43,7 @@ type tfRunner struct {
 func (r *Runner) NewTFRunner(
 	ctx context.Context,
 	module *tfaplv1beta1.Module,
-	runCommit string,
+	runRef string,
 	envs map[string]string,
 	vars map[string]string,
 ) (te TFExecuter, err error) {
@@ -64,7 +64,7 @@ func (r *Runner) NewTFRunner(
 	// clone repo to new temp dir so that file doesn't change during run.
 	// checkout whole repo as module might contain relative path to modules/files
 	// which are outside of its path
-	_, err = r.Repos.Clone(ctx, module.Spec.RepoURL, tmpRoot, runCommit, nil, true)
+	_, err = r.Repos.Clone(ctx, module.Spec.RepoURL, tmpRoot, runRef, nil, true)
 	if err != nil {
 		return nil, fmt.Errorf("unable copy module's tf files to tmp dir err:%w", err)
 	}

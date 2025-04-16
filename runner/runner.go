@@ -276,7 +276,9 @@ func (r *Runner) process(run *tfaplv1beta1.Run, cancelChan <-chan struct{}, envs
 		}
 	}
 
-	te, err := r.NewTFRunner(ctx, module, commitHash, envs, vars)
+	// run should happen on the head of the reference instead of commit to capture
+	// non-module path related changes
+	te, err := r.NewTFRunner(ctx, module, run.RepoRef, envs, vars)
 	if err != nil {
 		msg := fmt.Sprintf("unable to create terraform executer: err:%s", err)
 		log.Error(msg)
