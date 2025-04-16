@@ -37,7 +37,6 @@ ENV USER_ID=65532
 
 # '--repository' flag used to install latest git v 2.49
 # can be removed once alpine is updated to 3.22
-RUN apk --no-cache add git openssh-client 
 RUN adduser -S -H -u $USER_ID tf-applier \
       && apk --no-cache add ca-certificates openssh-client \
       && apk --no-cache add git --repository=https://dl-cdn.alpinelinux.org/alpine/edge/main
