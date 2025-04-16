@@ -11,7 +11,6 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	tfaplv1beta1 "github.com/utilitywarehouse/terraform-applier/api/v1beta1"
-	"github.com/utilitywarehouse/terraform-applier/sysutil"
 	"github.com/utilitywarehouse/terraform-applier/vault"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -63,7 +62,7 @@ var _ = Describe("Module controller with Runner", func() {
 			var dst string
 			testRepos.EXPECT().Clone(gomock.Any(), "https://host.xy/dummy/repo.git", gomock.AssignableToTypeOf(dst), "HEAD", "", true).
 				DoAndReturn(func(ctx context.Context, remote, dst, branch, pathspec string, rmGitDir bool) (string, error) {
-					return "commit124", sysutil.CopyDirWithHardLinks(context.TODO(), filepath.Join("src", "modules"), dst)
+					return "commit124", os.CopyFS(dst, os.DirFS(filepath.Join("src", "modules")))
 				}).AnyTimes()
 
 			testMetrics.EXPECT().UpdateModuleRunDuration(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()

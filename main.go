@@ -570,7 +570,7 @@ func run(c *cli.Context) {
 
 	// path to resolve strongbox
 	gitENV := []string{fmt.Sprintf("PATH=%s", os.Getenv("PATH"))}
-	repos, err := mirror.NewRepoPool(conf.GitMirror, logger.With("logger", "git-mirror"), gitENV)
+	repos, err := mirror.NewRepoPool(ctx, conf.GitMirror, logger.With("logger", "git-mirror"), gitENV)
 	if err != nil {
 		logger.Error("could not create git mirror pool", "err", err)
 		os.Exit(1)
