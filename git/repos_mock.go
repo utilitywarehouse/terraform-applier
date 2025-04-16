@@ -51,7 +51,7 @@ func (mr *MockRepositoriesMockRecorder) BranchCommits(arg0, arg1, arg2 interface
 }
 
 // Clone mocks base method.
-func (m *MockRepositories) Clone(arg0 context.Context, arg1, arg2, arg3, arg4 string, arg5 bool) (string, error) {
+func (m *MockRepositories) Clone(arg0 context.Context, arg1, arg2, arg3 string, arg4 []string, arg5 bool) (string, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Clone", arg0, arg1, arg2, arg3, arg4, arg5)
 	ret0, _ := ret[0].(string)

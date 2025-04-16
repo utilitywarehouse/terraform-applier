@@ -12,7 +12,7 @@ import (
 // testing the full process of an apply run
 // mirror.RepoPool satisfies this interface and drop in replacement
 type Repositories interface {
-	Clone(ctx context.Context, remote, dst, branch, pathspec string, rmGitDir bool) (string, error)
+	Clone(ctx context.Context, remote, dst, reference string, pathspecs []string, rmGitDir bool) (string, error)
 	Hash(ctx context.Context, remote, ref, path string) (string, error)
 	Mirror(ctx context.Context, remote string) error
 	Subject(ctx context.Context, remote, hash string) (string, error)

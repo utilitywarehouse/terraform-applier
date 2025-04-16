@@ -19,7 +19,7 @@ require (
 	github.com/redis/go-redis/v9 v9.7.3
 	github.com/robfig/cron/v3 v3.0.1
 	github.com/urfave/cli/v2 v2.27.6
-	github.com/utilitywarehouse/git-mirror v0.3.1
+	github.com/utilitywarehouse/git-mirror v0.3.2
 	github.com/utilitywarehouse/go-operational v0.0.0-20250206100814-e7d65e48b364
 	golang.org/x/exp v0.0.0-20250408133849-7e4ce0ab07d0
 	golang.org/x/oauth2 v0.29.0
