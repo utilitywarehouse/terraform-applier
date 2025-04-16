@@ -60,8 +60,8 @@ var _ = Describe("Module controller with Runner", func() {
 				Return(commitMsg, nil).AnyTimes()
 
 			var dst string
-			testRepos.EXPECT().Clone(gomock.Any(), "https://host.xy/dummy/repo.git", gomock.AssignableToTypeOf(dst), "HEAD", "", true).
-				DoAndReturn(func(ctx context.Context, remote, dst, branch, pathspec string, rmGitDir bool) (string, error) {
+			testRepos.EXPECT().Clone(gomock.Any(), "https://host.xy/dummy/repo.git", gomock.AssignableToTypeOf(dst), "HEAD", nil, true).
+				DoAndReturn(func(ctx context.Context, remote, dst, branch string, pathspec []string, rmGitDir bool) (string, error) {
 					return "commit124", os.CopyFS(dst, os.DirFS(filepath.Join("src", "modules")))
 				}).AnyTimes()
 
