@@ -49,7 +49,6 @@ const (
 	ReasonPlanOnlyDriftDetected = "PlanOnlyDriftDetected"
 	ReasonNoDriftDetected       = "NoDriftDetected"
 	ReasonApplied               = "Applied"
-	ReasonNoActionRequired      = "NoActionRequired"
 )
 
 const (
