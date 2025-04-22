@@ -192,6 +192,8 @@ func (r *ModuleReconciler) Reconcile(ctx context.Context, req reconcile.Request)
 		requeueAfter = pollIntervalDuration
 	}
 
+	msg := "no action required"
+	r.setOkStatus(req, module, tfaplv1beta1.ReasonNoActionRequired, msg)
 	return ctrl.Result{RequeueAfter: requeueAfter}, nil
 }
 
@@ -307,5 +309,18 @@ func (r *ModuleReconciler) setFailedStatus(req ctrl.Request, module *tfaplv1beta
 
 	if err := sysutil.PatchModuleStatus(context.Background(), r.Client, req.NamespacedName, module.Status); err != nil {
 		r.Log.With("module", req).Error("unable to set failed status", "err", err)
+	}
+}
+
+func (r *ModuleReconciler) setOkStatus(req ctrl.Request, module *tfaplv1beta1.Module, reason, msg string) {
+	module.Status.CurrentState = string(tfaplv1beta1.StatusOk)
+	module.Status.StateReason = reason
+	module.Status.LastDefaultRunStartedAt = nil
+	module.Status.ObservedGeneration = module.Generation
+
+	r.Recorder.Event(module, corev1.EventTypeNormal, reason, msg)
+
+	if err := sysutil.PatchModuleStatus(context.Background(), r.Client, req.NamespacedName, module.Status); err != nil {
+		r.Log.With("module", req).Error("unable to set ok status", "err", err)
 	}
 }
