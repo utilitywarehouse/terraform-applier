@@ -141,9 +141,9 @@ func (r *ModuleReconciler) Reconcile(ctx context.Context, req reconcile.Request)
 	//
 	hash, err := r.Repos.Hash(ctx, module.Spec.RepoURL, module.Spec.RepoRef, module.Spec.Path)
 	if err != nil {
-		msg := fmt.Sprintf("unable to get current hash of the repo err:%s", err)
+		msg := fmt.Sprintf("unable to reconcile: unable to get current hash of the repo err:%s", err)
 		log.Error(msg)
-		r.setFailedStatus(req, module, tfaplv1beta1.ReasonGitFailure, msg)
+		r.Recorder.Event(module, corev1.EventTypeWarning, tfaplv1beta1.ReasonGitFailure, msg)
 		// since issue is not related to module specs, requeue again in case its fixed
 		return ctrl.Result{RequeueAfter: pollIntervalDuration}, nil
 	}

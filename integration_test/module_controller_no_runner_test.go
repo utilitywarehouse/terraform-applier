@@ -274,29 +274,28 @@ var _ = Describe("Module controller without runner", func() {
 
 			moduleLookupKey := types.NamespacedName{Name: moduleName, Namespace: moduleNamespace}
 
-			By("By absorbing initial run due to no run commit history and updating status with commit hash")
+			By("By absorbing initial run due to no run commit history and updating status with commit hash and current state")
 			Eventually(func() types.NamespacedName {
 				return gotRun
 			}, time.Second*60, interval).Should(Equal(moduleLookupKey))
 			// add fake last run commit hash
 			module.Status.LastDefaultRunCommitHash = "CommitAbc123"
+			// add fake last run status
+			module.Status.CurrentState = "OK"
 			Expect(k8sClient.Status().Update(ctx, module)).Should(Succeed())
 
 			testRepos.EXPECT().Hash(gomock.Any(), repoURL, "HEAD", path).Return("", fmt.Errorf("some git error"))
 
-			// wait for next reconcile loop
-			time.Sleep(15 * time.Second)
-
 			fetchedModule := &tfaplv1beta1.Module{}
-			By("By making sure modules status is changed to errored after advancing time")
+			By("By making sure modules status is kept after advancing time")
 			fakeClock.T = time.Date(2022, 02, 01, 01, 02, 00, 0000, time.UTC)
-			Eventually(func() string {
+			Consistently(func() string {
 				err := k8sClient.Get(ctx, moduleLookupKey, fetchedModule)
 				if err != nil {
 					return ""
 				}
 				return fetchedModule.Status.CurrentState
-			}, time.Second*60, interval).Should(Equal("Errored"))
+			}, time.Second*60, interval).Should(Equal("OK"))
 			// delete module to stopping requeue
 			Expect(k8sClient.Delete(ctx, module)).Should(Succeed())
 		})
