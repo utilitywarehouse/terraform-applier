@@ -494,7 +494,7 @@ func applyGitDefaults(c *cli.Context, mirrorConf mirror.RepoPoolConfig) mirror.R
 	}
 
 	if mirrorConf.Defaults.Interval == 0 {
-		mirrorConf.Defaults.Interval = 30 * time.Second
+		mirrorConf.Defaults.Interval = time.Minute
 	}
 
 	if mirrorConf.Defaults.MirrorTimeout == 0 {
