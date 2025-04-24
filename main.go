@@ -498,7 +498,8 @@ func applyGitDefaults(c *cli.Context, mirrorConf mirror.RepoPoolConfig) mirror.R
 	}
 
 	if mirrorConf.Defaults.MirrorTimeout == 0 {
-		mirrorConf.Defaults.MirrorTimeout = 2 * time.Minute
+		// git operations can be delayed by server when rate limited
+		mirrorConf.Defaults.MirrorTimeout = 4 * time.Minute
 	}
 
 	if mirrorConf.Defaults.Auth.SSHKeyPath == "" {
