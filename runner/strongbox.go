@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"filippo.io/age"
 	"filippo.io/age/armor"
@@ -72,6 +73,8 @@ func setupGitConfigForSB(ctx context.Context, cwd string, runEnv []string) error
 	s := exec.CommandContext(ctx, "strongbox", "-git-config")
 	s.Dir = cwd
 	s.Env = runEnv
+	// force kill cmd & child process 5 seconds after sending it sigterm (when ctx is cancelled/timed out)
+	s.WaitDelay = 5 * time.Second
 
 	stderr, err := s.CombinedOutput()
 	if err != nil {
@@ -87,6 +90,8 @@ func runStrongboxDecryption(ctx context.Context, cwd string, runEnv []string) er
 	s := exec.CommandContext(ctx, "strongbox", "-decrypt", "-recursive", cwd)
 	s.Dir = cwd
 	s.Env = runEnv
+	// force kill cmd & child process 5 seconds after sending it sigterm (when ctx is cancelled/timed out)
+	s.WaitDelay = 5 * time.Second
 
 	stderr, err := s.CombinedOutput()
 	if err != nil {
