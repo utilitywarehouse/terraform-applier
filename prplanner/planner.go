@@ -101,11 +101,6 @@ func (p *Planner) StartPRPoll(ctx context.Context) {
 }
 
 func (p *Planner) processPullRequest(ctx context.Context, pr *pr, kubeModuleList *tfaplv1beta1.ModuleList) {
-	// skip draft PRs
-	if pr.IsDraft {
-		return
-	}
-
 	if pr.Closed && !pr.Merged {
 		return
 	}
@@ -129,13 +124,17 @@ func (p *Planner) processPullRequest(ctx context.Context, pr *pr, kubeModuleList
 		return
 	}
 
-	var skipCommitRun bool
+	// only process manual comment request for draft PRs
+	skipCommitRun := pr.IsDraft
+
 	if len(prModules) > 5 {
 		skipCommitRun = true
+	}
 
+	if skipCommitRun {
 		// add limit msg comment if not already added
-		if !isModuleLimitReachedCommentPosted(pr.Comments.Nodes) {
-			comment := prComment{Body: moduleLimitReachedTml}
+		if !isAutoPlanDisabledCommentPosted(pr.Comments.Nodes) {
+			comment := prComment{Body: autoPlanDisabledTml}
 			_, err := p.github.postComment(pr.BaseRepository.Owner.Login, pr.BaseRepository.Name, 0, pr.Number, comment)
 			if err != nil {
 				p.Log.Error("unable to post limit reached msg", "err", err)

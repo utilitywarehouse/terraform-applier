@@ -32,10 +32,29 @@ func Test_processPullRequest(t *testing.T) {
 	}
 
 	t.Run("skip draft PR", func(t *testing.T) {
+		goMockCtrl := gomock.NewController(t)
+		testGithub := NewMockGithubInterface(goMockCtrl)
+		planner.github = testGithub
 		p := generateMockPR(123, "ref1",
 			[]string{"random comment", "random comment", "random comment"},
 		)
 		p.IsDraft = true
+		p.BaseRepository.Owner.Login = "utilitywarehouse"
+		p.BaseRepository.Name = "foo"
+		p.BaseRepository.URL = "git@github.com:utilitywarehouse/foo.git"
+
+		testGit.EXPECT().BranchCommits(gomock.Any(), gomock.Any(), gomock.Any()).
+			DoAndReturn(func(_ context.Context, _, hash string) ([]mirror.CommitInfo, error) {
+				return []mirror.CommitInfo{
+					{Hash: "hash1", ChangedFiles: []string{"one", "six"}},
+				}, nil
+			})
+
+		testGithub.EXPECT().postComment(gomock.Any(), gomock.Any(), 0, 123, gomock.Any()).
+			DoAndReturn(func(repoOwner, repoName string, commentID, prNumber int, commentBody prComment) (int, error) {
+				t.Skip("comment posted. test passed")
+				return 111, nil
+			})
 
 		planner.processPullRequest(ctx, p, kubeModuleList)
 	})
