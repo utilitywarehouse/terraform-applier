@@ -139,7 +139,11 @@ func (r *ModuleReconciler) Reconcile(ctx context.Context, req reconcile.Request)
 	// case 3:
 	// check for new git hash changes on modules path
 	//
-	hash, err := r.Repos.Hash(ctx, module.Spec.RepoURL, module.Spec.RepoRef, module.Spec.Path)
+	// git calls might be slow if repository is locked due to fetch operation.
+	// hence shorter context to re-try later
+	ctxWto, cancelWto := context.WithTimeout(ctx, 10*time.Second)
+	hash, err := r.Repos.Hash(ctxWto, module.Spec.RepoURL, module.Spec.RepoRef, module.Spec.Path)
+	cancelWto()
 	if err != nil {
 		msg := fmt.Sprintf("unable to reconcile: unable to get current hash of the repo err:%s", err)
 		log.Error(msg)

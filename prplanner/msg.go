@@ -14,10 +14,10 @@ import (
 var (
 	planReqMsgRegex = regexp.MustCompile("^`?@terraform-applier plan `?([\\w-.\\/]+)`?$")
 
-	moduleLimitReachedTml = "A limit of 5 modules per PR has been reached, hence auto plan is disabled for this PR.\n" +
+	autoPlanDisabledTml = "Auto plan is disabled for this PR.\n" +
 		"Please post `@terraform-applier plan <module_name>` as comment if you want to request terraform plan for a particular module."
 
-	moduleLimitReachedRegex = regexp.MustCompile("A limit of 5 modules per PR has been reached")
+	autoPlanDisabledRegex = regexp.MustCompile("Auto plan is disabled for this PR")
 
 	requestAcknowledgedMsgTml = "Received terraform plan request\n" +
 		"```\n" +
@@ -120,9 +120,9 @@ func parseNamespaceName(str string) types.NamespacedName {
 	return types.NamespacedName{}
 }
 
-func isModuleLimitReachedCommentPosted(prComments []prComment) bool {
+func isAutoPlanDisabledCommentPosted(prComments []prComment) bool {
 	for _, comment := range prComments {
-		if moduleLimitReachedRegex.MatchString(comment.Body) {
+		if autoPlanDisabledRegex.MatchString(comment.Body) {
 			return true
 		}
 	}
@@ -133,5 +133,5 @@ func isModuleLimitReachedCommentPosted(prComments []prComment) bool {
 func isSelfComment(comment string) bool {
 	return runOutputMsgRegex.MatchString(comment) ||
 		requestAcknowledgedMsgRegex.MatchString(comment) ||
-		moduleLimitReachedRegex.MatchString(comment)
+		autoPlanDisabledRegex.MatchString(comment)
 }

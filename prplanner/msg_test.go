@@ -64,7 +64,7 @@ func Test_parsePlanReqMsg(t *testing.T) {
 		},
 		{
 			name:                 "do not trigger plan on module limit comment",
-			args:                 args{commentBody: moduleLimitReachedTml},
+			args:                 args{commentBody: autoPlanDisabledTml},
 			wantModuleNameOrPath: "",
 		},
 		{
@@ -496,7 +496,7 @@ func Test_parseNamespaceName(t *testing.T) {
 	}
 }
 
-func Test_isModuleLimitReachedCommentPosted(t *testing.T) {
+func Test_isAutoPlanDisabledCommentPosted(t *testing.T) {
 	type args struct {
 		prComments []prComment
 	}
@@ -513,14 +513,14 @@ func Test_isModuleLimitReachedCommentPosted(t *testing.T) {
 		},
 		{
 			name: "comment posted",
-			args: args{prComments: []prComment{{Body: moduleLimitReachedTml}, {Body: "random comment"}}},
+			args: args{prComments: []prComment{{Body: autoPlanDisabledTml}, {Body: "random comment"}}},
 			want: true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := isModuleLimitReachedCommentPosted(tt.args.prComments); !reflect.DeepEqual(got, tt.want) {
+			if got := isAutoPlanDisabledCommentPosted(tt.args.prComments); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("parseNamespaceName() = %v, want %v", got, tt.want)
 			}
 		})
@@ -537,7 +537,7 @@ func Test_isSelfAddedComment(t *testing.T) {
 		want bool
 	}{
 		{"empty", args{""}, false},
-		{"moduleLimitReachedTml", args{moduleLimitReachedTml}, true},
+		{"autoPlanDisabledTml", args{autoPlanDisabledTml}, true},
 		{"requestAcknowledgedMsg", args{requestAcknowledgedMsg("default", "foo/one", "path/to/module/one", "hash1", mustParseMetaTime("2006-01-02T15:04:05+07:00"))}, true},
 		{"runOutputMsg", args{runOutputMsg("default", "one", "foo/one", &v1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy."})}, true},
 		{"other", args{"other"}, false},
