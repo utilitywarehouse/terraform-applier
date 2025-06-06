@@ -49,7 +49,7 @@ function filterModulesList(hash) {
 }
 
 // Send an XHR request to the server to force a run.
-function forceRun(namespace, module, planOnly) {
+function forceRun(namespace, module, planOnly, verbose) {
   // Disable the buttons and close existing alert
   setForcedButtonDisabled(true)
 
@@ -64,6 +64,7 @@ function forceRun(namespace, module, planOnly) {
       namespace: namespace,
       module: module,
       planOnly: planOnly,
+      verbose: verbose,
       lockID: lockID,
     }),
   })
@@ -216,3 +217,25 @@ function setForcedButtonDisabled(disabled) {
     btn.disabled = disabled
   })
 }
+
+function toggleDropdown(event) {
+  event.stopPropagation()
+
+  const container = event.target.closest(".btn-group")
+  if (!container) return
+
+  const dropdown = container.querySelector(".custom-dropdown")
+  if (!dropdown) return
+
+  dropdown.classList.toggle("hide")
+}
+
+function hideAllDropdowns() {
+  // Close all dropdown types
+  document.querySelectorAll(".custom-dropdown").forEach((dropdown) => {
+    dropdown.classList.add("hide")
+  })
+}
+
+// Close dropdowns when clicking outside
+window.addEventListener("click", hideAllDropdowns)

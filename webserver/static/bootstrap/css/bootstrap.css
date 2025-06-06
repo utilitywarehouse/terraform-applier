@@ -3770,6 +3770,40 @@ textarea.form-control-lg {
   border-bottom-left-radius: 0;
 }
 
+.btn-group .dropdown-toggle {
+  cursor: pointer;
+}
+.btn-group .custom-dropdown {
+  background: white;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  position: absolute;
+  top: 100%; /* place below the button */
+  left: 0;
+  z-index: 1000;
+  width: 100%;
+  margin-top: 4px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+  transition: all 0.25s ease;
+  max-height: 150px;
+  overflow: auto;
+}
+.btn-group .custom-dropdown.hide {
+  max-height: 0;
+  opacity: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+.btn-group .custom-dropdown a {
+  display: block;
+  padding: 8px 12px;
+  text-decoration: none;
+  color: #333;
+  background-color: #fff;
+}
+.btn-group .custom-dropdown a:hover {
+  background-color: #f0f0f0;
+}
 .dropdown-toggle-split {
   padding-right: 0.5625rem;
   padding-left: 0.5625rem;

@@ -5,12 +5,7 @@
     <div class='card {{if eq .Module.Status.CurrentState "Running"}}border-info{{end}}' style="max-height: 90vh;">
         <div class="card-header bg-transparent">
             <div href="#{{ sanitizedUniqueName .Module.NamespacedName}}-info">
-                <div class="d-flex justify-content-between align-items-center mb-1">
-                    <h3 class="fw-bold" style="color: #550091;">{{.Module.Name}}
-                        {{ if .Module.IsPlanOnly}}
-                        <span class='badge text-bg-secondary'>plan only</span>
-                        {{end}}
-                    </h3>
+                <div class="d-flex justify-content-end align-items-center mb-1">
                     <div>
                         {{if index .Module.ObjectMeta.Annotations "terraform-applier.uw.systems/run-request"}}
                         <button type="button" class="btn btn-info" disabled>Queued</button>
@@ -20,22 +15,48 @@
                             Unlock State
                           </button>
                         {{ end }}
-                        <button data-namespace="{{ .Module.Namespace }}" data-name="{{ .Module.Name }}"
+                        <div class="btn-group">
+                          <button data-namespace="{{ .Module.Namespace }}" data-name="{{ .Module.Name }}"
                             data-plan-only="true" class="force-button force-module-button btn btn-info"
-                            onclick="forceRun('{{.Module.Namespace}}','{{ .Module.Name }}','true')">
+                            onclick="forceRun('{{.Module.Namespace}}','{{ .Module.Name }}','true', 'false')">
                             <strong>Force Plan</strong>
-                        </button>
-                        <button data-namespace=" {{ .Module.Namespace }}" data-name="{{ .Module.Name }}"
-                            data-plan-only="false" class="force-button force-module-button btn btn-warning"
-                            onclick="forceRun('{{.Module.Namespace}}','{{ .Module.Name }}','false')">
-                            <strong>Force Apply</strong>
-                        </button>
+                          </button>
+                          <button data-namespace="{{ .Module.Namespace }}" data-name="{{ .Module.Name }}"
+                            data-plan-only="true" class="btn btn-info dropdown-toggle"
+                            onclick="toggleDropdown(event)">
+                            <span class="caret"></span>
+                          </button>
+                          <div class="custom-dropdown hide">
+                            <a href="#" onclick="forceRun('{{.Module.Namespace}}','{{ .Module.Name }}','true', 'true')">Verbose Plan</a>
+                          </div>
+                        </div>
+
+                        <div class="btn-group">
+                          <button data-namespace=" {{ .Module.Namespace }}" data-name="{{ .Module.Name }}"
+                              data-plan-only="false" class="force-button force-module-button btn btn-warning"
+                              onclick="forceRun('{{.Module.Namespace}}','{{ .Module.Name }}','false')">
+                              <strong>Force Apply</strong>
+                          </button>
+                          <button class="btn btn-warning dropdown-toggle" onclick="toggleDropdown(event)">
+                            <span class="caret"></span>
+                          </button>
+                          <div class="custom-dropdown hide">
+                            <a href="#" onclick="forceRun('{{.Module.Namespace}}','{{ .Module.Name }}','false', 'true')">Verbose Apply</a>
+                          </div>
+                        </div>
                         {{end}}
                         <button type="button" class="btn btn-outline-primary"
                             onclick="loadModule('{{.Module.Namespace}}','{{ .Module.Name }}')">
                             Refresh
                         </button>
                     </div>
+                </div>
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                    <h3 class="fw-bold" style="color: #550091;">{{.Module.Name}}
+                        {{ if .Module.IsPlanOnly}}
+                        <span class='badge text-bg-secondary'>plan only</span>
+                        {{end}}
+                    </h3>
                 </div>
                 <div id="lockIdInputContainer" class="align-items-center mt-2" style="display: none;">
                   <input type="text" id="lockIdInput" class="form-control me-2" placeholder="Enter Lock ID">
