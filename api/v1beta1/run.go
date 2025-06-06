@@ -50,6 +50,7 @@ func NewRun(module *Module, req *Request) Run {
 type Request struct {
 	RequestedAt *metav1.Time `json:"reqAt,omitempty"`
 	Type        string       `json:"type,omitempty"`
+	VerboseLogs bool         `json:"verboseLogs,omitempty"`
 	PR          *PullRequest `json:"pr,omitempty"`
 	LockID      string       `json:"lockID,omitempty"`
 }

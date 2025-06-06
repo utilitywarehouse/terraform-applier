@@ -24,6 +24,8 @@ type TFExecuter interface {
 	init(ctx context.Context, backendConf map[string]string) (string, error)
 	plan(ctx context.Context) (bool, string, error)
 	showPlanFileRaw(ctx context.Context) (string, error)
+	showVerbosePlanFileRaw(ctx context.Context, prefix string) (string, error)
+	setLog(prefix, logLevel string) error
 	apply(ctx context.Context) (string, error)
 	forceUnlock(ctx context.Context, lockID string) (string, error)
 	cleanUp()
@@ -201,6 +203,32 @@ func (te *tfRunner) plan(ctx context.Context) (bool, string, error) {
 func (te *tfRunner) showPlanFileRaw(ctx context.Context) (string, error) {
 	planOut := filepath.Join(te.workingDir, te.planFileName)
 	return te.tf.ShowPlanFileRaw(ctx, planOut)
+}
+
+func (te *tfRunner) showVerbosePlanFileRaw(ctx context.Context, prefix string) (string, error) {
+	verboseOut := te.planFileName + prefix + "-verbose"
+	planOut := filepath.Join(te.workingDir, verboseOut)
+
+	content, err := os.ReadFile(planOut)
+	if err != nil {
+		return "", err
+	}
+
+	return string(content), nil
+}
+
+func (te *tfRunner) setLog(prefix, logLevel string) error {
+	if err := te.tf.SetLog(logLevel); err != nil {
+		return fmt.Errorf("unable to set log level", "err", fmt.Sprintf("%q", err))
+	}
+
+	planOut := filepath.Join(te.workingDir, te.planFileName+prefix+"-verbose")
+
+	if err := te.tf.SetLogPath(planOut); err != nil {
+		return fmt.Errorf("unable to set log path", "err", fmt.Sprintf("%q", err))
+	}
+
+	return nil
 }
 
 func (te *tfRunner) apply(ctx context.Context) (string, error) {

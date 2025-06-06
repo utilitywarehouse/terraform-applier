@@ -21,9 +21,7 @@
                             onclick="forceRun('{{.Module.Namespace}}','{{ .Module.Name }}','true', 'false')">
                             <strong>Force Plan</strong>
                           </button>
-                          <button data-namespace="{{ .Module.Namespace }}" data-name="{{ .Module.Name }}"
-                            data-plan-only="true" class="btn btn-info dropdown-toggle"
-                            onclick="toggleDropdown(event)">
+                          <button class="btn btn-info dropdown-toggle" onclick="toggleDropdown(event)">
                             <span class="caret"></span>
                           </button>
                           <div class="custom-dropdown hide">

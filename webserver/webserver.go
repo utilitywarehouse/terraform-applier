@@ -243,7 +243,12 @@ func (f *ForceRunHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		reqType = tfaplv1beta1.ForcedApply
 	}
 
-	req := module.NewRunRequest(reqType, payload["lockID"])
+	verboseLogs := false
+	if payload["verbose"] == "true" {
+		verboseLogs = true
+	}
+
+	req := module.NewRunRequest(reqType, payload["lockID"], verboseLogs)
 
 	err = sysutil.EnsureRequest(r.Context(), f.ClusterClt, module.NamespacedName(), req)
 	switch {

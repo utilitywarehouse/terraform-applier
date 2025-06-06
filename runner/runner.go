@@ -305,6 +305,13 @@ func (r *Runner) runTF(
 	log := r.Log.With("module", run.Module, "ref", run.RepoRef)
 	var err error
 
+	if run.Request.VerboseLogs {
+		err := te.setLog("plan", "DEBUG")
+		if err != nil {
+			log.Error("failed to enable verbose logging", "err", fmt.Sprintf("%q", err))
+		}
+	}
+
 	run.InitOutput, err = te.init(ctx, backendConf)
 	if err != nil {
 		// tf err contains new lines not suitable logging
@@ -362,6 +369,18 @@ func (r *Runner) runTF(
 		return false
 	}
 
+	if run.Request.VerboseLogs {
+		verboseOut, err := te.showVerbosePlanFileRaw(ctx, "plan")
+		if err != nil {
+			// tf err contains new lines not suitable logging
+			log.Error("unable to get saved plan", "err", fmt.Sprintf("%q", err))
+			r.setFailedStatus(run, module, tfaplv1beta1.ReasonPlanFailed, "unable to get saved plan")
+			return false
+		}
+
+		run.Output = verboseOut + run.Output
+	}
+
 	// return if plan only mode
 	if run.PlanOnly {
 		reason := tfaplv1beta1.ReasonNoDriftDetected
@@ -383,7 +402,25 @@ func (r *Runner) runTF(
 		return false
 	}
 
+	if run.Request.VerboseLogs {
+		err := te.setLog("apply", "DEBUG")
+		if err != nil {
+			log.Error("failed to enable verbose logging", "err", fmt.Sprintf("%q", err))
+		}
+	}
+
 	applyOut, err := te.apply(ctx)
+	if run.Request.VerboseLogs {
+		verboseOut, err := te.showVerbosePlanFileRaw(ctx, "apply")
+		if err != nil {
+			// tf err contains new lines not suitable logging
+			log.Error("unable to get saved plan", "err", fmt.Sprintf("%q", err))
+			r.setFailedStatus(run, module, tfaplv1beta1.ReasonPlanFailed, "unable to get saved plan")
+			return false
+		}
+
+		run.Output += verboseOut
+	}
 	run.Output += applyOut
 	if err != nil {
 		// tf err contains new lines not suitable logging
