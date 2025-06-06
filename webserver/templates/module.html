@@ -20,11 +20,22 @@
                             Unlock State
                           </button>
                         {{ end }}
-                        <button data-namespace="{{ .Module.Namespace }}" data-name="{{ .Module.Name }}"
+                        <div class="btn-group">
+                          <button data-namespace="{{ .Module.Namespace }}" data-name="{{ .Module.Name }}"
                             data-plan-only="true" class="force-button force-module-button btn btn-info"
-                            onclick="forceRun('{{.Module.Namespace}}','{{ .Module.Name }}','true')">
+                            onclick="forceRun('{{.Module.Namespace}}','{{ .Module.Name }}','true', 'false')">
                             <strong>Force Plan</strong>
-                        </button>
+                          </button>
+                          <button data-namespace="{{ .Module.Namespace }}" data-name="{{ .Module.Name }}"
+                            data-plan-only="true" class="btn btn-info dropdown-toggle"
+                            onclick="toggleDropdown(event)">
+                            <span class="caret"></span>
+                          </button>
+                          <div class="custom-dropdown hide">
+                            <a href="#" onclick="forceRun('{{.Module.Namespace}}','{{ .Module.Name }}','true', 'true')">Verbose Plan</a>
+                          </div>
+                        </div>
+
                         <button data-namespace=" {{ .Module.Namespace }}" data-name="{{ .Module.Name }}"
                             data-plan-only="false" class="force-button force-module-button btn btn-warning"
                             onclick="forceRun('{{.Module.Namespace}}','{{ .Module.Name }}','false')">
