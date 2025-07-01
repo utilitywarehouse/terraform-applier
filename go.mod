@@ -18,7 +18,7 @@ require (
 	github.com/prometheus/client_golang v1.22.0
 	github.com/redis/go-redis/v9 v9.9.0
 	github.com/robfig/cron/v3 v3.0.1
-	github.com/urfave/cli/v2 v2.27.6
+	github.com/urfave/cli/v2 v2.27.7
 	github.com/utilitywarehouse/git-mirror v0.3.6
 	github.com/utilitywarehouse/go-operational v0.0.0-20250423084238-c80547bcb12b
 	golang.org/x/exp v0.0.0-20250408133849-7e4ce0ab07d0
