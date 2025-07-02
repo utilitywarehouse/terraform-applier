@@ -9,7 +9,7 @@ import (
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
-	mirror "github.com/utilitywarehouse/git-mirror/pkg/mirror"
+	"github.com/utilitywarehouse/git-mirror/repository"
 )
 
 // MockRepositories is a mock of Repositories interface.
@@ -36,10 +36,10 @@ func (m *MockRepositories) EXPECT() *MockRepositoriesMockRecorder {
 }
 
 // BranchCommits mocks base method.
-func (m *MockRepositories) BranchCommits(arg0 context.Context, arg1, arg2 string) ([]mirror.CommitInfo, error) {
+func (m *MockRepositories) BranchCommits(arg0 context.Context, arg1, arg2 string) ([]repository.CommitInfo, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "BranchCommits", arg0, arg1, arg2)
-	ret0, _ := ret[0].([]mirror.CommitInfo)
+	ret0, _ := ret[0].([]repository.CommitInfo)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -81,10 +81,10 @@ func (mr *MockRepositoriesMockRecorder) Hash(arg0, arg1, arg2, arg3 interface{})
 }
 
 // MergeCommits mocks base method.
-func (m *MockRepositories) MergeCommits(arg0 context.Context, arg1, arg2 string) ([]mirror.CommitInfo, error) {
+func (m *MockRepositories) MergeCommits(arg0 context.Context, arg1, arg2 string) ([]repository.CommitInfo, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "MergeCommits", arg0, arg1, arg2)
-	ret0, _ := ret[0].([]mirror.CommitInfo)
+	ret0, _ := ret[0].([]repository.CommitInfo)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }

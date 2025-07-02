@@ -3,7 +3,7 @@ package git
 import (
 	"context"
 
-	"github.com/utilitywarehouse/git-mirror/pkg/mirror"
+	"github.com/utilitywarehouse/git-mirror/repository"
 )
 
 //go:generate go run github.com/golang/mock/mockgen -package git -destination repos_mock.go github.com/utilitywarehouse/terraform-applier/git Repositories
@@ -16,6 +16,6 @@ type Repositories interface {
 	Hash(ctx context.Context, remote, ref, path string) (string, error)
 	Mirror(ctx context.Context, remote string) error
 	Subject(ctx context.Context, remote, hash string) (string, error)
-	BranchCommits(ctx context.Context, remote, branch string) ([]mirror.CommitInfo, error)
-	MergeCommits(ctx context.Context, remote, mergeCommitHash string) ([]mirror.CommitInfo, error)
+	BranchCommits(ctx context.Context, remote, branch string) ([]repository.CommitInfo, error)
+	MergeCommits(ctx context.Context, remote, mergeCommitHash string) ([]repository.CommitInfo, error)
 }

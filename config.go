@@ -3,12 +3,12 @@ package main
 import (
 	"os"
 
-	"github.com/utilitywarehouse/git-mirror/pkg/mirror"
+	"github.com/utilitywarehouse/git-mirror/repopool"
 	"gopkg.in/yaml.v2"
 )
 
 type Config struct {
-	GitMirror mirror.RepoPoolConfig `yaml:"git_mirror"`
+	GitMirror repopool.Config `yaml:"git_mirror"`
 }
 
 func parseConfigFile(path string) (*Config, error) {

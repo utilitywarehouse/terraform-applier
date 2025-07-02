@@ -8,8 +8,9 @@ import (
 	"time"
 
 	"github.com/redis/go-redis/v9"
-	"github.com/utilitywarehouse/git-mirror/pkg/giturl"
-	"github.com/utilitywarehouse/git-mirror/pkg/mirror"
+	"github.com/utilitywarehouse/git-mirror/giturl"
+	"github.com/utilitywarehouse/git-mirror/repopool"
+	"github.com/utilitywarehouse/git-mirror/repository"
 	tfaplv1beta1 "github.com/utilitywarehouse/terraform-applier/api/v1beta1"
 	"github.com/utilitywarehouse/terraform-applier/git"
 	"github.com/utilitywarehouse/terraform-applier/runner"
@@ -23,7 +24,7 @@ type Planner struct {
 	ListenAddress  string
 	WebhookSecret  string
 	ClusterEnvName string
-	GitMirror      mirror.RepoPoolConfig
+	GitMirror      repopool.Config
 	ClusterClt     client.Client
 	Repos          git.Repositories
 	RedisClient    sysutil.RedisInterface
@@ -148,7 +149,7 @@ func (p *Planner) processPullRequest(ctx context.Context, pr *pr, kubeModuleList
 	p.uploadRequestOutput(ctx, pr)
 }
 
-func (p *Planner) getPRModuleList(pr *pr, commitsInfo []mirror.CommitInfo, kubeModules *tfaplv1beta1.ModuleList) ([]types.NamespacedName, error) {
+func (p *Planner) getPRModuleList(pr *pr, commitsInfo []repository.CommitInfo, kubeModules *tfaplv1beta1.ModuleList) ([]types.NamespacedName, error) {
 	var modulesUpdated []types.NamespacedName
 
 	for _, kubeModule := range kubeModules.Items {
@@ -180,7 +181,7 @@ func (p *Planner) getPRModuleList(pr *pr, commitsInfo []mirror.CommitInfo, kubeM
 	return modulesUpdated, nil
 }
 
-func isModuleUpdated(module *tfaplv1beta1.Module, commit mirror.CommitInfo) bool {
+func isModuleUpdated(module *tfaplv1beta1.Module, commit repository.CommitInfo) bool {
 	for _, path := range commit.ChangedFiles {
 		if strings.HasPrefix(path, module.Spec.Path) {
 			return true

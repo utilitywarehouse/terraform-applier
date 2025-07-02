@@ -10,7 +10,7 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
-	"github.com/utilitywarehouse/git-mirror/pkg/mirror"
+	"github.com/utilitywarehouse/git-mirror/repository"
 	tfaplv1beta1 "github.com/utilitywarehouse/terraform-applier/api/v1beta1"
 	"github.com/utilitywarehouse/terraform-applier/git"
 	"github.com/utilitywarehouse/terraform-applier/sysutil"
@@ -57,7 +57,7 @@ func TestCheckPRCommits(t *testing.T) {
 			[]string{"random comment", "random comment", "random comment"},
 		)
 
-		commitsInfo := []mirror.CommitInfo{
+		commitsInfo := []repository.CommitInfo{
 			{Hash: "hash3", ChangedFiles: []string{"foo/two", "foo/three"}},
 			{Hash: "hash2", ChangedFiles: []string{"foo/two"}},
 			{Hash: "hash1", ChangedFiles: []string{"foo/one"}},
@@ -116,7 +116,7 @@ func TestCheckPRCommits(t *testing.T) {
 			[]string{"random comment", "random comment", "random comment"},
 		)
 
-		commitsInfo := []mirror.CommitInfo{
+		commitsInfo := []repository.CommitInfo{
 			{Hash: "hash3", ChangedFiles: []string{"foo/two", "foo/three"}},
 			{Hash: "hash2", ChangedFiles: []string{"foo/two"}},
 			{Hash: "hash1", ChangedFiles: []string{"foo/one"}},
@@ -175,7 +175,7 @@ func TestCheckPRCommits(t *testing.T) {
 			[]string{"random comment", runOutputMsg("default", "foo/two", "foo/two", &tfaplv1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy.", Output: "some output"}), "random comment"},
 		)
 
-		commitsInfo := []mirror.CommitInfo{
+		commitsInfo := []repository.CommitInfo{
 			{Hash: "hash3", ChangedFiles: []string{"foo/two", "foo/three"}},
 			{Hash: "hash2", ChangedFiles: []string{"foo/two"}},
 		}
@@ -210,7 +210,7 @@ func TestCheckPRCommits(t *testing.T) {
 		p := generateMockPR(123, "ref1",
 			[]string{"random comment", runOutputMsg("default", "foo/two", "foo/two", &tfaplv1beta1.Run{CommitHash: "hash3", Summary: "Plan: x to add, x to change, x to destroy.", Output: "some output"}), "random comment"},
 		)
-		commitsInfo := []mirror.CommitInfo{
+		commitsInfo := []repository.CommitInfo{
 			{Hash: "hash3", ChangedFiles: []string{"foo/two", "foo/three"}},
 			{Hash: "hash2", ChangedFiles: []string{"foo/two"}},
 			{Hash: "hash1", ChangedFiles: []string{"foo/one"}},
@@ -246,7 +246,7 @@ func TestCheckPRCommits(t *testing.T) {
 		p := generateMockPR(123, "ref1",
 			[]string{"random comment", runOutputMsg("diff-cluster", "foo/two", "foo/two", &tfaplv1beta1.Run{CommitHash: "hash3", Summary: "Plan: x to add, x to change, x to destroy.", Output: "some output"}), "random comment"},
 		)
-		commitsInfo := []mirror.CommitInfo{
+		commitsInfo := []repository.CommitInfo{
 			{Hash: "hash3", ChangedFiles: []string{"foo/two", "foo/three"}},
 			{Hash: "hash2", ChangedFiles: []string{"foo/two"}},
 			{Hash: "hash1", ChangedFiles: []string{"foo/one"}},
@@ -304,7 +304,7 @@ func TestCheckPRCommits(t *testing.T) {
 		p := generateMockPR(123, "ref1",
 			[]string{"random comment", requestAcknowledgedMsg("default", "foo/two", "foo/two", "hash3", &metav1.Time{Time: time.Now()}), "random comment"},
 		)
-		commitsInfo := []mirror.CommitInfo{
+		commitsInfo := []repository.CommitInfo{
 			{Hash: "hash3", ChangedFiles: []string{"foo/two", "foo/three"}},
 			{Hash: "hash2", ChangedFiles: []string{"foo/two"}},
 			{Hash: "hash1", ChangedFiles: []string{"foo/one"}},
@@ -340,7 +340,7 @@ func TestCheckPRCommits(t *testing.T) {
 		p := generateMockPR(123, "ref1",
 			[]string{"random comment", requestAcknowledgedMsg("diff-cluster", "foo/two", "foo/two", "hash3", &metav1.Time{Time: time.Now()}), "random comment"},
 		)
-		commitsInfo := []mirror.CommitInfo{
+		commitsInfo := []repository.CommitInfo{
 			{Hash: "hash3", ChangedFiles: []string{"foo/two", "foo/three"}},
 			{Hash: "hash2", ChangedFiles: []string{"foo/two"}},
 			{Hash: "hash1", ChangedFiles: []string{"foo/one"}},
@@ -398,7 +398,7 @@ func TestCheckPRCommits(t *testing.T) {
 		p := generateMockPR(123, "ref1",
 			[]string{"random comment", runOutputMsg("default", "foo/two", "foo/two", &tfaplv1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy.", Output: "some output"}), "random comment"},
 		)
-		commitsInfo := []mirror.CommitInfo{
+		commitsInfo := []repository.CommitInfo{
 			{Hash: "hash3", ChangedFiles: []string{"foo/two", "foo/three"}},
 			{Hash: "hash2", ChangedFiles: []string{"foo/two"}},
 			{Hash: "hash1", ChangedFiles: []string{"foo/one"}},
@@ -456,7 +456,7 @@ func TestCheckPRCommits(t *testing.T) {
 		p := generateMockPR(123, "ref1",
 			[]string{"random comment", "random comment", "random comment"},
 		)
-		commitsInfo := []mirror.CommitInfo{
+		commitsInfo := []repository.CommitInfo{
 			{Hash: "hash3", ChangedFiles: []string{"foo/two", "foo/three"}},
 			{Hash: "hash2", ChangedFiles: []string{"foo/two"}},
 			{Hash: "hash1", ChangedFiles: []string{"foo/one"}},

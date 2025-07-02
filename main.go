@@ -23,7 +23,8 @@ import (
 	"github.com/redis/go-redis/v9"
 	"github.com/urfave/cli/v2"
 
-	"github.com/utilitywarehouse/git-mirror/pkg/mirror"
+	"github.com/utilitywarehouse/git-mirror/repopool"
+	"github.com/utilitywarehouse/git-mirror/repository"
 	"github.com/utilitywarehouse/terraform-applier/git"
 	"github.com/utilitywarehouse/terraform-applier/metrics"
 	"github.com/utilitywarehouse/terraform-applier/prplanner"
@@ -485,7 +486,7 @@ func cleanupTmpDir() {
 	}
 }
 
-func applyGitDefaults(c *cli.Context, mirrorConf mirror.RepoPoolConfig) mirror.RepoPoolConfig {
+func applyGitDefaults(c *cli.Context, mirrorConf repopool.Config) repopool.Config {
 	// always override root as we use root path passed as argument on controller
 	mirrorConf.Defaults.Root = reposRootPath
 
@@ -567,11 +568,11 @@ func run(c *cli.Context) {
 	// setup git-mirror
 	conf.GitMirror = applyGitDefaults(c, conf.GitMirror)
 
-	mirror.EnableMetrics("terraform_applier", runTimeMetrics.Registry)
+	repository.EnableMetrics("terraform_applier", runTimeMetrics.Registry)
 
 	// path to resolve strongbox
 	gitENV := []string{fmt.Sprintf("PATH=%s", os.Getenv("PATH"))}
-	repos, err := mirror.NewRepoPool(ctx, conf.GitMirror, logger.With("logger", "git-mirror"), gitENV)
+	repos, err := repopool.New(ctx, conf.GitMirror, logger.With("logger", "git-mirror"), "", gitENV)
 	if err != nil {
 		logger.Error("could not create git mirror pool", "err", err)
 		os.Exit(1)
