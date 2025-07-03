@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/redis/go-redis/v9"
-	"github.com/utilitywarehouse/git-mirror/pkg/giturl"
+	"github.com/utilitywarehouse/git-mirror/giturl"
 	tfaplv1beta1 "github.com/utilitywarehouse/terraform-applier/api/v1beta1"
 )
 

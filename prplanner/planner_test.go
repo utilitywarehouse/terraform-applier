@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	gomock "github.com/golang/mock/gomock"
-	"github.com/utilitywarehouse/git-mirror/pkg/mirror"
+	"github.com/utilitywarehouse/git-mirror/repository"
 	tfaplv1beta1 "github.com/utilitywarehouse/terraform-applier/api/v1beta1"
 	"github.com/utilitywarehouse/terraform-applier/git"
 )
@@ -44,8 +44,8 @@ func Test_processPullRequest(t *testing.T) {
 		p.BaseRepository.URL = "git@github.com:utilitywarehouse/foo.git"
 
 		testGit.EXPECT().BranchCommits(gomock.Any(), gomock.Any(), gomock.Any()).
-			DoAndReturn(func(_ context.Context, _, hash string) ([]mirror.CommitInfo, error) {
-				return []mirror.CommitInfo{
+			DoAndReturn(func(_ context.Context, _, hash string) ([]repository.CommitInfo, error) {
+				return []repository.CommitInfo{
 					{Hash: "hash1", ChangedFiles: []string{"one", "six"}},
 				}, nil
 			})
@@ -66,8 +66,8 @@ func Test_processPullRequest(t *testing.T) {
 		)
 
 		testGit.EXPECT().BranchCommits(gomock.Any(), gomock.Any(), gomock.Any()).
-			DoAndReturn(func(_ context.Context, _, hash string) ([]mirror.CommitInfo, error) {
-				return []mirror.CommitInfo{
+			DoAndReturn(func(_ context.Context, _, hash string) ([]repository.CommitInfo, error) {
+				return []repository.CommitInfo{
 					{Hash: "hash3"},
 					{Hash: "hash2"},
 					{Hash: "hash1"},
@@ -90,8 +90,8 @@ func Test_processPullRequest(t *testing.T) {
 		p.BaseRepository.URL = "git@github.com:utilitywarehouse/foo.git"
 
 		testGit.EXPECT().BranchCommits(gomock.Any(), gomock.Any(), gomock.Any()).
-			DoAndReturn(func(_ context.Context, _, hash string) ([]mirror.CommitInfo, error) {
-				return []mirror.CommitInfo{
+			DoAndReturn(func(_ context.Context, _, hash string) ([]repository.CommitInfo, error) {
+				return []repository.CommitInfo{
 					{Hash: "hash3", ChangedFiles: []string{"four", "three"}},
 					{Hash: "hash2", ChangedFiles: []string{"two", "five"}},
 					{Hash: "hash1", ChangedFiles: []string{"one", "six"}},

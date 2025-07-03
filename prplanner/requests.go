@@ -6,13 +6,13 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/utilitywarehouse/git-mirror/pkg/mirror"
+	"github.com/utilitywarehouse/git-mirror/repository"
 	tfaplv1beta1 "github.com/utilitywarehouse/terraform-applier/api/v1beta1"
 	"github.com/utilitywarehouse/terraform-applier/sysutil"
 	"k8s.io/apimachinery/pkg/types"
 )
 
-func (p *Planner) ensurePlanRequests(ctx context.Context, pr *pr, commitsInfo []mirror.CommitInfo, prModules []types.NamespacedName, skipCommitRun bool) {
+func (p *Planner) ensurePlanRequests(ctx context.Context, pr *pr, commitsInfo []repository.CommitInfo, prModules []types.NamespacedName, skipCommitRun bool) {
 	for _, moduleName := range prModules {
 		// Check if module has a pending plan request
 		module, err := sysutil.GetModule(ctx, p.ClusterClt, moduleName)
@@ -39,7 +39,7 @@ func (p *Planner) ensurePlanRequests(ctx context.Context, pr *pr, commitsInfo []
 	}
 }
 
-func (p *Planner) ensurePlanRequest(ctx context.Context, pr *pr, commitsInfo []mirror.CommitInfo, module *tfaplv1beta1.Module, skipCommitRun bool) (*tfaplv1beta1.Request, error) {
+func (p *Planner) ensurePlanRequest(ctx context.Context, pr *pr, commitsInfo []repository.CommitInfo, module *tfaplv1beta1.Module, skipCommitRun bool) (*tfaplv1beta1.Request, error) {
 	if !skipCommitRun {
 		// loop through commits from latest to oldest
 		req, err := p.checkPRCommits(ctx, pr, commitsInfo, module)
@@ -55,7 +55,7 @@ func (p *Planner) ensurePlanRequest(ctx context.Context, pr *pr, commitsInfo []m
 	return p.checkPRCommentsForPlanRequests(pr, module)
 }
 
-func (p *Planner) checkPRCommits(ctx context.Context, pr *pr, commitsInfo []mirror.CommitInfo, module *tfaplv1beta1.Module) (*tfaplv1beta1.Request, error) {
+func (p *Planner) checkPRCommits(ctx context.Context, pr *pr, commitsInfo []repository.CommitInfo, module *tfaplv1beta1.Module) (*tfaplv1beta1.Request, error) {
 	// loop through commits to check if module path is updated
 	for _, commit := range commitsInfo {
 		if !isModuleUpdated(module, commit) {

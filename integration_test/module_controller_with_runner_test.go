@@ -73,7 +73,7 @@ var _ = Describe("Module controller with Runner", func() {
 			os.Remove(testStateFilePath)
 		})
 
-		It("Should send module to job queue on commit change and runner should do plan & apply", func() {
+		It("Should send module to job queue on initial runner should do plan & apply", func() {
 			const (
 				moduleName = "hello"
 				repoURL    = "https://host.xy/dummy/repo.git"
@@ -122,7 +122,7 @@ var _ = Describe("Module controller with Runner", func() {
 			testDelegate.EXPECT().DelegateToken(gomock.Any(), gomock.Any(), gomock.Any()).Return("token.X1", nil)
 			testDelegate.EXPECT().SetupDelegation(gomock.Any(), "token.X1").Return(fakeClient, nil)
 
-			By("By making sure job was sent to jobQueue when commit hash is changed")
+			By("By making sure job was sent to jobQueue")
 			Eventually(func() string {
 				err := k8sClient.Get(ctx, moduleLookupKey, fetchedModule)
 				if err != nil {
@@ -168,7 +168,7 @@ var _ = Describe("Module controller with Runner", func() {
 			Expect(k8sClient.Delete(ctx, module)).Should(Succeed())
 		})
 
-		It("Should send module to job queue on commit change and runner should only do plan", func() {
+		It("Should send module to job queue on initial run and runner should only do plan", func() {
 			const (
 				moduleName = "hello-plan-only"
 				repoURL    = "https://host.xy/dummy/repo.git"
@@ -214,7 +214,7 @@ var _ = Describe("Module controller with Runner", func() {
 			testDelegate.EXPECT().DelegateToken(gomock.Any(), gomock.Any(), gomock.Any()).Return("token.X2", nil)
 			testDelegate.EXPECT().SetupDelegation(gomock.Any(), "token.X2").Return(fakeClient, nil)
 
-			By("By making sure job was sent to jobQueue when commit hash is changed")
+			By("By making sure job was sent to jobQueue")
 			Eventually(func() string {
 				err := k8sClient.Get(ctx, moduleLookupKey, fetchedModule)
 				if err != nil {
@@ -255,7 +255,7 @@ var _ = Describe("Module controller with Runner", func() {
 			Expect(k8sClient.Delete(ctx, module)).Should(Succeed())
 		})
 
-		It("Should send module to job queue on commit change and runner should read configmaps and secrets before apply and setup local backend", func() {
+		It("Should send module to job queue on initial run and runner should read configmaps and secrets before apply and setup local backend", func() {
 			const (
 				moduleName = "hello-with-var-env"
 				repoURL    = "https://host.xy/dummy/repo.git"
@@ -349,7 +349,7 @@ var _ = Describe("Module controller with Runner", func() {
 			testDelegate.EXPECT().DelegateToken(gomock.Any(), gomock.Any(), gomock.Any()).Return("token.X3", nil)
 			testDelegate.EXPECT().SetupDelegation(gomock.Any(), "token.X3").Return(fakeClient, nil)
 
-			By("By making sure job was sent to jobQueue when commit hash is changed")
+			By("By making sure job was sent to jobQueue")
 			Eventually(func() string {
 				err := k8sClient.Get(ctx, moduleLookupKey, fetchedModule)
 				if err != nil {
@@ -400,7 +400,7 @@ var _ = Describe("Module controller with Runner", func() {
 			Expect(k8sClient.Delete(ctx, module)).Should(Succeed())
 		})
 
-		It("Should send module to job queue on commit change and runner should generate vault creds", func() {
+		It("Should send module to job queue on initial run and runner should generate vault creds", func() {
 			const (
 				moduleName = "hello-with-vault-creds"
 				repoURL    = "https://host.xy/dummy/repo.git"
@@ -464,7 +464,7 @@ var _ = Describe("Module controller with Runner", func() {
 			testVaultAWSConf.EXPECT().GenerateGCPToken(gomock.Any(), "token.X4", gomock.Any()).
 				Return("ya29.c.c0ASRK0GZ2fzoXHQakYwhwQhSJZ3gFQT5V0Ro_E94zL3fo", nil)
 
-			By("By making sure job was sent to jobQueue when commit hash is changed")
+			By("By making sure job was sent to jobQueue")
 			Eventually(func() string {
 				err := k8sClient.Get(ctx, moduleLookupKey, fetchedModule)
 				if err != nil {

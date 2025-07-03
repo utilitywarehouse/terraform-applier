@@ -57,7 +57,7 @@ import (
 )
 
 const (
-	TestENVK8sVersion = "1.26.0"
+	TestENVK8sVersion = "1.33.0"
 )
 
 // These tests use Ginkgo (BDD-style Go testing framework). Refer to
@@ -113,6 +113,7 @@ var _ = BeforeSuite(func() {
 		"sigs.k8s.io/controller-runtime/tools/setup-envtest",
 		"use", TestENVK8sVersion, "--bin-dir", "../bin", "-p", "path",
 	).Output()
+
 	Expect(err).NotTo(HaveOccurred())
 
 	Expect(os.Setenv("KUBEBUILDER_ASSETS", string(k8sAssetPath))).To(Succeed())
