@@ -10,6 +10,7 @@ import (
 
 	"github.com/hashicorp/terraform-exec/tfexec"
 	tfaplv1beta1 "github.com/utilitywarehouse/terraform-applier/api/v1beta1"
+	"github.com/utilitywarehouse/terraform-applier/git"
 	"github.com/utilitywarehouse/terraform-applier/sysutil"
 )
 
@@ -99,8 +100,7 @@ func (r *Runner) NewTFRunner(
 		runEnv[key] = envs[key]
 	}
 
-	// Set HOME to cwd, this means that SSH should not pick up any
-	// HOME is also used to setup git config in current dir
+	// HOME is used to setup global '.gitconfig' in current dir
 	runEnv["HOME"] = tfr.workingDir
 	// setup SB home for terraform remote module
 	runEnv["STRONGBOX_HOME"] = tfr.workingDir
@@ -109,6 +109,19 @@ func (r *Runner) NewTFRunner(
 		err := ensureDecryption(ctx, tfr.workingDir, strongboxKeyringData, strongboxIdentityData)
 		if err != nil {
 			return nil, fmt.Errorf("unable to setup strongbox err:%w", err)
+		}
+	}
+
+	// setup Github APP token for fetching modules from private repo
+	if r.GithubApp != nil {
+		token, err := setupGithubAppToken(ctx, r.GithubApp, tfr.workingDir)
+		if err != nil {
+			r.Log.Error("unable to configure github app token", "err", err)
+		}
+
+		if token != "" {
+			runEnv["REPO_USERNAME"] = "-" // username is required
+			runEnv["REPO_PASSWORD"] = token
 		}
 	}
 
@@ -230,4 +243,32 @@ func (te *tfRunner) forceUnlock(ctx context.Context, lockID string) (string, err
 	}
 
 	return out.String(), nil
+}
+
+func setupGithubAppToken(ctx context.Context, app git.TokenGenerator, cwd string) (string, error) {
+	token, err := app.Token(ctx, map[string]string{"contents": "read"})
+	if err == nil {
+		return "", err
+	}
+
+	gitConfig := filepath.Join(cwd, ".gitconfig")
+
+	// convert ssh urls to https to use token
+	urlConfig := `
+[url "https://github.com/"]
+	insteadOf = git@github.com:
+	insteadOf = ssh://git@github.com/
+`
+
+	f, err := os.OpenFile(gitConfig, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0644)
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+
+	if _, err = f.WriteString(urlConfig); err != nil {
+		return "", err
+	}
+
+	return token, nil
 }

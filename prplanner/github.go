@@ -8,6 +8,8 @@ import (
 	"io"
 	"net/http"
 	"strings"
+
+	"github.com/utilitywarehouse/terraform-applier/git"
 )
 
 //go:generate go run github.com/golang/mock/mockgen -package prplanner -destination github_mock.go github.com/utilitywarehouse/terraform-applier/prplanner GithubInterface
@@ -20,9 +22,22 @@ type GithubInterface interface {
 }
 
 type gitHubClient struct {
-	rootURL string
-	http    *http.Client
-	token   string
+	rootURL     string
+	http        *http.Client
+	staticToken string
+	app         git.TokenGenerator
+}
+
+func (gc *gitHubClient) token(ctx context.Context) (string, error) {
+	if gc.staticToken != "" {
+		return gc.staticToken, nil
+	}
+
+	if gc.app != nil {
+		return gc.app.Token(ctx, map[string]string{"pull_requests": "write"})
+	}
+
+	return "", fmt.Errorf("static token or app not set")
 }
 
 func (gc *gitHubClient) openPRs(ctx context.Context, repoOwner, repoName string) ([]*pr, error) {
@@ -79,8 +94,12 @@ func (gc *gitHubClient) query(ctx context.Context, q gitPRRequest, result any) e
 	}
 
 	// Set headers
+	token, err := gc.token(ctx)
+	if err != nil {
+		return err
+	}
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+gc.token)
+	req.Header.Set("Authorization", "Bearer "+token)
 
 	// Send the HTTP request
 	resp, err := gc.http.Do(req)
@@ -123,8 +142,12 @@ func (gc *gitHubClient) postComment(repoOwner, repoName string, commentID, prNum
 	}
 
 	// Set headers
+	token, err := gc.token(context.Background())
+	if err != nil {
+		return 0, err
+	}
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+gc.token)
+	req.Header.Set("Authorization", "Bearer "+token)
 
 	// Send the HTTP request
 	resp, err := gc.http.Do(req)

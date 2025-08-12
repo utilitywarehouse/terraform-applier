@@ -290,6 +290,21 @@ var (
 			Usage:   "provide GH API token with write to PR access",
 		},
 		&cli.StringFlag{
+			Name:    "github-app-id",
+			EnvVars: []string{"GITHUB_APP_ID"},
+			Usage:   "The application id or the client ID of the Github app",
+		},
+		&cli.StringFlag{
+			Name:    "github-app-install-id",
+			EnvVars: []string{"GITHUB_APP_INSTALL_ID"},
+			Usage:   "The installation id of the Github app (in the organization).",
+		},
+		&cli.StringFlag{
+			Name:    "github-app-key-path",
+			EnvVars: []string{"GITHUB_APP_KEY_PATH"},
+			Usage:   "The path to the github app private key",
+		},
+		&cli.StringFlag{
 			Name:    "github-webhook-secret",
 			EnvVars: []string{"GITHUB_WEBHOOK_SECRET"},
 			Usage:   "used to sign and authorise GH webhooks",
@@ -333,6 +348,15 @@ func validate(c *cli.Context) {
 
 	if c.IsSet("watch-namespaces") {
 		watchNamespaces = strings.Split(c.String("watch-namespaces"), ",")
+	}
+
+	if c.IsSet("github-app-id") {
+		if c.String("github-app-id") == "" ||
+			c.String("github-app-install-id") == "" ||
+			c.String("github-app-key-path") == "" {
+			logger.Error("github app ID, installation ID and key path are required but only ID is set")
+			os.Exit(1)
+		}
 	}
 
 	logger.Info("config", "reposRootPath", reposRootPath)
@@ -403,6 +427,27 @@ func terraformVersionString(execPath string) (string, error) {
 	return version.String(), nil
 }
 
+func ensureGitCredsLoader(path string) (string, error) {
+	const loadCredsScript = `#!/bin/sh
+
+case "$1" in
+  Username*) echo "$REPO_USERNAME" ;;
+  Password*) echo "$REPO_PASSWORD" ;;
+esac
+`
+	_, err := os.Stat(path)
+	switch {
+	case os.IsNotExist(err):
+		if err := os.WriteFile(path, []byte(loadCredsScript), 0750); err != nil {
+			return "", err
+		}
+	case err != nil:
+		return "", fmt.Errorf("unable to check if script file exits err:%w", err)
+	}
+
+	return path, nil
+}
+
 func kubeClient() (*kubernetes.Clientset, error) {
 	// creates the in-cluster config
 	config, err := rest.InClusterConfig()
@@ -441,6 +486,19 @@ func setupGlobalEnv(c *cli.Context) {
 		}
 		logger.Info("setting GIT_SSH_COMMAND as global env", "value", cmdStr)
 		globalRunEnv["GIT_SSH_COMMAND"] = cmdStr
+	}
+
+	// if GH application flags are set then set `GIT_ASKPASS` env so
+	// github app token can be used to fetch private remote modules during run
+	if c.IsSet("github-app-id") {
+		gitCredsLoader := filepath.Join(os.TempDir(), "tf-git-creds-loader.sh")
+		loadCredsScript, err := ensureGitCredsLoader(gitCredsLoader)
+		if err != nil {
+			logger.Error("unable to write load creds script file", "err", err)
+			os.Exit(1)
+		}
+
+		globalRunEnv["GIT_ASKPASS"] = loadCredsScript
 	}
 
 	// KUBE_CONFIG_PATH will be used by modules with kubernetes backend.
@@ -661,10 +719,20 @@ func run(c *cli.Context) {
 		os.Exit(1)
 	}
 
+	var runnerGHApp *git.GithubApp
+	if c.IsSet("github-app-id") {
+		runnerGHApp = &git.GithubApp{
+			ID:             c.String("github-app-id"),
+			InstallID:      c.String("github-app-install-id"),
+			PrivateKeyPath: c.String("github-app-key-path"),
+		}
+	}
+
 	runner := runner.Runner{
 		Clock:                  clock,
 		KubeClt:                kubeClient,
 		Repos:                  repos,
+		GithubApp:              runnerGHApp,
 		Log:                    logger.With("logger", "runner"),
 		Metrics:                metrics,
 		TerraformExecPath:      execPath,
@@ -786,7 +854,16 @@ func run(c *cli.Context) {
 			os.Exit(1)
 		}
 
-		err = prPlanner.Init(ctx, c.String("github-token"), sub.Channel())
+		var plannerGHApp *git.GithubApp
+		if c.IsSet("github-app-id") {
+			plannerGHApp = &git.GithubApp{
+				ID:             c.String("github-app-id"),
+				InstallID:      c.String("github-app-install-id"),
+				PrivateKeyPath: c.String("github-app-key-path"),
+			}
+		}
+
+		err = prPlanner.Init(ctx, c.String("github-token"), plannerGHApp, sub.Channel())
 		if err != nil {
 			logger.Error("unable to init pr planner", "err", err)
 		}
