@@ -20,7 +20,7 @@ type GithubApp struct {
 	InstallID      string
 	PrivateKeyPath string
 
-	log        *slog.Logger
+	Log        *slog.Logger
 	token      string
 	tokenExpAt time.Time
 }
@@ -45,7 +45,7 @@ func (app *GithubApp) Token(ctx context.Context, permissions map[string]string) 
 	app.token = token.Token
 	app.tokenExpAt = token.ExpiresAt
 
-	app.log.Debug("new github app access token created")
+	app.Log.Debug("new github app access token created")
 
 	return app.token, nil
 }

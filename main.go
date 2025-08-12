@@ -725,6 +725,7 @@ func run(c *cli.Context) {
 			ID:             c.String("github-app-id"),
 			InstallID:      c.String("github-app-install-id"),
 			PrivateKeyPath: c.String("github-app-key-path"),
+			Log:            logger.With("logger", "runner-github-app"),
 		}
 	}
 
@@ -860,6 +861,7 @@ func run(c *cli.Context) {
 				ID:             c.String("github-app-id"),
 				InstallID:      c.String("github-app-install-id"),
 				PrivateKeyPath: c.String("github-app-key-path"),
+				Log:            logger.With("logger", "pr-github-app"),
 			}
 		}
 
