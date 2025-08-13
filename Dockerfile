@@ -3,7 +3,7 @@ FROM golang:1.25rc3-alpine3.22 AS builder
 ARG TARGETOS
 ARG TARGETARCH
 
-ENV STRONGBOX_VERSION=2.0.0-RC4
+ENV STRONGBOX_VERSION=v2.1.0
 
 RUN os=$(go env GOOS) && arch=$(go env GOARCH) \
       && apk --no-cache add curl git \
@@ -35,11 +35,8 @@ FROM alpine:3.22
 
 ENV USER_ID=65532
 
-# '--repository' flag used to install latest git v 2.49
-# can be removed once alpine is updated to 3.22
 RUN adduser -S -H -u $USER_ID tf-applier \
-      && apk --no-cache add ca-certificates openssh-client \
-      && apk --no-cache add git --repository=https://dl-cdn.alpinelinux.org/alpine/edge/main
+      && apk --no-cache add ca-certificates git openssh-client
 
 COPY --from=builder /usr/local/bin/strongbox /usr/local/bin/
 
