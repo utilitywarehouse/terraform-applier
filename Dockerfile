@@ -3,7 +3,7 @@ FROM golang:1.24-alpine AS builder
 ARG TARGETOS
 ARG TARGETARCH
 
-ENV STRONGBOX_VERSION=v2.1.0
+ENV STRONGBOX_VERSION=2.1.0
 
 RUN os=$(go env GOOS) && arch=$(go env GOARCH) \
       && apk --no-cache add curl git \
