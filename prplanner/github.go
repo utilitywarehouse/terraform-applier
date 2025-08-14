@@ -29,7 +29,10 @@ type gitHubClient struct {
 
 func (gc *gitHubClient) token(ctx context.Context) (string, error) {
 	_, token, err := gc.credsProvider.Creds(ctx)
-	return token, fmt.Errorf("unable to provide creds err:%w", err)
+	if err != nil {
+		return "", fmt.Errorf("unable to provide creds err:%w", err)
+	}
+	return token, nil
 }
 
 func (gc *gitHubClient) openPRs(ctx context.Context, repoOwner, repoName string) ([]*pr, error) {

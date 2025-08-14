@@ -113,7 +113,7 @@ func (r *Runner) NewTFRunner(
 
 	// setup Github APP token for fetching modules from private repo
 	username, password, err := r.GHCredsProvider.Creds(ctx)
-	if err == nil {
+	if err != nil {
 		r.Log.Error("unable to configure github app token", "err", err)
 	}
 
