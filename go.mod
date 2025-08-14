@@ -1,6 +1,6 @@
 module github.com/utilitywarehouse/terraform-applier
 
-go 1.24.0
+go 1.25.0
 
 require (
 	filippo.io/age v1.2.1
@@ -19,7 +19,7 @@ require (
 	github.com/redis/go-redis/v9 v9.12.1
 	github.com/robfig/cron/v3 v3.0.1
 	github.com/urfave/cli/v2 v2.27.7
-	github.com/utilitywarehouse/git-mirror v0.3.13-0.20250813122924-d976fee17b8f
+	github.com/utilitywarehouse/git-mirror v0.3.13
 	github.com/utilitywarehouse/go-operational v0.0.0-20250423084238-c80547bcb12b
 	golang.org/x/oauth2 v0.30.0
 	gopkg.in/yaml.v2 v2.4.0
@@ -27,7 +27,7 @@ require (
 	k8s.io/apimachinery v0.35.0-alpha.0
 	k8s.io/client-go v0.35.0-alpha.0
 	sigs.k8s.io/controller-runtime v0.21.0
-	sigs.k8s.io/controller-runtime/tools/setup-envtest v0.0.0-20250812131711-682465344b9b
+	sigs.k8s.io/controller-runtime/tools/setup-envtest v0.0.0-20250813191507-c7df6d0236ed
 	sigs.k8s.io/controller-tools v0.18.0
 )
 
@@ -115,8 +115,8 @@ require (
 	gopkg.in/evanphx/json-patch.v4 v4.13.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-	k8s.io/apiextensions-apiserver v0.33.3 // indirect
-	k8s.io/code-generator v0.33.3 // indirect
+	k8s.io/apiextensions-apiserver v0.33.4 // indirect
+	k8s.io/code-generator v0.33.4 // indirect
 	k8s.io/gengo/v2 v2.0.0-20250704022524-ddb642e17a28 // indirect
 	k8s.io/klog/v2 v2.130.1 // indirect
 	k8s.io/kube-openapi v0.0.0-20250812141708-942b836dc350 // indirect
