@@ -27,14 +27,6 @@ type gitHubClient struct {
 	credsProvider sysutil.CredsProvider
 }
 
-func (gc *gitHubClient) token(ctx context.Context) (string, error) {
-	_, token, err := gc.credsProvider.Creds(ctx)
-	if err != nil {
-		return "", fmt.Errorf("unable to provide creds err:%w", err)
-	}
-	return token, nil
-}
-
 func (gc *gitHubClient) openPRs(ctx context.Context, repoOwner, repoName string) ([]*pr, error) {
 	repoName = strings.TrimSuffix(repoName, ".git")
 	q := gitPRRequest{Query: queryRepoPRs}
@@ -89,10 +81,11 @@ func (gc *gitHubClient) query(ctx context.Context, q gitPRRequest, result any) e
 	}
 
 	// Set headers
-	token, err := gc.token(ctx)
+	_, token, err := gc.credsProvider.Creds(ctx)
 	if err != nil {
-		return err
+		return fmt.Errorf("unable to provide creds err:%w", err)
 	}
+
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+token)
 
@@ -137,10 +130,11 @@ func (gc *gitHubClient) postComment(repoOwner, repoName string, commentID, prNum
 	}
 
 	// Set headers
-	token, err := gc.token(context.Background())
+	_, token, err := gc.credsProvider.Creds(context.Background())
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("unable to provide creds err:%w", err)
 	}
+
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+token)
 
