@@ -34,14 +34,13 @@ type Planner struct {
 	Log            *slog.Logger
 }
 
-func (p *Planner) Init(ctx context.Context, token string, ghApp git.TokenGenerator, ch <-chan *redis.Message) error {
+func (p *Planner) Init(ctx context.Context, ghApp sysutil.CredsProvider, ch <-chan *redis.Message) error {
 	p.github = &gitHubClient{
 		rootURL: "https://api.github.com",
 		http: &http.Client{
 			Timeout: 15 * time.Second,
 		},
-		staticToken: token,
-		app:         ghApp,
+		credsProvider: ghApp,
 	}
 
 	if ch != nil {

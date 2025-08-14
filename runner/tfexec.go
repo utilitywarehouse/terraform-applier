@@ -10,7 +10,6 @@ import (
 
 	"github.com/hashicorp/terraform-exec/tfexec"
 	tfaplv1beta1 "github.com/utilitywarehouse/terraform-applier/api/v1beta1"
-	"github.com/utilitywarehouse/terraform-applier/git"
 	"github.com/utilitywarehouse/terraform-applier/sysutil"
 )
 
@@ -78,7 +77,7 @@ func (r *Runner) NewTFRunner(
 		planFileName:    "plan.out",
 	}
 
-	tf, err := tfexec.NewTerraform(tfr.workingDir, r.TerraformExecPath)
+	tfr.tf, err = tfexec.NewTerraform(tfr.workingDir, r.TerraformExecPath)
 	if err != nil {
 		return nil, err
 	}
@@ -113,15 +112,20 @@ func (r *Runner) NewTFRunner(
 	}
 
 	// setup Github APP token for fetching modules from private repo
-	if r.GithubApp != nil {
-		token, err := setupGithubAppToken(ctx, r.GithubApp, tfr.workingDir)
-		if err != nil {
-			r.Log.Error("unable to configure github app token", "err", err)
-		}
+	username, password, err := r.GHCredsProvider.Creds(ctx)
+	if err == nil {
+		r.Log.Error("unable to configure github app token", "err", err)
+	}
 
-		if token != "" {
-			runEnv["REPO_USERNAME"] = "-" // username is required
-			runEnv["REPO_PASSWORD"] = token
+	if password != "" {
+		runEnv["GITHUB_REPO_USERNAME"] = username
+		runEnv["GITHUB_REPO_PASSWORD"] = password
+
+		// if SSH cred is not set enforce `https` instead of `ssh` protocol
+		if _, ok := runEnv["GIT_SSH_COMMAND"]; !ok {
+			if err := enforceHTTPSGithub(tfr.workingDir); err != nil {
+				r.Log.Error("unable to override git url", "err", err)
+			}
 		}
 	}
 
@@ -134,7 +138,7 @@ func (r *Runner) NewTFRunner(
 		runEnv["TF_PLUGIN_CACHE_MAY_BREAK_DEPENDENCY_LOCK_FILE"] = "1"
 	}
 
-	tf.SetEnv(runEnv)
+	tfr.tf.SetEnv(runEnv)
 
 	// Setup *.auto.tfvars.json file to auto load TF variables during plan and apply
 	jsonBytes, err := json.Marshal(vars)
@@ -147,7 +151,6 @@ func (r *Runner) NewTFRunner(
 		return nil, fmt.Errorf("unable to write the data to file %s err:%s", tfvarFile, err)
 	}
 
-	tfr.tf = tf
 	return tfr, nil
 }
 
@@ -245,12 +248,9 @@ func (te *tfRunner) forceUnlock(ctx context.Context, lockID string) (string, err
 	return out.String(), nil
 }
 
-func setupGithubAppToken(ctx context.Context, app git.TokenGenerator, cwd string) (string, error) {
-	token, err := app.Token(ctx, map[string]string{"contents": "read"})
-	if err == nil {
-		return "", err
-	}
-
+// enforceHTTPSGithub will push git's `insteadOf` config to override repo remote url
+// git@github.com to https://github.com
+func enforceHTTPSGithub(cwd string) error {
 	gitConfig := filepath.Join(cwd, ".gitconfig")
 
 	// convert ssh urls to https to use token
@@ -262,13 +262,13 @@ func setupGithubAppToken(ctx context.Context, app git.TokenGenerator, cwd string
 
 	f, err := os.OpenFile(gitConfig, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0644)
 	if err != nil {
-		return "", err
+		return err
 	}
 	defer f.Close()
 
 	if _, err = f.WriteString(urlConfig); err != nil {
-		return "", err
+		return err
 	}
 
-	return token, nil
+	return nil
 }

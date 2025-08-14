@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/utilitywarehouse/terraform-applier/git"
+	"github.com/utilitywarehouse/terraform-applier/sysutil"
 )
 
 //go:generate go run github.com/golang/mock/mockgen -package prplanner -destination github_mock.go github.com/utilitywarehouse/terraform-applier/prplanner GithubInterface
@@ -22,22 +22,14 @@ type GithubInterface interface {
 }
 
 type gitHubClient struct {
-	rootURL     string
-	http        *http.Client
-	staticToken string
-	app         git.TokenGenerator
+	rootURL       string
+	http          *http.Client
+	credsProvider sysutil.CredsProvider
 }
 
 func (gc *gitHubClient) token(ctx context.Context) (string, error) {
-	if gc.staticToken != "" {
-		return gc.staticToken, nil
-	}
-
-	if gc.app != nil {
-		return gc.app.Token(ctx, map[string]string{"pull_requests": "write"})
-	}
-
-	return "", fmt.Errorf("static token or app not set")
+	_, token, err := gc.credsProvider.Creds(ctx)
+	return token, fmt.Errorf("unable to provide creds err:%w", err)
 }
 
 func (gc *gitHubClient) openPRs(ctx context.Context, repoOwner, repoName string) ([]*pr, error) {
