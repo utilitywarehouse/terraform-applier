@@ -8,6 +8,8 @@ import (
 	"io"
 	"net/http"
 	"strings"
+
+	"github.com/utilitywarehouse/terraform-applier/sysutil"
 )
 
 //go:generate go run github.com/golang/mock/mockgen -package prplanner -destination github_mock.go github.com/utilitywarehouse/terraform-applier/prplanner GithubInterface
@@ -20,9 +22,9 @@ type GithubInterface interface {
 }
 
 type gitHubClient struct {
-	rootURL string
-	http    *http.Client
-	token   string
+	rootURL       string
+	http          *http.Client
+	credsProvider sysutil.CredsProvider
 }
 
 func (gc *gitHubClient) openPRs(ctx context.Context, repoOwner, repoName string) ([]*pr, error) {
@@ -79,8 +81,13 @@ func (gc *gitHubClient) query(ctx context.Context, q gitPRRequest, result any) e
 	}
 
 	// Set headers
+	_, token, err := gc.credsProvider.Creds(ctx)
+	if err != nil {
+		return fmt.Errorf("unable to provide creds err:%w", err)
+	}
+
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+gc.token)
+	req.Header.Set("Authorization", "Bearer "+token)
 
 	// Send the HTTP request
 	resp, err := gc.http.Do(req)
@@ -123,8 +130,13 @@ func (gc *gitHubClient) postComment(repoOwner, repoName string, commentID, prNum
 	}
 
 	// Set headers
+	_, token, err := gc.credsProvider.Creds(context.Background())
+	if err != nil {
+		return 0, fmt.Errorf("unable to provide creds err:%w", err)
+	}
+
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+gc.token)
+	req.Header.Set("Authorization", "Bearer "+token)
 
 	// Send the HTTP request
 	resp, err := gc.http.Do(req)

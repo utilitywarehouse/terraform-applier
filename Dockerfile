@@ -1,9 +1,9 @@
 # Build the manager binary
-FROM golang:1.24-alpine AS builder
+FROM golang:1.25-alpine AS builder
 ARG TARGETOS
 ARG TARGETARCH
 
-ENV STRONGBOX_VERSION=2.0.0-RC4
+ENV STRONGBOX_VERSION=2.1.0
 
 RUN os=$(go env GOOS) && arch=$(go env GOARCH) \
       && apk --no-cache add curl git \
@@ -31,15 +31,12 @@ RUN \
  go test -v -cover ./... && \
     CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -a -o tf-applier
 
-FROM alpine:3.21
+FROM alpine:3.22
 
 ENV USER_ID=65532
 
-# '--repository' flag used to install latest git v 2.49
-# can be removed once alpine is updated to 3.22
 RUN adduser -S -H -u $USER_ID tf-applier \
-      && apk --no-cache add ca-certificates openssh-client \
-      && apk --no-cache add git --repository=https://dl-cdn.alpinelinux.org/alpine/edge/main
+      && apk --no-cache add ca-certificates git openssh-client
 
 COPY --from=builder /usr/local/bin/strongbox /usr/local/bin/
 

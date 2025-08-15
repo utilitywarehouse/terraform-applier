@@ -78,7 +78,7 @@ func setupGitConfigForSB(ctx context.Context, cwd string, runEnv []string) error
 
 	stderr, err := s.CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("error running strongbox -git-config  err:%s ", stderr)
+		return fmt.Errorf("error running strongbox -git-config  stderr:%s err:%w", stderr, err)
 	}
 
 	return nil
@@ -95,7 +95,7 @@ func runStrongboxDecryption(ctx context.Context, cwd string, runEnv []string) er
 
 	stderr, err := s.CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("error running strongbox -decrypt err:%s ", stderr)
+		return fmt.Errorf("error running strongbox -decrypt stderr:%s err:%w", stderr, err)
 	}
 
 	return nil

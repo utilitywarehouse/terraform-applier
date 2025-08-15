@@ -41,6 +41,7 @@ type Runner struct {
 	Recorder               record.EventRecorder
 	KubeClt                kubernetes.Interface
 	Repos                  git.Repositories
+	GHCredsProvider        sysutil.CredsProvider
 	Redis                  sysutil.RedisInterface
 	Log                    *slog.Logger
 	Delegate               DelegateInterface

@@ -86,6 +86,7 @@ var (
 	testMockRunner2  *runner.MockRunnerInterface //only used for controller behaviour testing without runner
 	testReconciler   *controllers.ModuleReconciler
 	testVaultAWSConf *vault.MockProviderInterface
+	testCreds        *sysutil.MockCredsProvider
 )
 
 func TestAPIs(t *testing.T) {
@@ -167,6 +168,7 @@ var _ = BeforeSuite(func() {
 	testMockRunner1 = runner.NewMockRunnerInterface(goMockCtrl)
 	testMockRunner2 = runner.NewMockRunnerInterface(goMockCtrl)
 	testRedis = sysutil.NewMockRedisInterface(goMockCtrl)
+	testCreds = sysutil.NewMockCredsProvider(goMockCtrl)
 
 	testVaultAWSConf = vault.NewMockProviderInterface(goMockCtrl)
 
@@ -220,6 +222,7 @@ var _ = BeforeSuite(func() {
 		Recorder:               k8sManager.GetEventRecorderFor("terraform-applier"),
 		KubeClt:                fakeClient,
 		Repos:                  testRepos,
+		GHCredsProvider:        testCreds,
 		Delegate:               testDelegate,
 		Log:                    testLogger.With("logger", "runner"),
 		Metrics:                testMetrics,

@@ -25,7 +25,6 @@ import (
 
 	"github.com/utilitywarehouse/git-mirror/repopool"
 	"github.com/utilitywarehouse/git-mirror/repository"
-	"github.com/utilitywarehouse/terraform-applier/git"
 	"github.com/utilitywarehouse/terraform-applier/metrics"
 	"github.com/utilitywarehouse/terraform-applier/prplanner"
 	"github.com/utilitywarehouse/terraform-applier/runner"
@@ -290,6 +289,21 @@ var (
 			Usage:   "provide GH API token with write to PR access",
 		},
 		&cli.StringFlag{
+			Name:    "github-app-id",
+			EnvVars: []string{"GITHUB_APP_ID"},
+			Usage:   "The application id or the client ID of the Github app",
+		},
+		&cli.StringFlag{
+			Name:    "github-app-install-id",
+			EnvVars: []string{"GITHUB_APP_INSTALL_ID"},
+			Usage:   "The installation id of the Github app (in the organization).",
+		},
+		&cli.StringFlag{
+			Name:    "github-app-key-path",
+			EnvVars: []string{"GITHUB_APP_KEY_PATH"},
+			Usage:   "The path to the github app private key",
+		},
+		&cli.StringFlag{
 			Name:    "github-webhook-secret",
 			EnvVars: []string{"GITHUB_WEBHOOK_SECRET"},
 			Usage:   "used to sign and authorise GH webhooks",
@@ -333,6 +347,15 @@ func validate(c *cli.Context) {
 
 	if c.IsSet("watch-namespaces") {
 		watchNamespaces = strings.Split(c.String("watch-namespaces"), ",")
+	}
+
+	if c.IsSet("github-app-id") {
+		if c.String("github-app-id") == "" ||
+			c.String("github-app-install-id") == "" ||
+			c.String("github-app-key-path") == "" {
+			logger.Error("github app ID, installation ID and key path are required but only ID is set")
+			os.Exit(1)
+		}
 	}
 
 	logger.Info("config", "reposRootPath", reposRootPath)
@@ -432,17 +455,37 @@ func setupGlobalEnv(c *cli.Context) {
 	}
 
 	if c.Bool("set-git-ssh-command-global-env") {
-		cmdStr, err := git.GitSSHCommand(
+		cmdStr, err := sysutil.GitSSHCommand(
 			c.String("git-ssh-key-file"), c.String("git-ssh-known-hosts-file"), c.Bool("git-verify-known-hosts"),
 		)
 		if err != nil {
 			logger.Error("unable to set GIT_SSH_COMMAND", "err", err)
 			os.Exit(1)
 		}
-		logger.Info("setting GIT_SSH_COMMAND as global env", "value", cmdStr)
+		logger.Info("setting GIT_SSH_COMMAND as global env, it will be used to fetch private modules", "value", cmdStr)
 		globalRunEnv["GIT_SSH_COMMAND"] = cmdStr
 	}
 
+	// if GH application flags are set then set `GIT_ASKPASS` env so
+	// github app token can be used to fetch private remote modules during run
+	if c.IsSet("github-app-id") {
+		loadCredsScript, err := sysutil.EnsureGitCredsLoader()
+		if err != nil {
+			logger.Error("unable to write load creds script file", "err", err)
+			os.Exit(1)
+		}
+
+		logger.Info("setting GIT_ASKPASS as global env, it will be used to fetch private modules")
+		globalRunEnv["GIT_ASKPASS"] = loadCredsScript
+	}
+
+	if c.Bool("set-git-ssh-command-global-env") && c.IsSet("github-app-id") {
+		logger.Info(
+			"'set-git-ssh-command-global-env' and 'github-app-id' both are set." +
+				"github app token will not be enforced and appropriate creds will" +
+				"be selected by 'git' based on URL scheme of remote repository",
+		)
+	}
 	// KUBE_CONFIG_PATH will be used by modules with kubernetes backend.
 	// ideally modules should be using own SA to auth with kube cluster and not depend on default in cluster config of controller's SA
 	// but without this config terraform ignores `host` and `token` backend attributes
@@ -661,10 +704,24 @@ func run(c *cli.Context) {
 		os.Exit(1)
 	}
 
+	runnerGHCreds, err := sysutil.NewGithubCredProvider(
+		c.String("github-token"),
+		c.String("github-app-id"),
+		c.String("github-app-install-id"),
+		c.String("github-app-key-path"),
+		map[string]string{"contents": "read"},
+		logger.With("logger", "pr-github-app"),
+	)
+	if err != nil {
+		logger.Error("unable to create creds provider", "error", err)
+		os.Exit(1)
+	}
+
 	runner := runner.Runner{
 		Clock:                  clock,
 		KubeClt:                kubeClient,
 		Repos:                  repos,
+		GHCredsProvider:        runnerGHCreds,
 		Log:                    logger.With("logger", "runner"),
 		Metrics:                metrics,
 		TerraformExecPath:      execPath,
@@ -786,7 +843,20 @@ func run(c *cli.Context) {
 			os.Exit(1)
 		}
 
-		err = prPlanner.Init(ctx, c.String("github-token"), sub.Channel())
+		plannerGHCreds, err := sysutil.NewGithubCredProvider(
+			c.String("github-token"),
+			c.String("github-app-id"),
+			c.String("github-app-install-id"),
+			c.String("github-app-key-path"),
+			map[string]string{"pull_requests": "write"},
+			logger.With("logger", "pr-github-app"),
+		)
+		if err != nil {
+			logger.Error("unable to create creds provider", "error", err)
+			os.Exit(1)
+		}
+
+		err = prPlanner.Init(ctx, plannerGHCreds, sub.Channel())
 		if err != nil {
 			logger.Error("unable to init pr planner", "err", err)
 		}
