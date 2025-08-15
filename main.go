@@ -554,6 +554,12 @@ func applyGitDefaults(c *cli.Context, mirrorConf repopool.Config) repopool.Confi
 		mirrorConf.Defaults.Auth.SSHKnownHostsPath = c.String("git-ssh-known-hosts-file")
 	}
 
+	if mirrorConf.Defaults.Auth.GithubAppID == "" {
+		mirrorConf.Defaults.Auth.GithubAppID = c.String("github-app-id")
+		mirrorConf.Defaults.Auth.GithubAppInstallationID = c.String("github-app-install-id")
+		mirrorConf.Defaults.Auth.GithubAppPrivateKeyPath = c.String("github-app-key-path")
+	}
+
 	return mirrorConf
 }
 
