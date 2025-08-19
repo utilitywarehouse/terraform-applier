@@ -21,17 +21,18 @@ import (
 )
 
 type Planner struct {
-	ListenAddress  string
-	WebhookSecret  string
-	ClusterEnvName string
-	GitMirror      repopool.Config
-	ClusterClt     client.Client
-	Repos          git.Repositories
-	RedisClient    sysutil.RedisInterface
-	Runner         runner.RunnerInterface
-	github         GithubInterface
-	Interval       time.Duration
-	Log            *slog.Logger
+	ListenAddress         string
+	WebhookSecret         string
+	SkipWebhookValidation bool
+	ClusterEnvName        string
+	GitMirror             repopool.Config
+	ClusterClt            client.Client
+	Repos                 git.Repositories
+	RedisClient           sysutil.RedisInterface
+	Runner                runner.RunnerInterface
+	github                GithubInterface
+	Interval              time.Duration
+	Log                   *slog.Logger
 }
 
 func (p *Planner) Init(ctx context.Context, ghApp sysutil.CredsProvider, ch <-chan *redis.Message) error {

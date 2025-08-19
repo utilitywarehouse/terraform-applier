@@ -10,9 +10,12 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"slices"
 
 	tfaplv1beta1 "github.com/utilitywarehouse/terraform-applier/api/v1beta1"
 )
+
+var expectedEvents = []string{"ping", "pull_request", "issue_comment"}
 
 func (p *Planner) startWebhook() {
 	http.HandleFunc("/github-events", p.handleWebhook)
@@ -29,6 +32,14 @@ func (p *Planner) handleWebhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Get the X-GitHub-Event header
+	event := r.Header.Get("X-GitHub-Event")
+
+	if !slices.Contains(expectedEvents, event) {
+		// exit early
+		return
+	}
+
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		p.Log.Error("cannot read request body", "error", err)
@@ -36,14 +47,11 @@ func (p *Planner) handleWebhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !p.isValidSignature(r, body, p.WebhookSecret) {
+	if !p.SkipWebhookValidation && !p.isValidSignature(r, body, p.WebhookSecret) {
 		p.Log.Error("invalid signature")
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-
-	// Get the X-GitHub-Event header
-	event := r.Header.Get("X-GitHub-Event")
 
 	// Parse the JSON payload
 	var payload GitHubWebhook
