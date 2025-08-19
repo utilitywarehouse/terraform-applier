@@ -308,6 +308,11 @@ var (
 			EnvVars: []string{"GITHUB_WEBHOOK_SECRET"},
 			Usage:   "used to sign and authorise GH webhooks",
 		},
+		&cli.BoolFlag{
+			Name:    "github-webhook-skip-validation",
+			EnvVars: []string{"GITHUB_WEBHOOK_SKIP_VALIDATION"},
+			Usage:   "If set github webhook signature validation will be skipped",
+		},
 		&cli.StringFlag{
 			Name:    "cluster-env-name",
 			EnvVars: []string{"CLUSTER_ENV_NAME"},
@@ -829,16 +834,17 @@ func run(c *cli.Context) {
 
 	if !c.Bool("disable-pr-planner") {
 		prPlanner := &prplanner.Planner{
-			ListenAddress:  c.String("pr-planner-webhook-port"),
-			WebhookSecret:  c.String("github-webhook-secret"),
-			ClusterEnvName: c.String("cluster-env-name"),
-			GitMirror:      conf.GitMirror,
-			Interval:       time.Duration(c.Int("pr-planner-interval")) * time.Second,
-			ClusterClt:     mgr.GetClient(),
-			Repos:          repos,
-			RedisClient:    sysutil.Redis{Client: rdb},
-			Runner:         &runner,
-			Log:            logger.With("logger", "pr-planner"),
+			ListenAddress:         c.String("pr-planner-webhook-port"),
+			WebhookSecret:         c.String("github-webhook-secret"),
+			SkipWebhookValidation: c.Bool("github-webhook-skip-validation"),
+			ClusterEnvName:        c.String("cluster-env-name"),
+			GitMirror:             conf.GitMirror,
+			Interval:              time.Duration(c.Int("pr-planner-interval")) * time.Second,
+			ClusterClt:            mgr.GetClient(),
+			Repos:                 repos,
+			RedisClient:           sysutil.Redis{Client: rdb},
+			Runner:                &runner,
+			Log:                   logger.With("logger", "pr-planner"),
 		}
 
 		// setup subscription for key set
