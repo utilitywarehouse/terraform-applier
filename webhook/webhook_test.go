@@ -1,4 +1,4 @@
-package prplanner
+package webhook
 
 import (
 	"net/http"
@@ -6,12 +6,20 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/golang/mock/gomock"
 	"github.com/google/go-cmp/cmp"
+	"github.com/utilitywarehouse/terraform-applier/git"
 )
 
 func Test_webhook(t *testing.T) {
-	planner := &Planner{
+	goMockCtrl := gomock.NewController(t)
+	testRepos := git.NewMockRepositories(goMockCtrl)
+
+	testRepos.EXPECT().Repository(gomock.Any()).Return(nil, nil).AnyTimes()
+
+	planner := &Webhook{
 		WebhookSecret: "a1b2c3d4e5",
+		Repos:         testRepos,
 	}
 
 	body := []byte(`{"foo":"bar", "action": "foo"}`)
@@ -26,7 +34,7 @@ func Test_webhook(t *testing.T) {
 
 		wantOk := true
 
-		if diff := cmp.Diff(wantOk, gotOk, cmpIgnoreRandFields); diff != "" {
+		if diff := cmp.Diff(wantOk, gotOk); diff != "" {
 			t.Errorf("isValidSignature() mismatch (-want +got):\n%s", diff)
 		}
 	})
@@ -41,7 +49,7 @@ func Test_webhook(t *testing.T) {
 
 		wantOk := false
 
-		if diff := cmp.Diff(wantOk, gotOk, cmpIgnoreRandFields); diff != "" {
+		if diff := cmp.Diff(wantOk, gotOk); diff != "" {
 			t.Errorf("isValidSignature() mismatch (-want +got):\n%s", diff)
 		}
 	})

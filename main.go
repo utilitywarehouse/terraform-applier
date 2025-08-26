@@ -30,6 +30,7 @@ import (
 	"github.com/utilitywarehouse/terraform-applier/runner"
 	"github.com/utilitywarehouse/terraform-applier/sysutil"
 	"github.com/utilitywarehouse/terraform-applier/vault"
+	"github.com/utilitywarehouse/terraform-applier/webhook"
 	"github.com/utilitywarehouse/terraform-applier/webserver"
 	"github.com/utilitywarehouse/terraform-applier/webserver/oidc"
 
@@ -832,19 +833,17 @@ func run(c *cli.Context) {
 		}
 	}()
 
+	var prPlanner *prplanner.Planner
 	if !c.Bool("disable-pr-planner") {
-		prPlanner := &prplanner.Planner{
-			ListenAddress:         c.String("pr-planner-webhook-port"),
-			WebhookSecret:         c.String("github-webhook-secret"),
-			SkipWebhookValidation: c.Bool("github-webhook-skip-validation"),
-			ClusterEnvName:        c.String("cluster-env-name"),
-			GitMirror:             conf.GitMirror,
-			Interval:              time.Duration(c.Int("pr-planner-interval")) * time.Second,
-			ClusterClt:            mgr.GetClient(),
-			Repos:                 repos,
-			RedisClient:           sysutil.Redis{Client: rdb},
-			Runner:                &runner,
-			Log:                   logger.With("logger", "pr-planner"),
+		prPlanner = &prplanner.Planner{
+			ClusterEnvName: c.String("cluster-env-name"),
+			GitMirror:      conf.GitMirror,
+			Interval:       time.Duration(c.Int("pr-planner-interval")) * time.Second,
+			ClusterClt:     mgr.GetClient(),
+			Repos:          repos,
+			RedisClient:    sysutil.Redis{Client: rdb},
+			Runner:         &runner,
+			Log:            logger.With("logger", "pr-planner"),
 		}
 
 		// setup subscription for key set
@@ -873,6 +872,17 @@ func run(c *cli.Context) {
 			logger.Error("unable to init pr planner", "err", err)
 		}
 	}
+
+	webhook := webhook.Webhook{
+		ListenAddress:         c.String("pr-planner-webhook-port"),
+		WebhookSecret:         c.String("github-webhook-secret"),
+		SkipWebhookValidation: c.Bool("github-webhook-skip-validation"),
+		Repos:                 repos,
+		PRPlanner:             prPlanner,
+		Log:                   logger.With("logger", "webhook"),
+	}
+
+	go webhook.Start()
 
 	logger.Info("starting manager")
 	if err := mgr.Start(ctx); err != nil {

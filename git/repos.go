@@ -18,4 +18,6 @@ type Repositories interface {
 	Subject(ctx context.Context, remote, hash string) (string, error)
 	BranchCommits(ctx context.Context, remote, branch string) ([]repository.CommitInfo, error)
 	MergeCommits(ctx context.Context, remote, mergeCommitHash string) ([]repository.CommitInfo, error)
+	Repository(remote string) (*repository.Repository, error)
+	QueueMirrorRun(remote string) error
 }
