@@ -1,6 +1,7 @@
 package webhook
 
 import (
+	"context"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
@@ -133,7 +134,7 @@ func toPRPlannerEvent(event GitHubEvent) prplanner.GitHubWebhook {
 }
 
 func (wh *Webhook) processPushEvent(event GitHubEvent) {
-	err := wh.Repos.QueueMirrorRun(event.Repository.URL)
+	err := wh.Repos.Mirror(context.Background(), event.Repository.URL)
 	if err != nil {
 		if errors.Is(err, repopool.ErrNotExist) {
 			return
