@@ -68,13 +68,6 @@ func (p *Planner) StartPRPoll(ctx context.Context) {
 			}
 
 			for _, repoConf := range p.GitMirror.Repositories {
-
-				err := p.Repos.Mirror(ctx, repoConf.Remote)
-				if err != nil {
-					p.Log.Error("unable to mirror repository", "url", repoConf.Remote, "error", err)
-					continue
-				}
-
 				repo, err := giturl.Parse(repoConf.Remote)
 				if err != nil {
 					p.Log.Error("unable to parse repo url", "url", repoConf.Remote, "error", err)
