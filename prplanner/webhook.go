@@ -10,12 +10,6 @@ import (
 func (p *Planner) ProcessPRWebHookEvent(event GitHubWebhook, prNumber int) {
 	ctx := context.Background()
 
-	err := p.Repos.Mirror(ctx, event.Repository.URL)
-	if err != nil {
-		p.Log.Error("unable to mirror repository", "url", event.Repository.URL, "pr", prNumber, "err", err)
-		return
-	}
-
 	pr, err := p.github.PR(ctx, event.Repository.Owner.Login, event.Repository.Name, prNumber)
 	if err != nil {
 		p.Log.Error("unable to get PR info", "pr", prNumber, "err", err)
@@ -38,12 +32,6 @@ func (p *Planner) ProcessPRCloseEvent(e GitHubWebhook) {
 	if e.Action != "closed" ||
 		e.PullRequest.Draft ||
 		!e.PullRequest.Merged {
-		return
-	}
-
-	err := p.Repos.Mirror(ctx, e.Repository.URL)
-	if err != nil {
-		p.Log.Error("unable to mirror repository", "url", e.Repository.URL, "pr", e.Number, "err", err)
 		return
 	}
 
