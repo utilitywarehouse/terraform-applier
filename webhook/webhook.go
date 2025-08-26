@@ -11,6 +11,7 @@ import (
 	"log/slog"
 	"net/http"
 	"slices"
+	"time"
 
 	"github.com/utilitywarehouse/git-mirror/repopool"
 	"github.com/utilitywarehouse/terraform-applier/git"
@@ -94,12 +95,20 @@ func (wh *Webhook) handleWebhook(w http.ResponseWriter, r *http.Request) {
 		}
 
 		switch payload.Action {
-		case "opened", "synchronize", "reopened":
+		case "opened", "reopened":
+			go wh.PRPlanner.ProcessPRWebHookEvent(toPRPlannerEvent(payload), payload.Number)
+		case "synchronize":
+			// synchronize and push events are triggered at the same time, so sleep
+			// here ensures push event is action or at least mirror process started
+			time.Sleep(5 * time.Second)
 			go wh.PRPlanner.ProcessPRWebHookEvent(toPRPlannerEvent(payload), payload.Number)
 		case "closed":
 			if !payload.PullRequest.Merged {
 				return
 			}
+			// closed and push (on default branch) events are triggered at the same time,
+			// so sleep here ensures push event is action or at least mirror process started
+			time.Sleep(5 * time.Second)
 			go wh.PRPlanner.ProcessPRCloseEvent(toPRPlannerEvent(payload))
 		}
 	}
