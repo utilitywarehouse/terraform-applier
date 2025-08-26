@@ -129,8 +129,8 @@ func isAutoPlanDisabledCommentPosted(prComments []prComment) bool {
 	return false
 }
 
-// isSelfComment will return true if comments matches TF applier comment templates
-func isSelfComment(comment string) bool {
+// IsSelfComment will return true if comments matches TF applier comment templates
+func IsSelfComment(comment string) bool {
 	return runOutputMsgRegex.MatchString(comment) ||
 		requestAcknowledgedMsgRegex.MatchString(comment) ||
 		autoPlanDisabledRegex.MatchString(comment)
