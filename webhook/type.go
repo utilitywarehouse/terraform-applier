@@ -20,9 +20,11 @@ type GitHubEvent struct {
 		MergeCommitSHA string `json:"merge_commit_sha"`
 		Head           struct {
 			Ref string `json:"ref"`
+			SHA string `json:"sha"`
 		} `json:"head"`
 		Base struct {
 			Ref string `json:"ref"`
+			SHA string `json:"sha"`
 		} `json:"base"`
 	} `json:"pull_request"`
 

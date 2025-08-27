@@ -7,8 +7,10 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
+	"math/rand/v2"
 	"net/http"
 	"slices"
 	"time"
@@ -95,21 +97,13 @@ func (wh *Webhook) handleWebhook(w http.ResponseWriter, r *http.Request) {
 		}
 
 		switch payload.Action {
-		case "opened", "reopened":
-			go wh.PRPlanner.ProcessPRWebHookEvent(toPRPlannerEvent(payload), payload.Number)
-		case "synchronize":
-			// synchronize and push events are triggered at the same time, so sleep
-			// here ensures push event is action or at least mirror process started
-			time.Sleep(5 * time.Second)
-			go wh.PRPlanner.ProcessPRWebHookEvent(toPRPlannerEvent(payload), payload.Number)
+		case "opened", "synchronize", "reopened":
+			go wh.processPRWebHookEvent(payload)
 		case "closed":
 			if !payload.PullRequest.Merged {
 				return
 			}
-			// closed and push (on default branch) events are triggered at the same time,
-			// so sleep here ensures push event is action or at least mirror process started
-			time.Sleep(5 * time.Second)
-			go wh.PRPlanner.ProcessPRCloseEvent(toPRPlannerEvent(payload))
+			go wh.processPRCloseEvent(payload)
 		}
 	}
 
@@ -143,13 +137,58 @@ func toPRPlannerEvent(event GitHubEvent) prplanner.GitHubWebhook {
 }
 
 func (wh *Webhook) processPushEvent(event GitHubEvent) {
+	// to avoid simultaneous fetch calls from all tf-appliers
+	time.Sleep(time.Duration(rand.Float64() * float64(time.Minute)))
+
 	err := wh.Repos.Mirror(context.Background(), event.Repository.URL)
 	if err != nil {
 		if errors.Is(err, repopool.ErrNotExist) {
 			return
 		}
-		wh.Log.Error("unable to process push event", "repo", event.Repository.URL, "err", err)
+		wh.Log.Error("unable to process push event", "repo", event.Repository.Name, "err", err)
 		return
+	}
+}
+
+func (wh *Webhook) processPRWebHookEvent(event GitHubEvent) {
+	if err := wh.waitForHeadCommitSync(event); err != nil {
+		wh.Log.Error("unable to process pr event", "repo", event.Repository.Name, "number", event.Number, "err", err)
+		return
+	}
+	wh.PRPlanner.ProcessPRWebHookEvent(toPRPlannerEvent(event), event.Number)
+}
+
+func (wh *Webhook) processPRCloseEvent(event GitHubEvent) {
+	if err := wh.waitForHeadCommitSync(event); err != nil {
+		wh.Log.Error("unable to process pr close event", "repo", event.Repository.Name, "number", event.Number, "err", err)
+		return
+	}
+	wh.PRPlanner.ProcessPRCloseEvent(toPRPlannerEvent(event))
+}
+
+// waitForHeadCommitSync will check if head SHA commit is mirrored
+func (wh *Webhook) waitForHeadCommitSync(event GitHubEvent) error {
+	// not all event will have head sha value
+	if event.PullRequest.Head.SHA == "" {
+		return nil
+	}
+
+	// push event has 1min jitter
+	timeout := 2 * time.Minute
+
+	start := time.Now()
+	for {
+		err := wh.Repos.ObjectExists(context.Background(), event.Repository.URL, event.PullRequest.Head.SHA)
+		switch {
+		case err == nil:
+			return nil
+		case errors.Is(err, repopool.ErrNotExist):
+			return fmt.Errorf("unable to check of new commit exits err: repo does not exist")
+		case time.Since(start) > timeout:
+			return fmt.Errorf("unable to check of new commit exits: timed out err:%w", err)
+		default:
+			time.Sleep(5 * time.Second)
+		}
 	}
 }
 
