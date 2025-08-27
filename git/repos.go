@@ -20,4 +20,5 @@ type Repositories interface {
 	MergeCommits(ctx context.Context, remote, mergeCommitHash string) ([]repository.CommitInfo, error)
 	Repository(remote string) (*repository.Repository, error)
 	QueueMirrorRun(remote string) error
+	ObjectExists(ctx context.Context, remote, obj string) error
 }
