@@ -183,7 +183,7 @@ func (wh *Webhook) waitForHeadCommitSync(event GitHubEvent) error {
 		case err == nil:
 			return nil
 		case errors.Is(err, repopool.ErrNotExist):
-			return fmt.Errorf("unable to check of new commit exits err:%w", err)
+			return fmt.Errorf("unable to check of new commit exits err: repo does not exist")
 		case time.Since(start) > timeout:
 			return fmt.Errorf("unable to check of new commit exits: timed out err:%w", err)
 		default:
