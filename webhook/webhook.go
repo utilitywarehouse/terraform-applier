@@ -151,7 +151,7 @@ func (wh *Webhook) processPushEvent(event GitHubEvent) {
 }
 
 func (wh *Webhook) processPRWebHookEvent(event GitHubEvent) {
-	if err := wh.waitForHeadCommitSync(event); err != nil {
+	if err := wh.waitForHeadCommitSync(event.Repository.URL, event.PullRequest.Head.SHA); err != nil {
 		wh.Log.Error("unable to process pr event", "repo", event.Repository.Name, "number", event.Number, "err", err)
 		return
 	}
@@ -159,7 +159,7 @@ func (wh *Webhook) processPRWebHookEvent(event GitHubEvent) {
 }
 
 func (wh *Webhook) processPRCloseEvent(event GitHubEvent) {
-	if err := wh.waitForHeadCommitSync(event); err != nil {
+	if err := wh.waitForHeadCommitSync(event.Repository.URL, event.PullRequest.MergeCommitSHA); err != nil {
 		wh.Log.Error("unable to process pr close event", "repo", event.Repository.Name, "number", event.Number, "err", err)
 		return
 	}
@@ -167,9 +167,9 @@ func (wh *Webhook) processPRCloseEvent(event GitHubEvent) {
 }
 
 // waitForHeadCommitSync will check if head SHA commit is mirrored
-func (wh *Webhook) waitForHeadCommitSync(event GitHubEvent) error {
+func (wh *Webhook) waitForHeadCommitSync(repoURL, sha string) error {
 	// not all event will have head sha value
-	if event.PullRequest.Head.SHA == "" {
+	if sha == "" {
 		return nil
 	}
 
@@ -178,7 +178,7 @@ func (wh *Webhook) waitForHeadCommitSync(event GitHubEvent) error {
 
 	start := time.Now()
 	for {
-		err := wh.Repos.ObjectExists(context.Background(), event.Repository.URL, event.PullRequest.Head.SHA)
+		err := wh.Repos.ObjectExists(context.Background(), repoURL, sha)
 		switch {
 		case err == nil:
 			return nil
