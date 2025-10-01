@@ -101,8 +101,8 @@ github.com/go-openapi/swag/yamlutils v0.24.0 h1:bhw4894A7Iw6ne+639hsBNRHg9iZg/IS
 github.com/go-openapi/swag/yamlutils v0.24.0/go.mod h1:DpKv5aYuaGm/sULePoeiG8uwMpZSfReo1HR3Ik0yaG8=
 github.com/go-task/slim-sprig/v3 v3.0.0 h1:sUs3vkvUymDpBKi3qH1YSqBQk9+9D/8M2mN1vB6EwHI=
 github.com/go-task/slim-sprig/v3 v3.0.0/go.mod h1:W848ghGpv3Qj3dhTPRyJypKRiqCdHZiAzKg9hl15HA8=
-github.com/go-test/deep v1.0.2 h1:onZX1rnHT3Wv6cqNgYyFOOlgVKJrksuCMCRvJStbMYw=
-github.com/go-test/deep v1.0.2/go.mod h1:wGDj63lr65AM2AQyKZd/NYHGb0R+1RLqB8NKt3aSFNA=
+github.com/go-test/deep v1.1.1 h1:0r/53hagsehfO4bzD2Pgr/+RgHqhmf+k1Bpse2cTu1U=
+github.com/go-test/deep v1.1.1/go.mod h1:5C2ZWiW0ErCdrYzpqxLbTX7MG14M9iiw8DgHncVwcsE=
 github.com/gobuffalo/flect v1.0.3 h1:xeWBM2nui+qnVvNM4S3foBhCAL2XgPU+a7FdpelbTq4=
 github.com/gobuffalo/flect v1.0.3/go.mod h1:A5msMlrHtLqh9umBSnvabjsMrCcCpAyzglnDvkbYKHs=
 github.com/gogo/protobuf v1.3.2 h1:Ov1cvc58UF3b5XjBnZv7+opcTcQFZebYjWzi34vdm4Q=
@@ -161,8 +161,8 @@ github.com/hashicorp/terraform-exec v0.24.0 h1:mL0xlk9H5g2bn0pPF6JQZk5YlByqSqrO5
 github.com/hashicorp/terraform-exec v0.24.0/go.mod h1:lluc/rDYfAhYdslLJQg3J0oDqo88oGQAdHR+wDqFvo4=
 github.com/hashicorp/terraform-json v0.27.1 h1:zWhEracxJW6lcjt/JvximOYyc12pS/gaKSy/wzzE7nY=
 github.com/hashicorp/terraform-json v0.27.1/go.mod h1:GzPLJ1PLdUG5xL6xn1OXWIjteQRT2CNT9o/6A9mi9hE=
-github.com/hashicorp/vault/api v1.20.0 h1:KQMHElgudOsr+IbJgmbjHnCTxEpKs9LnozA1D3nozU4=
-github.com/hashicorp/vault/api v1.20.0/go.mod h1:GZ4pcjfzoOWpkJ3ijHNpEoAxKEsBJnVljyTe3jM2Sms=
+github.com/hashicorp/vault/api v1.21.0 h1:Xej4LJETV/spWRdjreb2vzQhEZt4+B5yxHAObfQVDOs=
+github.com/hashicorp/vault/api v1.21.0/go.mod h1:IUZA2cDvr4Ok3+NtK2Oq/r+lJeXkeCrHRmqdyWfpmGM=
 github.com/inconshreveable/mousetrap v1.1.0 h1:wN+x4NVGpMsO7ErUn/mUI3vEoE6Jt13X2s0bqwp9tc8=
 github.com/inconshreveable/mousetrap v1.1.0/go.mod h1:vpF70FUmC8bwa3OWnCshd2FqLfsEA9PFc4w1p2J65bw=
 github.com/jbenet/go-context v0.0.0-20150711004518-d14ea06fba99 h1:BQSFePA1RWJOlocH6Fxy8MmwDt+yVQYULKfN0RoTN8A=
