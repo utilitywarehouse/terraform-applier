@@ -137,14 +137,13 @@ type ModuleSpec struct {
 	// +kubebuilder:validation:Minimum=60
 	PollInterval int `json:"pollInterval,omitempty"`
 
-	// DelegateServiceAccountSecretRef references a Secret of type
-	// kubernetes.io/service-account-token in the same namespace as the Module
+	// DelegateServiceAccount references the name of the secret in the same namespace as the Module
 	// that will be used to fetch secrets, configmaps from modules' namespace.
 	// if vaultRequests are specified, the service account's jwt will be used for vault authentication.
 	// +optional
-	// +kubebuilder:default=terraform-applier-delegate-token
+	// +kubebuilder:default=terraform-applier-delegate
 	// +kubebuilder:validation:MinLength=1
-	DelegateServiceAccountSecretRef string `json:"delegateServiceAccountSecretRef,omitempty"`
+	DelegateServiceAccount string `json:"delegateServiceAccount,omitempty"`
 
 	// RunTimeout specifies the timeout in sec for performing a complete TF run (init,plan and apply if required).
 	// +optional

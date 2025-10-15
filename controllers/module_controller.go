@@ -54,7 +54,7 @@ type ModuleReconciler struct {
 }
 
 //+kubebuilder:rbac:groups="",resources=events,verbs=create;patch
-//+kubebuilder:rbac:groups="",resources=secrets,resourceNames=terraform-applier-delegate-token,verbs=get
+//+kubebuilder:rbac:groups="",resources=serviceaccounts/token,resourceNames=terraform-applier-delegate,verbs=create
 //+kubebuilder:rbac:groups="authorization.k8s.io",resources=subjectaccessreviews,verbs=create
 //+kubebuilder:rbac:groups=terraform-applier.uw.systems,resources=modules,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=terraform-applier.uw.systems,resources=modules/status,verbs=get;update;patch

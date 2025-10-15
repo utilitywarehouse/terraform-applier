@@ -6,6 +6,7 @@ import (
 	"time"
 
 	tfaplv1beta1 "github.com/utilitywarehouse/terraform-applier/api/v1beta1"
+	authenticationv1 "k8s.io/api/authentication/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -98,6 +99,21 @@ func GetSecret(ctx context.Context, client kubernetes.Interface, namespace, name
 		return nil, fmt.Errorf("timed out trying to get secret err:%w", err)
 	}
 	return secret, nil
+}
+
+// GetSAToken will use PollUntilContextTimeout to get requested token
+func GetSAToken(ctx context.Context, client kubernetes.Interface, namespace, name string) (string, error) {
+	var tokenResp *authenticationv1.TokenRequest
+
+	tokenReq := &authenticationv1.TokenRequest{}
+	err := PollUntilTimeout(ctx, func(ctx context.Context) (err error) {
+		tokenResp, err = client.CoreV1().ServiceAccounts(namespace).CreateToken(ctx, name, tokenReq, metav1.CreateOptions{})
+		return err
+	})
+	if err != nil {
+		return "", fmt.Errorf("timed out trying to get secret err:%w", err)
+	}
+	return tokenResp.Status.Token, nil
 }
 
 // GetConfigMaps will use PollUntilContextTimeout to get requested ConfigMaps

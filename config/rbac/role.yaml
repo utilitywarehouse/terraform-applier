@@ -14,11 +14,11 @@ rules:
 - apiGroups:
   - ""
   resourceNames:
-  - terraform-applier-delegate-token
+  - terraform-applier-delegate
   resources:
-  - secrets
+  - serviceaccounts/token
   verbs:
-  - get
+  - create
 - apiGroups:
   - authorization.k8s.io
   resources:

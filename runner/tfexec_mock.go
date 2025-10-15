@@ -61,6 +61,21 @@ func (mr *MockTFExecuterMockRecorder) cleanUp() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "cleanUp", reflect.TypeOf((*MockTFExecuter)(nil).cleanUp))
 }
 
+// forceUnlock mocks base method.
+func (m *MockTFExecuter) forceUnlock(arg0 context.Context, arg1 string) (string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "forceUnlock", arg0, arg1)
+	ret0, _ := ret[0].(string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// forceUnlock indicates an expected call of forceUnlock.
+func (mr *MockTFExecuterMockRecorder) forceUnlock(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "forceUnlock", reflect.TypeOf((*MockTFExecuter)(nil).forceUnlock), arg0, arg1)
+}
+
 // init mocks base method.
 func (m *MockTFExecuter) init(arg0 context.Context, arg1 map[string]string) (string, error) {
 	m.ctrl.T.Helper()
