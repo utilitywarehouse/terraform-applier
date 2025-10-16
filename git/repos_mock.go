@@ -9,7 +9,7 @@ import (
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
-	"github.com/utilitywarehouse/git-mirror/repository"
+	repository "github.com/utilitywarehouse/git-mirror/repository"
 )
 
 // MockRepositories is a mock of Repositories interface.

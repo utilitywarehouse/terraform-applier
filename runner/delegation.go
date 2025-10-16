@@ -8,7 +8,6 @@ import (
 
 	tfaplv1beta1 "github.com/utilitywarehouse/terraform-applier/api/v1beta1"
 	"github.com/utilitywarehouse/terraform-applier/sysutil"
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/util/cert"
@@ -34,18 +33,11 @@ func (d *Delegate) SetupDelegation(ctx context.Context, jwt string) (kubernetes.
 }
 
 func (d *Delegate) DelegateToken(ctx context.Context, kubeClt kubernetes.Interface, module *tfaplv1beta1.Module) (string, error) {
-	secret, err := sysutil.GetSecret(ctx, kubeClt, module.Namespace, module.Spec.DelegateServiceAccountSecretRef)
+	token, err := sysutil.GetSAToken(ctx, kubeClt, module.Namespace, module.Spec.DelegateServiceAccount)
 	if err != nil {
-		return "", fmt.Errorf(`unable to get delegate token secret "%s/%s" err:%w`, module.Namespace, module.Spec.DelegateServiceAccountSecretRef, err)
+		return "", fmt.Errorf(`unable to get delegate token "%s/%s" err:%w`, module.Namespace, module.Spec.DelegateServiceAccount, err)
 	}
-	if secret.Type != corev1.SecretTypeServiceAccountToken {
-		return "", fmt.Errorf(`secret "%s/%s" is not of type %s`, secret.Namespace, secret.Name, corev1.SecretTypeServiceAccountToken)
-	}
-	delegateToken, ok := secret.Data["token"]
-	if !ok {
-		return "", fmt.Errorf(`secret "%s/%s" does not contain key 'token'`, secret.Namespace, secret.Name)
-	}
-	return string(delegateToken), nil
+	return token, nil
 }
 
 // InClusterConfig returns a config object which uses the service account's token

@@ -36,8 +36,6 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	hcinstall "github.com/hashicorp/hc-install"
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
@@ -200,18 +198,7 @@ var _ = BeforeSuite(func() {
 	}()
 
 	// Setup Runner
-	fakeClient := fake.NewSimpleClientset(
-		&corev1.Secret{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "terraform-applier-delegate-token",
-				Namespace: "default",
-			},
-			Type: corev1.SecretTypeServiceAccountToken,
-			Data: map[string][]byte{
-				"token": []byte("xxxxxxxxxxxxxxxxxxx"),
-			},
-		},
-	)
+	fakeClient := fake.NewSimpleClientset()
 
 	execPath, err := setupTFBin()
 	Expect(err).NotTo(HaveOccurred())

@@ -212,7 +212,7 @@ func (r *Runner) process(run *tfaplv1beta1.Run, cancelChan <-chan struct{}, envs
 	}
 
 	// Setup Delegation and get vars and envs
-	jwt, err := r.Delegate.DelegateToken(ctx, r.KubeClt, module)
+	delegateToken, err := r.Delegate.DelegateToken(ctx, r.KubeClt, module)
 	if err != nil {
 		msg := fmt.Sprintf("unable to get service account token: err:%s", err)
 		log.Error(msg)
@@ -220,7 +220,7 @@ func (r *Runner) process(run *tfaplv1beta1.Run, cancelChan <-chan struct{}, envs
 		return false
 	}
 
-	delegatedClient, err := r.Delegate.SetupDelegation(ctx, jwt)
+	delegatedClient, err := r.Delegate.SetupDelegation(ctx, delegateToken)
 	if err != nil {
 		msg := fmt.Sprintf("unable to create kube client: err:%s", err)
 		log.Error(msg)
@@ -257,7 +257,7 @@ func (r *Runner) process(run *tfaplv1beta1.Run, cancelChan <-chan struct{}, envs
 
 	if module.Spec.VaultRequests != nil {
 		if module.Spec.VaultRequests.AWS != nil {
-			err = r.generateVaultAWSCreds(ctx, module, jwt, envs)
+			err = r.generateVaultAWSCreds(ctx, module, delegateToken, envs)
 			if err != nil {
 				msg := fmt.Sprintf("unable to generate vault aws secrets: err:%s", err)
 				log.Error(msg)
@@ -267,7 +267,7 @@ func (r *Runner) process(run *tfaplv1beta1.Run, cancelChan <-chan struct{}, envs
 		}
 
 		if module.Spec.VaultRequests.GCP != nil {
-			err = r.generateVaultGCPToken(ctx, module, jwt, envs)
+			err = r.generateVaultGCPToken(ctx, module, delegateToken, envs)
 			if err != nil {
 				msg := fmt.Sprintf("unable to generate vault gcp access token: err:%s", err)
 				log.Error(msg)

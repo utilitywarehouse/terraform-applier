@@ -79,7 +79,7 @@ var _ = Describe("Module controller without runner", func() {
 			Expect(createdModule.Spec.Path).Should(Equal(path))
 			// check default values
 			Expect(createdModule.Spec.PollInterval).Should(Equal(60))
-			Expect(createdModule.Spec.DelegateServiceAccountSecretRef).Should(Equal("terraform-applier-delegate-token"))
+			Expect(createdModule.Spec.DelegateServiceAccount).Should(Equal("terraform-applier-delegate"))
 			Expect(createdModule.Spec.RunTimeout).Should(Equal(900))
 
 			By("By absorbing initial run due to no run commit history and updating status with commit hash")
