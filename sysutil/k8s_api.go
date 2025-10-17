@@ -111,7 +111,7 @@ func GetSAToken(ctx context.Context, client kubernetes.Interface, namespace, nam
 		return err
 	})
 	if err != nil {
-		return "", fmt.Errorf("timed out trying to get secret err:%w", err)
+		return "", fmt.Errorf("timed out trying to get sa token err:%w", err)
 	}
 	return tokenResp.Status.Token, nil
 }

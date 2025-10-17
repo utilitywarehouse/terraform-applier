@@ -121,7 +121,7 @@ var _ = Describe("Module controller with Runner", func() {
 
 			// Setup FakeDelegation
 			fakeClient := fake.NewSimpleClientset()
-			testDelegate.EXPECT().DelegateToken(gomock.Any(), gomock.Any(), gomock.Any()).Return("token.X1", nil)
+			testDelegate.EXPECT().DelegateToken(gomock.Any(), gomock.Any(), moduleNamespace, "terraform-applier-delegate").Return("token.X1", nil)
 			testDelegate.EXPECT().SetupDelegation(gomock.Any(), "token.X1").Return(fakeClient, nil)
 
 			By("By making sure job was sent to jobQueue")
@@ -213,7 +213,7 @@ var _ = Describe("Module controller with Runner", func() {
 
 			// Setup FakeDelegation
 			fakeClient := fake.NewSimpleClientset()
-			testDelegate.EXPECT().DelegateToken(gomock.Any(), gomock.Any(), gomock.Any()).Return("token.X2", nil)
+			testDelegate.EXPECT().DelegateToken(gomock.Any(), gomock.Any(), moduleNamespace, "terraform-applier-delegate").Return("token.X2", nil)
 			testDelegate.EXPECT().SetupDelegation(gomock.Any(), "token.X2").Return(fakeClient, nil)
 
 			By("By making sure job was sent to jobQueue")
@@ -348,7 +348,7 @@ var _ = Describe("Module controller with Runner", func() {
 					},
 				},
 			)
-			testDelegate.EXPECT().DelegateToken(gomock.Any(), gomock.Any(), gomock.Any()).Return("token.X3", nil)
+			testDelegate.EXPECT().DelegateToken(gomock.Any(), gomock.Any(), moduleNamespace, "terraform-applier-delegate").Return("token.X3", nil)
 			testDelegate.EXPECT().SetupDelegation(gomock.Any(), "token.X3").Return(fakeClient, nil)
 
 			By("By making sure job was sent to jobQueue")
@@ -458,7 +458,7 @@ var _ = Describe("Module controller with Runner", func() {
 
 			// Setup FakeDelegation
 			fakeClient := fake.NewSimpleClientset()
-			testDelegate.EXPECT().DelegateToken(gomock.Any(), gomock.Any(), gomock.Any()).Return("token.X4", nil)
+			testDelegate.EXPECT().DelegateToken(gomock.Any(), gomock.Any(), moduleNamespace, "terraform-applier-delegate").Return("token.X4", nil)
 			testDelegate.EXPECT().SetupDelegation(gomock.Any(), "token.X4").Return(fakeClient, nil)
 
 			testVaultAWSConf.EXPECT().GenerateAWSCreds(gomock.Any(), "token.X4", gomock.Any()).
@@ -497,6 +497,129 @@ var _ = Describe("Module controller with Runner", func() {
 			// make sure all values are there in output
 			Expect(lastRun.Output).Should(ContainSubstring("AWS_KEY_ABCD1234"))
 			Expect(lastApplyRun.Output).Should(ContainSubstring("AWS_KEY_ABCD1234"))
+
+			// delete module to stopping requeue
+			Expect(k8sClient.Delete(ctx, module)).Should(Succeed())
+		})
+
+		It("Should send module to job queue on initial run and runner should generate vault creds using run-as-serviceAccount", func() {
+			const (
+				moduleName = "hello-with-run-as-sa-vault-creds"
+				repoURL    = "https://host.xy/dummy/repo.git"
+				path       = "hello"
+				runAsSA    = "tf-applier-run-as-sa"
+			)
+
+			var lastRun, lastApplyRun *tfaplv1beta1.Run
+			testRedis.EXPECT().SetDefaultLastRun(gomock.Any(), gomock.Any()).
+				DoAndReturn(func(ctx context.Context, run *tfaplv1beta1.Run) error {
+					lastRun = run
+					return nil
+				})
+			testRedis.EXPECT().SetDefaultApply(gomock.Any(), gomock.Any()).
+				DoAndReturn(func(ctx context.Context, run *tfaplv1beta1.Run) error {
+					lastApplyRun = run
+					return nil
+				})
+
+			By("By creating a new Module")
+			ctx := context.Background()
+			vaultReq := tfaplv1beta1.VaultRequests{
+				AWS: &tfaplv1beta1.VaultAWSRequest{
+					VaultRole: "aws-vault-role",
+				},
+				GCP: &tfaplv1beta1.VaultGCPRequest{
+					StaticAccount: "gcp-vault-static-account",
+				},
+			}
+			module := &tfaplv1beta1.Module{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: "terraform-applier.uw.systems/v1beta1",
+					Kind:       "Module",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      moduleName,
+					Namespace: moduleNamespace,
+				},
+				Spec: tfaplv1beta1.ModuleSpec{
+					Schedule:            "50 * * * *",
+					RepoURL:             repoURL,
+					Path:                path,
+					VaultRequests:       &vaultReq,
+					RunAsServiceAccount: runAsSA,
+					Env: []tfaplv1beta1.EnvVar{
+						{Name: "TF_APPLIER_STRONGBOX_KEYRING", Value: string(sbKeyringData)},
+						{Name: "TF_APPLIER_STRONGBOX_IDENTITY", Value: string(sbIdentityData)},
+						{Name: "TF_ENV_3", ValueFrom: &tfaplv1beta1.EnvVarSource{
+							SecretKeyRef: &tfaplv1beta1.SecretKeySelector{
+								Name: "test-secret", Key: "TF_ENV_3"},
+						}},
+					},
+				},
+			}
+			Expect(k8sClient.Create(ctx, module)).Should(Succeed())
+
+			moduleLookupKey := types.NamespacedName{Name: moduleName, Namespace: moduleNamespace}
+			fetchedModule := &tfaplv1beta1.Module{}
+
+			// Setup FakeDelegation
+			fakeClient := fake.NewSimpleClientset()
+			testDelegate.EXPECT().DelegateToken(gomock.Any(), gomock.Any(), moduleNamespace, "terraform-applier-delegate").Return("token.X4", nil)
+			testDelegate.EXPECT().SetupDelegation(gomock.Any(), "token.X4").Return(fakeClient, nil)
+
+			// Setup FakeDelegation for run-as-sa
+			runAsfakeClient := fake.NewSimpleClientset(
+				&corev1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-secret",
+						Namespace: moduleNamespace,
+					},
+					Data: map[string][]byte{
+						"TF_ENV_3": []byte("ENV-VALUE3"),
+					},
+				},
+			)
+			// runner should use delegated token to fetch run-as-sa token
+			testDelegate.EXPECT().DelegateToken(gomock.Any(), gomock.Any(), moduleNamespace, runAsSA).Return("token.X4_run_as", nil)
+			testDelegate.EXPECT().SetupDelegation(gomock.Any(), "token.X4_run_as").Return(runAsfakeClient, nil)
+
+			testVaultAWSConf.EXPECT().GenerateAWSCreds(gomock.Any(), "token.X4_run_as", gomock.Any()).
+				Return(&vault.AWSCredentials{AccessKeyID: "AWS_KEY_ABCD1234", SecretAccessKey: "secret", Token: "token"}, nil)
+			testVaultAWSConf.EXPECT().GenerateGCPToken(gomock.Any(), "token.X4_run_as", gomock.Any()).
+				Return("ya29.c.c0ASRK0GZ2fzoXHQakYwhwQhSJZ3gFQT5V0Ro_E94zL3fo", nil)
+
+			By("By making sure job was sent to jobQueue")
+			Eventually(func() string {
+				err := k8sClient.Get(ctx, moduleLookupKey, fetchedModule)
+				if err != nil {
+					return ""
+				}
+				return fetchedModule.Status.CurrentState
+			}, time.Second*30, interval).Should(Not(Equal("")))
+
+			Expect(fetchedModule.Status.CurrentState).Should(Equal("Running"))
+
+			// advance time for testing
+			fakeClock.T = time.Date(2022, 02, 01, 01, 01, 00, 0000, time.UTC)
+
+			By("By making sure job run finished with expected AWS and Secret ENVs")
+			Eventually(func() string {
+				err := k8sClient.Get(ctx, moduleLookupKey, fetchedModule)
+				if err != nil {
+					return ""
+				}
+				return fetchedModule.Status.CurrentState
+			}, time.Second*30, interval).Should(Not(Equal("Running")))
+
+			Expect(fetchedModule.Status.CurrentState).Should(Equal(string(tfaplv1beta1.StatusOk)))
+
+			// runner does clean up before updating redis
+			time.Sleep(5 * time.Second)
+
+			// make sure all values are there in output
+			Expect(lastRun.Output).Should(ContainSubstring("AWS_KEY_ABCD1234"))
+			Expect(lastApplyRun.Output).Should(ContainSubstring("AWS_KEY_ABCD1234"))
+			Expect(lastApplyRun.Output).Should(ContainSubstring("ENV-VALUE3"))
 
 			// delete module to stopping requeue
 			Expect(k8sClient.Delete(ctx, module)).Should(Succeed())

@@ -212,7 +212,7 @@ func (r *Runner) process(run *tfaplv1beta1.Run, cancelChan <-chan struct{}, envs
 	}
 
 	// Setup Delegation and get vars and envs
-	delegateToken, err := r.Delegate.DelegateToken(ctx, r.KubeClt, module)
+	delegateToken, err := r.Delegate.DelegateToken(ctx, r.KubeClt, module.Namespace, module.Spec.DelegateServiceAccount)
 	if err != nil {
 		msg := fmt.Sprintf("unable to get service account token: err:%s", err)
 		log.Error(msg)
@@ -226,6 +226,25 @@ func (r *Runner) process(run *tfaplv1beta1.Run, cancelChan <-chan struct{}, envs
 		log.Error(msg)
 		r.setFailedStatus(run, module, tfaplv1beta1.ReasonDelegationFailed, msg)
 		return false
+	}
+	// if run as sa set use that creds
+	if module.Spec.RunAsServiceAccount != "" {
+		// use delegatedClient client to fetch run-as sa's token
+		delegateToken, err = r.Delegate.DelegateToken(ctx, delegatedClient, module.Namespace, module.Spec.RunAsServiceAccount)
+		if err != nil {
+			msg := fmt.Sprintf("unable to get service account token: err:%s", err)
+			log.Error(msg)
+			r.setFailedStatus(run, module, tfaplv1beta1.ReasonDelegationFailed, msg)
+			return false
+		}
+
+		delegatedClient, err = r.Delegate.SetupDelegation(ctx, delegateToken)
+		if err != nil {
+			msg := fmt.Sprintf("unable to create kube client: err:%s", err)
+			log.Error(msg)
+			r.setFailedStatus(run, module, tfaplv1beta1.ReasonDelegationFailed, msg)
+			return false
+		}
 	}
 
 	backendConf, err := fetchEnvVars(ctx, delegatedClient, module, module.Spec.Backend)
