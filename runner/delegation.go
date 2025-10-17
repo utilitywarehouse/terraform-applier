@@ -17,7 +17,7 @@ import (
 
 // this interface is for mock testing
 type DelegateInterface interface {
-	DelegateToken(ctx context.Context, kubeClt kubernetes.Interface, module *tfaplv1beta1.Module) (string, error)
+	DelegateToken(ctx context.Context, kubeClt kubernetes.Interface, namespace, serviceAccount string) (string, error)
 	SetupDelegation(ctx context.Context, jwt string) (kubernetes.Interface, error)
 }
 
@@ -32,10 +32,10 @@ func (d *Delegate) SetupDelegation(ctx context.Context, jwt string) (kubernetes.
 	return kubernetes.NewForConfig(config)
 }
 
-func (d *Delegate) DelegateToken(ctx context.Context, kubeClt kubernetes.Interface, module *tfaplv1beta1.Module) (string, error) {
-	token, err := sysutil.GetSAToken(ctx, kubeClt, module.Namespace, module.Spec.DelegateServiceAccount)
+func (d *Delegate) DelegateToken(ctx context.Context, kubeClt kubernetes.Interface, namespace, serviceAccount string) (string, error) {
+	token, err := sysutil.GetSAToken(ctx, kubeClt, namespace, serviceAccount)
 	if err != nil {
-		return "", fmt.Errorf(`unable to get delegate token "%s/%s" err:%w`, module.Namespace, module.Spec.DelegateServiceAccount, err)
+		return "", fmt.Errorf(`unable to get delegate token "%s/%s" err:%w`, namespace, serviceAccount, err)
 	}
 	return token, nil
 }

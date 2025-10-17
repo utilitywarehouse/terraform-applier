@@ -137,13 +137,23 @@ type ModuleSpec struct {
 	// +kubebuilder:validation:Minimum=60
 	PollInterval int `json:"pollInterval,omitempty"`
 
-	// DelegateServiceAccount references the name of the secret in the same namespace as the Module
+	// The name of the service account in the same namespace as the Module
 	// that will be used to fetch secrets, configmaps from modules' namespace.
 	// if vaultRequests are specified, the service account's jwt will be used for vault authentication.
+	// if 'runAsServiceAccount' is set then this SA is only used to get runAsServiceAccount's token
 	// +optional
 	// +kubebuilder:default=terraform-applier-delegate
 	// +kubebuilder:validation:MinLength=1
 	DelegateServiceAccount string `json:"delegateServiceAccount,omitempty"`
+
+	// An optional Service Account name in the same namespace as the Module that, if provided,
+	// the controller will use this service account to fetch secrets and configmaps.
+	// if vaultRequests are specified, this service account's jwt will be used for vault authentication.
+	//
+	// 'delegateServiceAccount' is used to fetch creds for this SA so it should have
+	// 'create' 'serviceaccounts/token' permission on 'runAsServiceAccount'
+	// +optional
+	RunAsServiceAccount string `json:"runAsServiceAccount,omitempty"`
 
 	// RunTimeout specifies the timeout in sec for performing a complete TF run (init,plan and apply if required).
 	// +optional
