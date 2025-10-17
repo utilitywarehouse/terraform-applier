@@ -145,6 +145,12 @@ type ModuleSpec struct {
 	// +kubebuilder:validation:MinLength=1
 	DelegateServiceAccount string `json:"delegateServiceAccount,omitempty"`
 
+	// An optional Service Account name in the same namespace as the Module that, if provided,
+	// the controller will use this service account to fetch secrets and configmaps.
+	// if vaultRequests are specified, this service account's jwt will be used for vault authentication.
+	// +optional
+	ImpersonateServiceAccount string `json:"impersonateServiceAccountName,omitempty"`
+
 	// RunTimeout specifies the timeout in sec for performing a complete TF run (init,plan and apply if required).
 	// +optional
 	// +kubebuilder:default=900

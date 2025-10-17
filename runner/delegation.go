@@ -18,14 +18,14 @@ import (
 // this interface is for mock testing
 type DelegateInterface interface {
 	DelegateToken(ctx context.Context, kubeClt kubernetes.Interface, module *tfaplv1beta1.Module) (string, error)
-	SetupDelegation(ctx context.Context, jwt string) (kubernetes.Interface, error)
+	SetupDelegation(ctx context.Context, jwt, namespace, impersonateSA string) (kubernetes.Interface, error)
 }
 
 type Delegate struct{}
 
-func (d *Delegate) SetupDelegation(ctx context.Context, jwt string) (kubernetes.Interface, error) {
+func (d *Delegate) SetupDelegation(ctx context.Context, jwt, namespace, impersonateSA string) (kubernetes.Interface, error) {
 	// creates the in-cluster config
-	config, err := inClusterDelegatedConfig(jwt)
+	config, err := inClusterDelegatedConfig(jwt, fmt.Sprintf("system:serviceAccount:%s:%s", namespace, impersonateSA))
 	if err != nil {
 		return nil, fmt.Errorf("unable to create in-cluster config err:%s", err)
 	}
@@ -42,7 +42,7 @@ func (d *Delegate) DelegateToken(ctx context.Context, kubeClt kubernetes.Interfa
 
 // InClusterConfig returns a config object which uses the service account's token
 // modified version of https://pkg.go.dev/k8s.io/client-go@v0.26.1/rest#InClusterConfig
-func inClusterDelegatedConfig(token string) (*rest.Config, error) {
+func inClusterDelegatedConfig(token string, impersonateSA string) (*rest.Config, error) {
 	const (
 		rootCAFile = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
 	)
@@ -63,6 +63,9 @@ func inClusterDelegatedConfig(token string) (*rest.Config, error) {
 		Host:            "https://" + net.JoinHostPort(host, port),
 		TLSClientConfig: tlsClientConfig,
 		BearerToken:     token,
+		Impersonate: rest.ImpersonationConfig{
+			UserName: impersonateSA,
+		},
 	}, nil
 }
 

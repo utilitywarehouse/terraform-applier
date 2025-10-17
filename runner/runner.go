@@ -220,7 +220,7 @@ func (r *Runner) process(run *tfaplv1beta1.Run, cancelChan <-chan struct{}, envs
 		return false
 	}
 
-	delegatedClient, err := r.Delegate.SetupDelegation(ctx, delegateToken)
+	delegatedClient, err := r.Delegate.SetupDelegation(ctx, delegateToken, module.Namespace, module.Spec.ImpersonateServiceAccount)
 	if err != nil {
 		msg := fmt.Sprintf("unable to create kube client: err:%s", err)
 		log.Error(msg)
