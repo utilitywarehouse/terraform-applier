@@ -37,6 +37,7 @@ import (
 
 const (
 	TestENVK8sVersion = "1.33.0"
+	TestLogLevel      = slog.LevelInfo //can be slog.LevelDebug or slog.Level(-8)
 )
 
 var (
@@ -66,7 +67,7 @@ var (
 
 func TestMain(m *testing.M) {
 	testLogger = slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
-		Level: slog.Level(-8),
+		Level: TestLogLevel,
 	}))
 
 	var err error
