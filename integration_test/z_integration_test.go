@@ -1,19 +1,3 @@
-/*
-Copyright 2023.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
-
 package integration_test
 
 import (
@@ -30,12 +14,10 @@ import (
 	"github.com/hashicorp/hc-install/product"
 	"github.com/hashicorp/hc-install/releases"
 	"github.com/hashicorp/hc-install/src"
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
-
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	hcinstall "github.com/hashicorp/hc-install"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
@@ -51,15 +33,12 @@ import (
 	"github.com/utilitywarehouse/terraform-applier/runner"
 	"github.com/utilitywarehouse/terraform-applier/sysutil"
 	"github.com/utilitywarehouse/terraform-applier/vault"
-	//+kubebuilder:scaffold:imports
 )
 
 const (
 	TestENVK8sVersion = "1.33.0"
+	TestLogLevel      = slog.LevelInfo //can be slog.LevelDebug or slog.Level(-8)
 )
-
-// These tests use Ginkgo (BDD-style Go testing framework). Refer to
-// http://onsi.github.io/ginkgo/ to learn more about Ginkgo.
 
 var (
 	cfg       *rest.Config
@@ -69,7 +48,6 @@ var (
 	cancel    context.CancelFunc
 
 	fakeClock  *sysutil.FakeClock
-	goMockCtrl *gomock.Controller
 	testLogger *slog.Logger
 
 	testStateFilePath string
@@ -87,22 +65,9 @@ var (
 	testCreds        *sysutil.MockCredsProvider
 )
 
-func TestAPIs(t *testing.T) {
-	RegisterFailHandler(Fail)
-
-	// fetch the current config
-	suiteConfig, reporterConfig := GinkgoConfiguration()
-	// adjust it
-	suiteConfig.SkipStrings = []string{"NEVER-RUN"}
-	reporterConfig.Verbose = true
-	reporterConfig.FullTrace = true
-	// pass it in to RunSpecs
-	RunSpecs(t, "Controller Suite", suiteConfig, reporterConfig)
-}
-
-var _ = BeforeSuite(func() {
-	testLogger = slog.New(slog.NewTextHandler(GinkgoWriter, &slog.HandlerOptions{
-		Level: slog.Level(-8),
+func TestMain(m *testing.M) {
+	testLogger = slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
+		Level: TestLogLevel,
 	}))
 
 	var err error
@@ -113,73 +78,79 @@ var _ = BeforeSuite(func() {
 		"use", TestENVK8sVersion, "--bin-dir", "../bin", "-p", "path",
 	).Output()
 
-	Expect(err).NotTo(HaveOccurred())
+	if err != nil {
+		testLogger.Error("Failed to setup envtest", "error", err)
+		os.Exit(1)
+	}
 
-	Expect(os.Setenv("KUBEBUILDER_ASSETS", string(k8sAssetPath))).To(Succeed())
+	if err := os.Setenv("KUBEBUILDER_ASSETS", string(k8sAssetPath)); err != nil {
+		testLogger.Error("Failed to set KUBEBUILDER_ASSETS", "error", err)
+		os.Exit(1)
+	}
 
 	logf.SetLogger(logr.FromSlogHandler(testLogger.Handler()))
 
 	ctx, cancel = context.WithCancel(context.TODO())
 
-	By("bootstrapping test environment")
+	testLogger.Info("bootstrapping test environment")
 	testEnv = &envtest.Environment{
 		CRDDirectoryPaths:     []string{filepath.Join("..", "config", "crd", "bases")},
 		ErrorIfCRDPathMissing: true,
 	}
 
-	// cfg is defined in this file globally.
 	cfg, err = testEnv.Start()
-	Expect(err).NotTo(HaveOccurred())
-	Expect(cfg).NotTo(BeNil())
+	if err != nil {
+		testLogger.Error("Failed to start testEnv", "error", err)
+		os.Exit(1)
+	}
+	if cfg == nil {
+		testLogger.Error("Config is nil")
+		os.Exit(1)
+	}
 
-	err = tfaplv1beta1.AddToScheme(scheme.Scheme)
-	Expect(err).NotTo(HaveOccurred())
-
-	//+kubebuilder:scaffold:scheme
+	if err = tfaplv1beta1.AddToScheme(scheme.Scheme); err != nil {
+		testLogger.Error("Failed to add scheme", "error", err)
+		os.Exit(1)
+	}
 
 	k8sClient, err = client.New(cfg, client.Options{Scheme: scheme.Scheme})
-	Expect(err).NotTo(HaveOccurred())
-	Expect(k8sClient).NotTo(BeNil())
+	if err != nil {
+		testLogger.Error("Failed to create k8sClient", "error", err)
+		os.Exit(1)
+	}
 
 	k8sManager, err := ctrl.NewManager(cfg, ctrl.Options{
 		Scheme: scheme.Scheme,
 		Controller: config.Controller{
-			// always test with concurrency
 			MaxConcurrentReconciles: 10,
 		},
 	})
-	Expect(err).ToNot(HaveOccurred())
+	if err != nil {
+		testLogger.Error("Failed to create manager", "error", err)
+		os.Exit(1)
+	}
 
 	fakeClock = &sysutil.FakeClock{
 		T: time.Date(01, 01, 01, 0, 0, 0, 0, time.UTC),
 	}
 
 	runStatus := sysutil.NewRunStatus()
-
 	minIntervalBetweenRunsDuration := 1 * time.Minute
 
-	goMockCtrl = gomock.NewController(RecoveringGinkgoT())
+	// Initial placeholder initialization for globals.
+	// Actual mocks are re-created per test in setupTest(t)
+	// but we need the struct pointers to remain consistent for the Manager.
 
-	testRepos = git.NewMockRepositories(goMockCtrl)
-	testMetrics = metrics.NewMockPrometheusInterface(goMockCtrl)
-	testDelegate = runner.NewMockDelegateInterface(goMockCtrl)
-	testMockRunner1 = runner.NewMockRunnerInterface(goMockCtrl)
-	testMockRunner2 = runner.NewMockRunnerInterface(goMockCtrl)
-	testRedis = sysutil.NewMockRedisInterface(goMockCtrl)
-	testCreds = sysutil.NewMockCredsProvider(goMockCtrl)
-
-	testVaultAWSConf = vault.NewMockProviderInterface(goMockCtrl)
-
+	// We initialize the Reconciler struct once.
+	// The fields (interfaces) will be updated by setupTest() before each test.
 	testReconciler = &controllers.ModuleReconciler{
 		Client:                 k8sManager.GetClient(),
 		Scheme:                 k8sManager.GetScheme(),
 		Recorder:               k8sManager.GetEventRecorderFor("terraform-applier"),
 		Clock:                  fakeClock,
-		Repos:                  testRepos,
 		Log:                    testLogger.With("logger", "manager"),
 		MinIntervalBetweenRuns: minIntervalBetweenRunsDuration,
 		RunStatus:              runStatus,
-		Metrics:                testMetrics,
 	}
 
 	testFilter = &controllers.Filter{
@@ -188,66 +159,110 @@ var _ = BeforeSuite(func() {
 		LabelSelectorValue: "",
 	}
 
-	err = testReconciler.SetupWithManager(k8sManager, testFilter)
-	Expect(err).ToNot(HaveOccurred())
+	if err = testReconciler.SetupWithManager(k8sManager, testFilter); err != nil {
+		testLogger.Error("Failed to setup reconciler with manager", "error", err)
+		os.Exit(1)
+	}
 
 	go func() {
-		defer GinkgoRecover()
-		err = k8sManager.Start(ctx)
-		Expect(err).ToNot(HaveOccurred(), "failed to run manager")
+		if err = k8sManager.Start(ctx); err != nil {
+			testLogger.Error("Manager failed", "error", err)
+			os.Exit(1)
+		}
 	}()
 
 	// Setup Runner
 	fakeClient := fake.NewSimpleClientset()
-
-	execPath, err := setupTFBin()
-	Expect(err).NotTo(HaveOccurred())
+	execPath, err := hcinstall.NewInstaller().Ensure(context.Background(), []src.Source{
+		&releases.LatestVersion{
+			Product: product.Terraform,
+		},
+	})
+	if err != nil {
+		testLogger.Error("Failed to setup TF bin", "error", err)
+		os.Exit(1)
+	}
 
 	testRunner = runner.Runner{
 		Clock:                  fakeClock,
 		ClusterClt:             k8sManager.GetClient(),
 		Recorder:               k8sManager.GetEventRecorderFor("terraform-applier"),
 		KubeClt:                fakeClient,
-		Repos:                  testRepos,
-		GHCredsProvider:        testCreds,
-		Delegate:               testDelegate,
 		Log:                    testLogger.With("logger", "runner"),
-		Metrics:                testMetrics,
 		TerraformExecPath:      execPath,
-		Vault:                  testVaultAWSConf,
 		TerminationGracePeriod: 10 * time.Second,
 		RunStatus:              runStatus,
-		Redis:                  testRedis,
 		DataRootPath:           os.TempDir(),
 	}
 
-	err = testRunner.Init(false, 10)
-	Expect(err).NotTo(HaveOccurred())
+	if err = testRunner.Init(false, 10); err != nil {
+		testLogger.Error("Failed to init runner", "error", err)
+		os.Exit(1)
+	}
 
 	pwd, err := os.Getwd()
-	Expect(err).NotTo(HaveOccurred())
+	if err != nil {
+		testLogger.Error("Failed to get wd", "error", err)
+		os.Exit(1)
+	}
 	testStateFilePath = filepath.Join(pwd, "src", "modules", "hello", "terraform.tfstate")
 
-	go func() {
-		defer GinkgoRecover()
-	}()
-})
+	// Run Tests
+	exitCode := m.Run()
 
-var _ = AfterSuite(func() {
+	// Teardown
 	cancel()
-	By("tearing down the test environment")
-	err := testEnv.Stop()
-	Expect(err).NotTo(HaveOccurred())
-
+	testLogger.Info("tearing down the test environment")
+	if err := testEnv.Stop(); err != nil {
+		testLogger.Error("Failed to stop testEnv", "error", err)
+	}
 	os.Remove(testStateFilePath)
-})
 
-func setupTFBin() (string, error) {
-	execPath, err := hcinstall.NewInstaller().Ensure(context.Background(), []src.Source{
-		&releases.LatestVersion{
-			Product: product.Terraform,
-		},
-	})
+	os.Exit(exitCode)
+}
 
-	return execPath, err
+// setupTest initializes mocks for a specific test execution and updates the global references.
+// It returns a gomock Controller that must be finished by the caller.
+func setupTest(t *testing.T) *gomock.Controller {
+	ctrl := gomock.NewController(t)
+
+	// Initialize Mocks
+	testRepos = git.NewMockRepositories(ctrl)
+	testMetrics = metrics.NewMockPrometheusInterface(ctrl)
+	testDelegate = runner.NewMockDelegateInterface(ctrl)
+	testMockRunner1 = runner.NewMockRunnerInterface(ctrl)
+	testMockRunner2 = runner.NewMockRunnerInterface(ctrl)
+	testRedis = sysutil.NewMockRedisInterface(ctrl)
+	testCreds = sysutil.NewMockCredsProvider(ctrl)
+	testVaultAWSConf = vault.NewMockProviderInterface(ctrl)
+
+	// Update Reconciler with new mocks
+	testReconciler.Repos = testRepos
+	testReconciler.Metrics = testMetrics
+	// Note: Runner is swapped in specific tests
+
+	// Update Runner with new mocks
+	testRunner.Repos = testRepos
+	testRunner.Metrics = testMetrics
+	testRunner.Delegate = testDelegate
+	testRunner.Vault = testVaultAWSConf
+	testRunner.Redis = testRedis
+	testRunner.GHCredsProvider = testCreds
+
+	return ctrl
+}
+
+// triggerReconcile touches the module in a way that forces the controller to reconcile immediately.
+// We update the Spec (specifically PollInterval) to trigger a Generation change.
+// This is required because the Controller's Predicate filters out updates that don't change
+// the Generation or the RunRequest annotation.
+func triggerReconcile(ctx context.Context, clt client.Client, key types.NamespacedName) error {
+	module := &tfaplv1beta1.Module{}
+	if err := clt.Get(ctx, key, module); err != nil {
+		return err
+	}
+
+	module.Spec.PollInterval++
+
+	return clt.Update(ctx, module)
 }
