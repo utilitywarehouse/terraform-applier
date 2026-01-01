@@ -19,7 +19,7 @@ require (
 	github.com/urfave/cli/v2 v2.27.7
 	github.com/utilitywarehouse/git-mirror v0.3.13
 	github.com/utilitywarehouse/go-operational v0.0.0-20250423084238-c80547bcb12b
-	golang.org/x/oauth2 v0.33.0
+	golang.org/x/oauth2 v0.34.0
 	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/api v0.35.0
 	k8s.io/apimachinery v0.35.0
