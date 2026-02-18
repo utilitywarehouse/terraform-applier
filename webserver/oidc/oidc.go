@@ -163,7 +163,7 @@ func (u *userSession) Save(w http.ResponseWriter) error {
 
 func (u *userSession) newCodeVerifier() error {
 	cv := make([]byte, codeVerifierLen)
-	for i := 0; i < codeVerifierLen; i++ {
+	for i := range codeVerifierLen {
 		num, err := rand.Int(rand.Reader, codeVerifierCharsetLen)
 		if err != nil {
 			return err
@@ -434,7 +434,7 @@ func (o *Authenticator) introspectToken(ctx context.Context, token, tokenType st
 	return resp, nil
 }
 
-func (o *Authenticator) do(req *http.Request, data interface{}) error {
+func (o *Authenticator) do(req *http.Request, data any) error {
 	resp, err := o.httpClient.Do(req)
 	if err != nil {
 		return err

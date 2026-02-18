@@ -137,7 +137,7 @@ func TestModuleController_WithRunner(t *testing.T) {
 		// Check final state
 		fetchedModule := &tfaplv1beta1.Module{}
 		// Small retry loop for final status consistency
-		for i := 0; i < 20; i++ {
+		for range 20 {
 			k8sClient.Get(ctx, types.NamespacedName{Name: moduleName, Namespace: moduleNamespace}, fetchedModule)
 			if fetchedModule.Status.CurrentState == string(tfaplv1beta1.StatusOk) {
 				break
@@ -222,7 +222,7 @@ func TestModuleController_WithRunner(t *testing.T) {
 		}
 
 		fetchedModule := &tfaplv1beta1.Module{}
-		for i := 0; i < 20; i++ {
+		for range 20 {
 			k8sClient.Get(ctx, types.NamespacedName{Name: moduleName, Namespace: moduleNamespace}, fetchedModule)
 			if fetchedModule.Status.CurrentState == string(tfaplv1beta1.StatusDriftDetected) {
 				break
@@ -339,7 +339,7 @@ func TestModuleController_WithRunner(t *testing.T) {
 		}
 
 		fetchedModule := &tfaplv1beta1.Module{}
-		for i := 0; i < 20; i++ {
+		for range 20 {
 			k8sClient.Get(ctx, types.NamespacedName{Name: moduleName, Namespace: moduleNamespace}, fetchedModule)
 			if fetchedModule.Status.CurrentState == string(tfaplv1beta1.StatusOk) {
 				break
@@ -447,7 +447,7 @@ func TestModuleController_WithRunner(t *testing.T) {
 		}
 
 		fetchedModule := &tfaplv1beta1.Module{}
-		for i := 0; i < 20; i++ {
+		for range 20 {
 			k8sClient.Get(ctx, types.NamespacedName{Name: moduleName, Namespace: moduleNamespace}, fetchedModule)
 			if fetchedModule.Status.CurrentState == string(tfaplv1beta1.StatusOk) {
 				break
@@ -557,7 +557,7 @@ func TestModuleController_WithRunner(t *testing.T) {
 		}
 
 		fetchedModule := &tfaplv1beta1.Module{}
-		for i := 0; i < 20; i++ {
+		for range 20 {
 			k8sClient.Get(ctx, types.NamespacedName{Name: moduleName, Namespace: moduleNamespace}, fetchedModule)
 			if fetchedModule.Status.CurrentState == string(tfaplv1beta1.StatusOk) {
 				break
