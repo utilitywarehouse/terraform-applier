@@ -49,7 +49,7 @@ type gitPRRequest struct {
 		Owner    string `json:"owner"`
 		RepoName string `json:"repoName"`
 		PRNumber int    `json:"prNumber"`
-	} `json:"variables,omitempty"`
+	} `json:"variables"`
 }
 
 type Error struct {

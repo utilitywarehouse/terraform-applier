@@ -456,7 +456,7 @@ func setupGlobalEnv(c *cli.Context) {
 	// terraform depends on git for pulling remote modules
 	globalRunEnv["PATH"] = os.Getenv("PATH")
 
-	for _, env := range strings.Split(c.String("controller-runtime-env"), ",") {
+	for env := range strings.SplitSeq(c.String("controller-runtime-env"), ",") {
 		globalRunEnv[env] = os.Getenv(env)
 	}
 

@@ -237,7 +237,7 @@ func TestModuleController_NoRunner(t *testing.T) {
 		// Check for Error state
 		fetchedModule := &tfaplv1beta1.Module{}
 		// Small retry loop for status update
-		for i := 0; i < 20; i++ {
+		for range 20 {
 			k8sClient.Get(ctx, types.NamespacedName{Name: moduleName, Namespace: moduleNamespace}, fetchedModule)
 			if fetchedModule.Status.CurrentState == "Errored" {
 				break

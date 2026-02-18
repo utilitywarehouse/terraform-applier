@@ -191,10 +191,7 @@ func (r *ModuleReconciler) Reconcile(ctx context.Context, req reconcile.Request)
 	//
 
 	// Calculate shortest duration to next run
-	requeueAfter := nextRun.Sub(r.Clock.Now())
-	if pollIntervalDuration < requeueAfter {
-		requeueAfter = pollIntervalDuration
-	}
+	requeueAfter := min(pollIntervalDuration, nextRun.Sub(r.Clock.Now()))
 
 	return ctrl.Result{RequeueAfter: requeueAfter}, nil
 }

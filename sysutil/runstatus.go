@@ -7,13 +7,13 @@ import "sync"
 // lock will do for our limited use case
 type RunStatus struct {
 	*sync.RWMutex
-	status map[string]interface{}
+	status map[string]any
 }
 
 func NewRunStatus() *RunStatus {
 	return &RunStatus{
 		&sync.RWMutex{},
-		make(map[string]interface{}),
+		make(map[string]any),
 	}
 }
 
@@ -35,7 +35,7 @@ func (rs *RunStatus) Len() int {
 
 // Load returns the value stored in the map for a key, or nil if no value is present.
 // The ok result indicates whether value was found in the map.
-func (rs *RunStatus) Load(key string) (interface{}, bool) {
+func (rs *RunStatus) Load(key string) (any, bool) {
 	rs.RLock()
 	defer rs.RUnlock()
 
@@ -44,7 +44,7 @@ func (rs *RunStatus) Load(key string) (interface{}, bool) {
 }
 
 // Store sets the value for a key.
-func (rs *RunStatus) Store(key string, value interface{}) {
+func (rs *RunStatus) Store(key string, value any) {
 	rs.Lock()
 	defer rs.Unlock()
 

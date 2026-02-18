@@ -78,7 +78,7 @@ func newClient() (*vaultapi.Client, error) {
 
 func login(client *vaultapi.Client, kubeAuthPath, jwt, authRole string) error {
 	loginPath := kubeAuthPath + "/login"
-	secret, err := client.Logical().Write(loginPath, map[string]interface{}{
+	secret, err := client.Logical().Write(loginPath, map[string]any{
 		"jwt":  jwt,
 		"role": authRole,
 	})
