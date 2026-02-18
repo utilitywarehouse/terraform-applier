@@ -36,7 +36,7 @@ import (
 )
 
 const (
-	TestENVK8sVersion = "1.33.0"
+	TestENVK8sVersion = "1.35.0"
 	TestLogLevel      = slog.LevelInfo //can be slog.LevelDebug or slog.Level(-8)
 )
 

@@ -1,5 +1,5 @@
 # Build the manager binary
-FROM golang:1.25-alpine AS builder
+FROM golang:1.26-alpine AS builder
 ARG TARGETOS
 ARG TARGETARCH
 
@@ -31,7 +31,7 @@ RUN \
  go test -v -cover ./... && \
     CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -a -o tf-applier
 
-FROM alpine:3.22
+FROM alpine:3.23
 
 ENV USER_ID=65532
 
