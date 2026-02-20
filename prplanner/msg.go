@@ -22,7 +22,7 @@ var (
 	planReqMsgRegex = regexp.MustCompile("^`?@terraform-applier plan `?([\\w-.\\/]+)`?$")
 
 	// find our hidden JSON block
-	metadataRegex = regexp.MustCompile(fmt.Sprintf(`%s\s*(.*?)\s*%s`, regexp.QuoteMeta(metaStart), regexp.QuoteMeta(metaEnd)))
+	metadataRegex = regexp.MustCompile(fmt.Sprintf(`(?s)%s(.*?)%s`, regexp.QuoteMeta(metaStart), regexp.QuoteMeta(metaEnd)))
 
 	autoPlanDisabledTml = "Auto plan is disabled for this PR.\n" +
 		"Please post `@terraform-applier plan <module_name>` as comment if you want to request terraform plan for a particular module."
@@ -83,8 +83,16 @@ func extractMetadata(commentBody string) *CommentMetadata {
 	if len(matches) < 2 {
 		return nil
 	}
+
+	rawJson := matches[1]
+
+	// GitHub markdown/browsers often convert spaces to Non-Breaking Spaces (\u00A0)
+	// or inject odd formatting.
+	rawJson = strings.ReplaceAll(rawJson, "\u00A0", "")
+	rawJson = strings.TrimSpace(rawJson)
+
 	var meta CommentMetadata
-	if err := json.Unmarshal([]byte(matches[1]), &meta); err != nil {
+	if err := json.Unmarshal([]byte(rawJson), &meta); err != nil {
 		return nil
 	}
 	return &meta
