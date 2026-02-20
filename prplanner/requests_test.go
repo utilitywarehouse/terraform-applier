@@ -80,9 +80,18 @@ func TestCheckPRCommits(t *testing.T) {
 		testGithub.EXPECT().postComment(gomock.Any(), gomock.Any(), 0, 123, gomock.Any()).
 			DoAndReturn(func(repoOwner, repoName string, commentID, prNumber int, commentBody prComment) (int, error) {
 				// validate comment message
-				if !requestAcknowledgedMsgRegex.Match([]byte(commentBody.Body)) {
-					return 0, fmt.Errorf("comment body doesn't match requestAcknowledgedRegex")
+				_, parsedModule, _, parsedCommitID, _ := parseRequestAcknowledgedMsg(commentBody.Body)
+				if parsedModule.Name == "" {
+					return 0, fmt.Errorf("comment body does not contain valid request acknowledgement metadata")
 				}
+				if parsedModule.Namespace != "foo" || parsedModule.Name != "one" {
+					return 0, fmt.Errorf("unexpected module in comment: %v", parsedModule)
+				}
+
+				if parsedCommitID != "hash1" {
+					return 0, fmt.Errorf("unexpected commitID: got %s, want hash1", parsedCommitID)
+				}
+
 				return 111, nil
 			})
 
@@ -139,8 +148,16 @@ func TestCheckPRCommits(t *testing.T) {
 		testGithub.EXPECT().postComment(gomock.Any(), gomock.Any(), 0, 123, gomock.Any()).
 			DoAndReturn(func(repoOwner, repoName string, commentID, prNumber int, commentBody prComment) (int, error) {
 				// validate comment message
-				if !requestAcknowledgedMsgRegex.Match([]byte(commentBody.Body)) {
-					return 0, fmt.Errorf("comment body doesn't match requestAcknowledgedRegex")
+				_, parsedModule, _, parsedCommitID, _ := parseRequestAcknowledgedMsg(commentBody.Body)
+				if parsedModule.Name == "" {
+					return 0, fmt.Errorf("comment body does not contain valid request acknowledgement metadata")
+				}
+				if parsedModule.Namespace != "foo" || parsedModule.Name != "two" {
+					return 0, fmt.Errorf("unexpected module in comment: %v", parsedModule)
+				}
+
+				if parsedCommitID != "hash3" {
+					return 0, fmt.Errorf("unexpected commitID: got %s, want hash1", parsedCommitID)
 				}
 				return 111, nil
 			})
@@ -269,8 +286,16 @@ func TestCheckPRCommits(t *testing.T) {
 		testGithub.EXPECT().postComment(gomock.Any(), gomock.Any(), 0, 123, gomock.Any()).
 			DoAndReturn(func(repoOwner, repoName string, commentID, prNumber int, commentBody prComment) (int, error) {
 				// validate comment message
-				if !requestAcknowledgedMsgRegex.Match([]byte(commentBody.Body)) {
-					return 0, fmt.Errorf("comment body doesn't match requestAcknowledgedRegex")
+				_, parsedModule, _, parsedCommitID, _ := parseRequestAcknowledgedMsg(commentBody.Body)
+				if parsedModule.Name == "" {
+					return 0, fmt.Errorf("comment body does not contain valid request acknowledgement metadata")
+				}
+				if parsedModule.Namespace != "foo" || parsedModule.Name != "two" {
+					return 0, fmt.Errorf("unexpected module in comment: %v", parsedModule)
+				}
+
+				if parsedCommitID != "hash3" {
+					return 0, fmt.Errorf("unexpected commitID: got %s, want hash1", parsedCommitID)
 				}
 				return 111, nil
 			})
@@ -363,8 +388,16 @@ func TestCheckPRCommits(t *testing.T) {
 		testGithub.EXPECT().postComment(gomock.Any(), gomock.Any(), 0, 123, gomock.Any()).
 			DoAndReturn(func(repoOwner, repoName string, commentID, prNumber int, commentBody prComment) (int, error) {
 				// validate comment message
-				if !requestAcknowledgedMsgRegex.Match([]byte(commentBody.Body)) {
-					return 0, fmt.Errorf("comment body doesn't match requestAcknowledgedRegex")
+				_, parsedModule, _, parsedCommitID, _ := parseRequestAcknowledgedMsg(commentBody.Body)
+				if parsedModule.Name == "" {
+					return 0, fmt.Errorf("comment body does not contain valid request acknowledgement metadata")
+				}
+				if parsedModule.Namespace != "foo" || parsedModule.Name != "two" {
+					return 0, fmt.Errorf("unexpected module in comment: %v", parsedModule)
+				}
+
+				if parsedCommitID != "hash3" {
+					return 0, fmt.Errorf("unexpected commitID: got %s, want hash1", parsedCommitID)
 				}
 				return 111, nil
 			})
@@ -421,8 +454,16 @@ func TestCheckPRCommits(t *testing.T) {
 		testGithub.EXPECT().postComment(gomock.Any(), gomock.Any(), 0, 123, gomock.Any()).
 			DoAndReturn(func(repoOwner, repoName string, commentID, prNumber int, commentBody prComment) (int, error) {
 				// validate comment message
-				if !requestAcknowledgedMsgRegex.Match([]byte(commentBody.Body)) {
-					return 0, fmt.Errorf("comment body doesn't match requestAcknowledgedRegex")
+				_, parsedModule, _, parsedCommitID, _ := parseRequestAcknowledgedMsg(commentBody.Body)
+				if parsedModule.Name == "" {
+					return 0, fmt.Errorf("comment body does not contain valid request acknowledgement metadata")
+				}
+				if parsedModule.Namespace != "foo" || parsedModule.Name != "two" {
+					return 0, fmt.Errorf("unexpected module in comment: %v", parsedModule)
+				}
+
+				if parsedCommitID != "hash3" {
+					return 0, fmt.Errorf("unexpected commitID: got %s, want hash1", parsedCommitID)
 				}
 				return 111, nil
 			})
@@ -632,8 +673,16 @@ func Test_checkPRCommentsForPlanRequests(t *testing.T) {
 		testGithub.EXPECT().postComment(gomock.Any(), gomock.Any(), 0, 123, gomock.Any()).
 			DoAndReturn(func(repoOwner, repoName string, commentID, prNumber int, commentBody prComment) (int, error) {
 				// validate comment message
-				if !requestAcknowledgedMsgRegex.Match([]byte(commentBody.Body)) {
-					return 0, fmt.Errorf("comment body doesn't match requestAcknowledgedRegex")
+				_, parsedModule, _, parsedCommitID, _ := parseRequestAcknowledgedMsg(commentBody.Body)
+				if parsedModule.Name == "" {
+					return 0, fmt.Errorf("comment body does not contain valid request acknowledgement metadata")
+				}
+				if parsedModule.Namespace != "foo" || parsedModule.Name != "two" {
+					return 0, fmt.Errorf("unexpected module in comment: %v", parsedModule)
+				}
+
+				if parsedCommitID != "hash1" {
+					return 0, fmt.Errorf("unexpected commitID: got %s, want hash1", parsedCommitID)
 				}
 				return 111, nil
 			})
@@ -674,8 +723,16 @@ func Test_checkPRCommentsForPlanRequests(t *testing.T) {
 		testGithub.EXPECT().postComment(gomock.Any(), gomock.Any(), 0, 123, gomock.Any()).
 			DoAndReturn(func(repoOwner, repoName string, commentID, prNumber int, commentBody prComment) (int, error) {
 				// validate comment message
-				if !requestAcknowledgedMsgRegex.Match([]byte(commentBody.Body)) {
-					return 0, fmt.Errorf("comment body doesn't match requestAcknowledgedRegex")
+				_, parsedModule, _, parsedCommitID, _ := parseRequestAcknowledgedMsg(commentBody.Body)
+				if parsedModule.Name == "" {
+					return 0, fmt.Errorf("comment body does not contain valid request acknowledgement metadata")
+				}
+				if parsedModule.Namespace != "foo" || parsedModule.Name != "two" {
+					return 0, fmt.Errorf("unexpected module in comment: %v", parsedModule)
+				}
+
+				if parsedCommitID != "hash1" {
+					return 0, fmt.Errorf("unexpected commitID: got %s, want hash1", parsedCommitID)
 				}
 				return 111, nil
 			})
@@ -723,8 +780,16 @@ func Test_checkPRCommentsForPlanRequests(t *testing.T) {
 		testGithub.EXPECT().postComment(gomock.Any(), gomock.Any(), 0, 123, gomock.Any()).
 			DoAndReturn(func(repoOwner, repoName string, commentID, prNumber int, commentBody prComment) (int, error) {
 				// validate comment message
-				if !requestAcknowledgedMsgRegex.Match([]byte(commentBody.Body)) {
-					return 0, fmt.Errorf("comment body doesn't match requestAcknowledgedRegex")
+				_, parsedModule, _, parsedCommitID, _ := parseRequestAcknowledgedMsg(commentBody.Body)
+				if parsedModule.Name == "" {
+					return 0, fmt.Errorf("comment body does not contain valid request acknowledgement metadata")
+				}
+				if parsedModule.Namespace != "foo" || parsedModule.Name != "two" {
+					return 0, fmt.Errorf("unexpected module in comment: %v", parsedModule)
+				}
+
+				if parsedCommitID != "hash1" {
+					return 0, fmt.Errorf("unexpected commitID: got %s, want hash1", parsedCommitID)
 				}
 				return 111, nil
 			})
@@ -767,8 +832,16 @@ func Test_checkPRCommentsForPlanRequests(t *testing.T) {
 		testGithub.EXPECT().postComment(gomock.Any(), gomock.Any(), 0, 123, gomock.Any()).
 			DoAndReturn(func(repoOwner, repoName string, commentID, prNumber int, commentBody prComment) (int, error) {
 				// validate comment message
-				if !requestAcknowledgedMsgRegex.Match([]byte(commentBody.Body)) {
-					return 0, fmt.Errorf("comment body doesn't match requestAcknowledgedRegex")
+				_, parsedModule, _, parsedCommitID, _ := parseRequestAcknowledgedMsg(commentBody.Body)
+				if parsedModule.Name == "" {
+					return 0, fmt.Errorf("comment body does not contain valid request acknowledgement metadata")
+				}
+				if parsedModule.Namespace != "foo" || parsedModule.Name != "two" {
+					return 0, fmt.Errorf("unexpected module in comment: %v", parsedModule)
+				}
+
+				if parsedCommitID != "hash1" {
+					return 0, fmt.Errorf("unexpected commitID: got %s, want hash1", parsedCommitID)
 				}
 				return 111, nil
 			})

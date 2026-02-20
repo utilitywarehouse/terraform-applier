@@ -2,7 +2,7 @@ package prplanner
 
 import (
 	"fmt"
-	reflect "reflect"
+	"reflect"
 	"testing"
 	"time"
 
@@ -64,7 +64,7 @@ func Test_parsePlanReqMsg(t *testing.T) {
 		},
 		{
 			name:                 "do not trigger plan on module limit comment",
-			args:                 args{commentBody: autoPlanDisabledTml},
+			args:                 args{commentBody: autoPlanDisabledTml + embedMetadata(CommentMetadata{Type: MsgTypeAutoPlanDisabled})},
 			wantModuleNameOrPath: "",
 		},
 		{
@@ -128,7 +128,15 @@ func Test_requestAcknowledgedMsg(t *testing.T) {
 				"Requested At: 2006-01-02T15:04:05+07:00\n" +
 				"```\n" +
 				"Do not edit this comment. This message will be updated once the plan run is completed.\n" +
-				"To manually trigger plan again please post `@terraform-applier plan path/to/module/one` as comment.",
+				"To manually trigger plan again please post `@terraform-applier plan path/to/module/one` as comment." +
+				embedMetadata(CommentMetadata{
+					Type:     MsgTypePlanRequest,
+					Cluster:  "default",
+					Module:   "foo/one",
+					Path:     "path/to/module/one",
+					CommitID: "hash1",
+					ReqAt:    "2006-01-02T15:04:05+07:00",
+				}),
 		},
 	}
 	for _, tt := range tests {
@@ -269,7 +277,14 @@ func Test_runOutputMsg(t *testing.T) {
 				"Terraform apply output....\n" +
 				"```\n" +
 				"</details>\n" +
-				"\n> To manually trigger plan again please post `@terraform-applier plan path/baz/one` as comment.",
+				"\n> To manually trigger plan again please post `@terraform-applier plan path/baz/one` as comment." +
+				embedMetadata(CommentMetadata{
+					Type:     MsgTypeRunOutput,
+					Cluster:  "default",
+					Module:   "baz/one",
+					Path:     "path/baz/one",
+					CommitID: "hash2",
+				}),
 		},
 		{
 			"2",
@@ -287,7 +302,14 @@ func Test_runOutputMsg(t *testing.T) {
 				"Some Init Output...\nSome TF Output .....\n" +
 				"```\n" +
 				"</details>\n" +
-				"\n> To manually trigger plan again please post `@terraform-applier plan path/baz/one` as comment.",
+				"\n> To manually trigger plan again please post `@terraform-applier plan path/baz/one` as comment." +
+				embedMetadata(CommentMetadata{
+					Type:     MsgTypeRunOutput,
+					Cluster:  "default",
+					Module:   "baz/one",
+					Path:     "path/baz/one",
+					CommitID: "hash2",
+				}),
 		}, {
 			"3",
 			args{cluster: "default", module: "baz/one", path: "path/baz/one", run: &v1beta1.Run{Status: v1beta1.StatusOk, DiffDetected: true, CommitHash: "hash2", Summary: "Applied: x to add, x to change, x to destroy.", Output: "Terraform apply output...."}},
@@ -304,7 +326,14 @@ func Test_runOutputMsg(t *testing.T) {
 				"Terraform apply output....\n" +
 				"```\n" +
 				"</details>\n" +
-				"\n> To manually trigger plan again please post `@terraform-applier plan path/baz/one` as comment.",
+				"\n> To manually trigger plan again please post `@terraform-applier plan path/baz/one` as comment." +
+				embedMetadata(CommentMetadata{
+					Type:     MsgTypeRunOutput,
+					Cluster:  "default",
+					Module:   "baz/one",
+					Path:     "path/baz/one",
+					CommitID: "hash2",
+				}),
 		},
 	}
 	for _, tt := range tests {
@@ -331,27 +360,6 @@ func Test_parseRunOutputMsg(t *testing.T) {
 		wantCommit  string
 	}{
 		{
-			name: "old msg-NamespaceName + Commit ID",
-			args: args{comment: "Terraform plan output for\n" +
-				"```\n" +
-				"Cluster: default\n" +
-				"Module: baz/one\n" +
-				"Path: path/baz/one\n" +
-				"Commit ID: hash12\n" +
-				"```\n" +
-				"<details><summary><b>⛔ Run Status: Errored, Run Summary: unable to plan module</b></summary>\n\n" +
-				"```" +
-				"terraform\n" +
-				"Some Init Output...\nSome TF Output .....\n" +
-				"```\n" +
-				"</details>\n" +
-				"\n> To manually trigger plan again please post `@terraform-applier plan path/baz/one` as comment."},
-			wantModule:  types.NamespacedName{Namespace: "baz", Name: "one"},
-			wantCluster: "default",
-			wantPath:    "path/baz/one",
-			wantCommit:  "hash12",
-		},
-		{
 			name:        "NamespaceName + Commit ID",
 			args:        args{comment: runOutputMsg("default", "baz/one", "foo/one", &v1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy."})},
 			wantModule:  types.NamespacedName{Namespace: "baz", Name: "one"},
@@ -368,18 +376,12 @@ func Test_parseRunOutputMsg(t *testing.T) {
 			wantCommit:  "hash2",
 		},
 		{
-			name:       "Module Name only",
-			args:       args{comment: runOutputMsg("default", "one", "foo/one", &v1beta1.Run{Summary: "Plan: x to add, x to change, x to destroy."})},
-			wantModule: types.NamespacedName{},
-			wantPath:   "",
-			wantCommit: "",
-		},
-		{
-			name:       "Module Name missing",
-			args:       args{comment: runOutputMsg("default", "", "foo/one", &v1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy."})},
-			wantModule: types.NamespacedName{},
-			wantPath:   "",
-			wantCommit: "",
+			name:        "Module Name only",
+			args:        args{comment: runOutputMsg("default", "one", "foo/one", &v1beta1.Run{CommitHash: "", Summary: "Plan: x to add..."})},
+			wantModule:  types.NamespacedName{Name: "one"},
+			wantCluster: "default",
+			wantPath:    "foo/one",
+			wantCommit:  "",
 		},
 		{
 			name:        "Module Name + Commit ID",
@@ -513,7 +515,7 @@ func Test_isAutoPlanDisabledCommentPosted(t *testing.T) {
 		},
 		{
 			name: "comment posted",
-			args: args{prComments: []prComment{{Body: autoPlanDisabledTml}, {Body: "random comment"}}},
+			args: args{prComments: []prComment{{Body: autoPlanDisabledTml + embedMetadata(CommentMetadata{Type: MsgTypeAutoPlanDisabled})}, {Body: "random comment"}}},
 			want: true,
 		},
 	}
@@ -521,13 +523,13 @@ func Test_isAutoPlanDisabledCommentPosted(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := isAutoPlanDisabledCommentPosted(tt.args.prComments); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("parseNamespaceName() = %v, want %v", got, tt.want)
+				t.Errorf("isAutoPlanDisabledCommentPosted() = %v, want %v", got, tt.want)
 			}
 		})
 	}
 }
 
-func Test_isSelfAddedComment(t *testing.T) {
+func Test_IsSelfComment(t *testing.T) {
 	type args struct {
 		comment string
 	}
@@ -537,7 +539,8 @@ func Test_isSelfAddedComment(t *testing.T) {
 		want bool
 	}{
 		{"empty", args{""}, false},
-		{"autoPlanDisabledTml", args{autoPlanDisabledTml}, true},
+		// Updated to simulate comments WITH metadata
+		{"autoPlanDisabledTml", args{autoPlanDisabledTml + embedMetadata(CommentMetadata{Type: MsgTypeAutoPlanDisabled})}, true},
 		{"requestAcknowledgedMsg", args{requestAcknowledgedMsg("default", "foo/one", "path/to/module/one", "hash1", mustParseMetaTime("2006-01-02T15:04:05+07:00"))}, true},
 		{"runOutputMsg", args{runOutputMsg("default", "one", "foo/one", &v1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy."})}, true},
 		{"other", args{"other"}, false},
@@ -545,7 +548,7 @@ func Test_isSelfAddedComment(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := IsSelfComment(tt.args.comment); got != tt.want {
-				t.Errorf("isSelfAddedComment() = %v, want %v", got, tt.want)
+				t.Errorf("IsSelfComment() = %v, want %v", got, tt.want)
 			}
 		})
 	}
