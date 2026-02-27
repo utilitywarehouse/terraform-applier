@@ -164,7 +164,7 @@ func runOutputMsg(cluster, module, path string, run *v1beta1.Run) string {
 
 	if len(runes) > characterLimit {
 		runOutput = "Plan output has reached the max character limit of " + fmt.Sprintf("%d", characterLimit) + " characters. " +
-			"The output is truncated from the top.\n" + string(runes[characterLimit:])
+			"The output is truncated from the top.\n" + string(runes[(len(runes)-characterLimit):])
 	}
 
 	display := fmt.Sprintf(runOutputMsgTml, cluster, module, path, run.CommitHash, statusSymbol, run.Status, run.Summary, runOutput, path)
