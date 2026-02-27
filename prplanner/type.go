@@ -1,5 +1,7 @@
 package prplanner
 
+import "time"
+
 const queryRepoPRs = `
 query ($owner: String!,$repoName: String! ) {
   repository(owner: $owner, name: $repoName) {
@@ -22,6 +24,7 @@ baseRepository {
   url
 }
 number
+updatedAt
 headRefName
 isDraft
 closed
@@ -36,6 +39,7 @@ comments(last:50) {
   nodes {
     databaseId
     body
+	updatedAt
     author {
       login
     }
@@ -82,15 +86,16 @@ type gitPRResponse struct {
 }
 
 type pr struct {
-	Number         int    `json:"number"`
-	BaseRefName    string `json:"baseRefName"`
-	BaseRepository prRepo `json:"baseRepository"`
-	HeadRefName    string `json:"headRefName"`
-	IsDraft        bool   `json:"isDraft"`
-	Closed         bool   `json:"closed"`
-	Merged         bool   `json:"merged"`
-	MergeCommit    Commit `json:"mergeCommit"`
-	Author         author `json:"author"`
+	Number         int       `json:"number"`
+	BaseRefName    string    `json:"baseRefName"`
+	BaseRepository prRepo    `json:"baseRepository"`
+	HeadRefName    string    `json:"headRefName"`
+	IsDraft        bool      `json:"isDraft"`
+	Closed         bool      `json:"closed"`
+	Merged         bool      `json:"merged"`
+	MergeCommit    Commit    `json:"mergeCommit"`
+	UpdatedAt      time.Time `json:"updatedAt"`
+	Author         author    `json:"author"`
 	Comments       struct {
 		Nodes []prComment `json:"nodes"`
 	} `json:"comments"`
@@ -113,9 +118,10 @@ type Commit struct {
 }
 
 type prComment struct {
-	DatabaseID int    `json:"databaseId"`
-	Author     author `json:"author"`
-	Body       string `json:"body"`
+	DatabaseID int       `json:"databaseId"`
+	Author     author    `json:"author"`
+	Body       string    `json:"body"`
+	UpdatedAt  time.Time `json:"updatedAt"`
 }
 
 type GitHubWebhook struct {

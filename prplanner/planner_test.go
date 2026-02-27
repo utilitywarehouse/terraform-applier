@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 	"testing"
+	"time"
 
 	gomock "github.com/golang/mock/gomock"
 	"github.com/utilitywarehouse/git-mirror/repository"
@@ -38,6 +39,7 @@ func Test_processPullRequest(t *testing.T) {
 		p := generateMockPR(123, "ref1",
 			[]string{"random comment", "random comment", "random comment"},
 		)
+		p.UpdatedAt = time.Now().Add(-time.Hour)
 		p.IsDraft = true
 		p.BaseRepository.Owner.Login = "utilitywarehouse"
 		p.BaseRepository.Name = "foo"
@@ -59,11 +61,28 @@ func Test_processPullRequest(t *testing.T) {
 		planner.processPullRequest(ctx, p, kubeModuleList)
 	})
 
+	t.Run("skip old PR", func(t *testing.T) {
+		goMockCtrl := gomock.NewController(t)
+		testGithub := NewMockGithubInterface(goMockCtrl)
+		planner.github = testGithub
+		p := generateMockPR(123, "ref1",
+			[]string{"random comment", "random comment", "random comment"},
+		)
+		p.UpdatedAt = time.Now().Add(-25 * time.Hour)
+		p.IsDraft = true
+		p.BaseRepository.Owner.Login = "utilitywarehouse"
+		p.BaseRepository.Name = "foo"
+		p.BaseRepository.URL = "git@github.com:utilitywarehouse/foo.git"
+
+		planner.processPullRequest(ctx, p, kubeModuleList)
+	})
+
 	t.Run("len PR modules == 0", func(t *testing.T) {
 		kubeModuleList := &tfaplv1beta1.ModuleList{}
 		p := generateMockPR(123, "ref1",
 			[]string{"random comment", "random comment", "random comment"},
 		)
+		p.UpdatedAt = time.Now().Add(-time.Hour)
 
 		testGit.EXPECT().BranchCommits(gomock.Any(), gomock.Any(), gomock.Any()).
 			DoAndReturn(func(_ context.Context, _, hash string) ([]repository.CommitInfo, error) {
@@ -85,6 +104,7 @@ func Test_processPullRequest(t *testing.T) {
 		p := generateMockPR(123, "ref1",
 			[]string{"random comment", "random comment", "random comment"},
 		)
+		p.UpdatedAt = time.Now().Add(-time.Hour)
 		p.BaseRepository.Owner.Login = "utilitywarehouse"
 		p.BaseRepository.Name = "foo"
 		p.BaseRepository.URL = "git@github.com:utilitywarehouse/foo.git"

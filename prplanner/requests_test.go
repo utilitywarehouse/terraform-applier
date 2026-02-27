@@ -27,7 +27,7 @@ func generateMockPR(num int, ref string, comments []string) *pr {
 	}
 
 	for _, v := range comments {
-		p.Comments.Nodes = append(p.Comments.Nodes, prComment{1, author{}, v})
+		p.Comments.Nodes = append(p.Comments.Nodes, prComment{1, author{}, v, time.Now()})
 	}
 
 	return p
@@ -550,6 +550,24 @@ func Test_checkPRCommentsForPlanRequests(t *testing.T) {
 			Path:    "path/foo/two",
 		},
 	}
+
+	t.Run("skip old comments", func(t *testing.T) {
+		pr := generateMockPR(123, "ref1",
+			[]string{
+				"@terraform-applier plan two",
+			},
+		)
+		pr.Comments.Nodes[0].UpdatedAt = time.Now().Add(-24 * time.Hour)
+
+		gotReq, err := planner.checkPRCommentsForPlanRequests(pr, module)
+		if err != nil {
+			t.Fatalf("unexpected error: %s", err)
+		}
+
+		if gotReq != nil {
+			t.Errorf("checkPRCommentsForPlanRequests() returner non-nil Request")
+		}
+	})
 
 	t.Run("request acknowledged for module (using name)", func(t *testing.T) {
 		// avoid generating another request from `@terraform-applier plan` comment
