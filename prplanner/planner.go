@@ -124,7 +124,7 @@ func (p *Planner) processPullRequest(ctx context.Context, pr *pr, kubeModuleList
 	if skipCommitRun {
 		// add limit msg comment if not already added
 		if !isAutoPlanDisabledCommentPosted(pr.Comments.Nodes) {
-			comment := prComment{Body: autoPlanDisabledTml}
+			comment := prComment{Body: autoPlanDisabledTml + embedMetadata(CommentMetadata{Type: MsgTypeAutoPlanDisabled})}
 			_, err := p.github.postComment(pr.BaseRepository.Owner.Login, pr.BaseRepository.Name, 0, pr.Number, comment)
 			if err != nil {
 				p.Log.Error("unable to post limit reached msg", "err", err)

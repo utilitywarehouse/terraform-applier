@@ -1,7 +1,9 @@
 package prplanner
 
 import (
+	"encoding/json"
 	"fmt"
+	"log/slog"
 	"regexp"
 	"strings"
 	"time"
@@ -11,13 +13,20 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
+const (
+	// Metadata Prefix to identify our comments
+	metaStart = "<!-- terraform-applier-pr-planner-metadata:"
+	metaEnd   = " -->"
+)
+
 var (
 	planReqMsgRegex = regexp.MustCompile("^`?@terraform-applier plan `?([\\w-.\\/]+)`?$")
 
+	// find our hidden JSON block
+	metadataRegex = regexp.MustCompile(fmt.Sprintf(`(?s)%s(.*?)%s`, regexp.QuoteMeta(metaStart), regexp.QuoteMeta(metaEnd)))
+
 	autoPlanDisabledTml = "Auto plan is disabled for this PR.\n" +
 		"Please post `@terraform-applier plan <module_name>` as comment if you want to request terraform plan for a particular module."
-
-	autoPlanDisabledRegex = regexp.MustCompile("Auto plan is disabled for this PR")
 
 	requestAcknowledgedMsgTml = "Received terraform plan request\n" +
 		"```\n" +
@@ -30,8 +39,6 @@ var (
 		"Do not edit this comment. This message will be updated once the plan run is completed.\n" +
 		"To manually trigger plan again please post `@terraform-applier plan %s` as comment."
 
-	requestAcknowledgedMsgRegex = regexp.MustCompile(`Received terraform plan request\n\x60{3}\nCluster: (.+)\nModule: (.+)\nPath: (.+)\nCommit ID: (.+)\nRequested At: (.+)`)
-
 	runOutputMsgTml = "Terraform run output for\n" +
 		"```\n" +
 		"Cluster: %s\n" +
@@ -42,9 +49,56 @@ var (
 		"<details><summary><b>%s Run Status: %s, Run Summary: %s</b></summary>" +
 		"\n\n```terraform\n%s\n```\n</details>\n" +
 		"\n> To manually trigger plan again please post `@terraform-applier plan %s` as comment."
-
-	runOutputMsgRegex = regexp.MustCompile(`Terraform (?:plan|run) output for\n\x60{3}\nCluster: (.+)\nModule: (.+)\nPath: (.+)\nCommit ID: (.+)\n`)
 )
+
+type MsgType string
+
+const (
+	MsgTypePlanRequest      MsgType = "PlanRequest"
+	MsgTypeRunOutput        MsgType = "RunOutput"
+	MsgTypeAutoPlanDisabled MsgType = "AutoPlanDisabled"
+)
+
+// CommentMetadata is the hidden JSON structure
+type CommentMetadata struct {
+	Type     MsgType `json:"type"`
+	Cluster  string  `json:"cluster,omitempty"`
+	Module   string  `json:"module,omitempty"` // Stores "Namespace/Name"
+	Path     string  `json:"path,omitempty"`
+	CommitID string  `json:"commit_id,omitempty"`
+	ReqAt    string  `json:"req_at,omitempty"` // RFC3339 String
+}
+
+// embedMetadata serializes the struct into a hidden HTML comment
+func embedMetadata(meta CommentMetadata) string {
+	b, err := json.Marshal(meta)
+	if err != nil {
+		panic(fmt.Sprintf("unable to marshal pr comment metadata: %v", meta))
+	}
+	return fmt.Sprintf("\n\n%s %s %s", metaStart, string(b), metaEnd)
+}
+
+// extractMetadata parses the hidden JSON from a comment body
+func extractMetadata(commentBody string) *CommentMetadata {
+	matches := metadataRegex.FindStringSubmatch(commentBody)
+	if len(matches) < 2 {
+		return nil
+	}
+
+	rawJson := matches[1]
+
+	// GitHub markdown/browsers often convert spaces to Non-Breaking Spaces (\u00A0)
+	// or inject odd formatting.
+	rawJson = strings.ReplaceAll(rawJson, "\u00A0", "")
+	rawJson = strings.TrimSpace(rawJson)
+
+	var meta CommentMetadata
+	if err := json.Unmarshal([]byte(rawJson), &meta); err != nil {
+		slog.Error("unable to parse PR comment metadata json", "logger", "pr-planner", "err", err)
+		return nil
+	}
+	return &meta
+}
 
 func parsePlanReqMsg(commentBody string) string {
 	matches := planReqMsgRegex.FindStringSubmatch(commentBody)
@@ -57,29 +111,39 @@ func parsePlanReqMsg(commentBody string) string {
 }
 
 func requestAcknowledgedMsg(cluster, module, path, commitID string, reqAt *metav1.Time) string {
-	return fmt.Sprintf(requestAcknowledgedMsgTml, cluster, module, path, commitID, reqAt.Format(time.RFC3339), path)
+	display := fmt.Sprintf(requestAcknowledgedMsgTml, cluster, module, path, commitID, reqAt.Format(time.RFC3339), path)
+
+	meta := CommentMetadata{
+		Type:     MsgTypePlanRequest,
+		Cluster:  cluster,
+		Module:   module,
+		Path:     path,
+		CommitID: commitID,
+		ReqAt:    reqAt.Format(time.RFC3339),
+	}
+
+	return display + embedMetadata(meta)
 }
 
 func parseRequestAcknowledgedMsg(commentBody string) (cluster string, module types.NamespacedName, path string, commID string, ReqAt *time.Time) {
-	matches := requestAcknowledgedMsgRegex.FindStringSubmatch(commentBody)
-	if len(matches) == 6 {
-		t, err := time.Parse(time.RFC3339, matches[5])
-		if err == nil {
-			return matches[1], parseNamespaceName(matches[2]), matches[3], matches[4], &t
-		}
-		return matches[1], parseNamespaceName(matches[2]), matches[3], matches[4], nil
+	meta := extractMetadata(commentBody)
+	if meta == nil || meta.Type != MsgTypePlanRequest {
+		return
 	}
 
-	return
+	if t, err := time.Parse(time.RFC3339, meta.ReqAt); err == nil {
+		ReqAt = &t
+	}
+
+	return meta.Cluster, parseNamespaceName(meta.Module), meta.Path, meta.CommitID, ReqAt
 }
 
 func parseRunOutputMsg(comment string) (cluster string, module types.NamespacedName, path string, commit string) {
-	matches := runOutputMsgRegex.FindStringSubmatch(comment)
-	if len(matches) == 5 {
-		return matches[1], parseNamespaceName(matches[2]), matches[3], matches[4]
+	meta := extractMetadata(comment)
+	if meta == nil || meta.Type != MsgTypeRunOutput {
+		return
 	}
-
-	return
+	return meta.Cluster, parseNamespaceName(meta.Module), meta.Path, meta.CommitID
 }
 
 func runOutputMsg(cluster, module, path string, run *v1beta1.Run) string {
@@ -100,10 +164,20 @@ func runOutputMsg(cluster, module, path string, run *v1beta1.Run) string {
 
 	if len(runes) > characterLimit {
 		runOutput = "Plan output has reached the max character limit of " + fmt.Sprintf("%d", characterLimit) + " characters. " +
-			"The output is truncated from the top.\n" + string(runes[characterLimit:])
+			"The output is truncated from the top.\n" + string(runes[(len(runes)-characterLimit):])
 	}
 
-	return fmt.Sprintf(runOutputMsgTml, cluster, module, path, run.CommitHash, statusSymbol, run.Status, run.Summary, runOutput, path)
+	display := fmt.Sprintf(runOutputMsgTml, cluster, module, path, run.CommitHash, statusSymbol, run.Status, run.Summary, runOutput, path)
+
+	meta := CommentMetadata{
+		Type:     MsgTypeRunOutput,
+		Cluster:  cluster,
+		Module:   module,
+		Path:     path,
+		CommitID: run.CommitHash,
+	}
+
+	return display + embedMetadata(meta)
 }
 
 func parseNamespaceName(str string) types.NamespacedName {
@@ -122,7 +196,8 @@ func parseNamespaceName(str string) types.NamespacedName {
 
 func isAutoPlanDisabledCommentPosted(prComments []prComment) bool {
 	for _, comment := range prComments {
-		if autoPlanDisabledRegex.MatchString(comment.Body) {
+		meta := extractMetadata(comment.Body)
+		if meta != nil && meta.Type == MsgTypeAutoPlanDisabled {
 			return true
 		}
 	}
@@ -131,7 +206,5 @@ func isAutoPlanDisabledCommentPosted(prComments []prComment) bool {
 
 // IsSelfComment will return true if comments matches TF applier comment templates
 func IsSelfComment(comment string) bool {
-	return runOutputMsgRegex.MatchString(comment) ||
-		requestAcknowledgedMsgRegex.MatchString(comment) ||
-		autoPlanDisabledRegex.MatchString(comment)
+	return strings.Contains(comment, metaStart)
 }
