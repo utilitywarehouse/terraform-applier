@@ -94,7 +94,7 @@ func extractMetadata(commentBody string) *CommentMetadata {
 
 	var meta CommentMetadata
 	if err := json.Unmarshal([]byte(rawJson), &meta); err != nil {
-		slog.Default().Error("unable to parse PR comment metadata json", "logger", "pr-planner", "err", err)
+		slog.Error("unable to parse PR comment metadata json", "logger", "pr-planner", "err", err)
 		return nil
 	}
 	return &meta
