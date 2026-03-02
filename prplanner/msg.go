@@ -100,7 +100,7 @@ func parsePlanReqMsg(commentBody string) string {
 }
 
 func requestAcknowledgedMsg(cluster string, module types.NamespacedName, path, commitID string, reqAt *metav1.Time, webserverURL string) string {
-	moduleURL := webserverURL + "/#" + module.Namespace + "-" + module.Name
+	moduleURL := webserverURL + "/#" + module.Namespace + "_" + module.Name
 
 	display := fmt.Sprintf(requestAcknowledgedMsgTml, module.Name, commitID, reqAt.Format(time.RFC3339), cluster, moduleURL, path)
 
@@ -163,7 +163,7 @@ func runOutputMsg(cluster string, module types.NamespacedName, path string, run 
 			"The output is truncated from the top.\n" + string(runes[(len(runes)-characterLimit):])
 	}
 
-	moduleURL := webserverURL + "/#" + module.Namespace + "-" + module.Name
+	moduleURL := webserverURL + "/#" + module.Namespace + "_" + module.Name
 
 	display := fmt.Sprintf(msgTml, module.Name, run.CommitHash, cluster, moduleURL, path, statusSymbol, run.Status, run.Summary, runOutput)
 
