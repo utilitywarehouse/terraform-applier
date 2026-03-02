@@ -35,7 +35,7 @@ func (p *Planner) uploadRequestOutput(ctx context.Context, pr *pr) {
 		}
 
 		payload := prComment{
-			Body: runOutputMsg(p.ClusterEnvName, moduleNamespacedName, path, run, "dashboard-url"),
+			Body: runOutputMsg(p.ClusterEnvName, moduleNamespacedName, path, run, p.WebserverURL),
 		}
 
 		_, err = p.github.postComment(pr.BaseRepository.Owner.Login, pr.BaseRepository.Name, comment.DatabaseID, pr.Number, payload)
@@ -104,7 +104,7 @@ func (p *Planner) processRedisKeySetMsg(ctx context.Context, ch <-chan *redis.Me
 		}
 
 		comment := prComment{
-			Body: runOutputMsg(p.ClusterEnvName, run.Module, module.Spec.Path, run, "dashboard-url"),
+			Body: runOutputMsg(p.ClusterEnvName, run.Module, module.Spec.Path, run, p.WebserverURL),
 		}
 
 		repo, err := giturl.Parse(module.Spec.RepoURL)
