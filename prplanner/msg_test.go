@@ -120,7 +120,7 @@ func Test_requestAcknowledgedMsg(t *testing.T) {
 			"1",
 			args{cluster: "default", module: types.NamespacedName{Name: "one", Namespace: "foo"}, path: "path/to/module/one", commitID: "hash1", reqAt: mustParseMetaTime("2006-01-02T15:04:05+07:00")},
 			"### Received terraform plan request for `one`\n" +
-				"🏷️ **Commit:** hash1 | 🕒 **Requested At:** 2006-01-02T15:04:05+07:00 | 🔗 [View in default dashboard](https://dashboard-url/#foo-one)\n\n" +
+				"🏷️ **Commit:** hash1 | 🕒 **Requested At:** 2006-01-02T15:04:05+07:00 | 🔗 [View in default dashboard](https://dashboard-url/#foo_one)\n\n" +
 				"*(Do not edit this comment. This message will be updated once the plan run is completed.)*\n" +
 				">To manually trigger plan again please post `@terraform-applier plan path/to/module/one` as comment." +
 				embedMetadata(CommentMetadata{
@@ -259,7 +259,7 @@ func Test_runOutputMsg(t *testing.T) {
 			"1",
 			args{cluster: "default", module: types.NamespacedName{Name: "one", Namespace: "baz"}, path: "path/baz/one", run: &v1beta1.Run{Status: v1beta1.StatusOk, PlanOnly: true, CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy.", Output: "Terraform apply output...."}},
 			"### Terraform Plan Output for `one`\n" +
-				"🏷️ **Commit:** hash2 | 🔗 [View in default dashboard](https://dashboard-url/#baz-one)\n\n" +
+				"🏷️ **Commit:** hash2 | 🔗 [View in default dashboard](https://dashboard-url/#baz_one)\n\n" +
 				"> To manually trigger plan again please post `@terraform-applier plan path/baz/one` as comment.\n" +
 				"<details><summary><b>✅ Run Status: Ok, Run Summary: Plan: x to add, x to change, x to destroy.</b></summary>\n\n" +
 				"```" +
@@ -279,7 +279,7 @@ func Test_runOutputMsg(t *testing.T) {
 			"2",
 			args{cluster: "default", module: types.NamespacedName{Name: "one", Namespace: "baz"}, path: "path/baz/one", run: &v1beta1.Run{Status: v1beta1.StatusErrored, PlanOnly: true, CommitHash: "hash2", Summary: "unable to plan module", InitOutput: "Some Init Output...", Output: "Some TF Output ....."}},
 			"### Terraform Plan Output for `one`\n" +
-				"🏷️ **Commit:** hash2 | 🔗 [View in default dashboard](https://dashboard-url/#baz-one)\n\n" +
+				"🏷️ **Commit:** hash2 | 🔗 [View in default dashboard](https://dashboard-url/#baz_one)\n\n" +
 				"> To manually trigger plan again please post `@terraform-applier plan path/baz/one` as comment.\n" +
 				"<details><summary><b>⛔ Run Status: Errored, Run Summary: unable to plan module</b></summary>\n\n" +
 				"```" +
@@ -298,7 +298,7 @@ func Test_runOutputMsg(t *testing.T) {
 			"3",
 			args{cluster: "default", module: types.NamespacedName{Name: "one", Namespace: "baz"}, path: "path/baz/one", run: &v1beta1.Run{Status: v1beta1.StatusOk, PlanOnly: false, DiffDetected: true, CommitHash: "hash2", Summary: "Applied: x to add, x to change, x to destroy.", Output: "Terraform apply output...."}},
 			"### Terraform Apply Output for `one`\n" +
-				"🏷️ **Commit:** hash2 | 🔗 [View in default dashboard](https://dashboard-url/#baz-one)\n\n" +
+				"🏷️ **Commit:** hash2 | 🔗 [View in default dashboard](https://dashboard-url/#baz_one)\n\n" +
 				"> To manually trigger plan again please post `@terraform-applier plan path/baz/one` as comment.\n" +
 				"<details><summary><b>✅ Run Status: Ok, Run Summary: Applied: x to add, x to change, x to destroy.</b></summary>\n\n" +
 				"```" +
