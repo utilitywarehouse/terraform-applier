@@ -94,6 +94,11 @@ func (p *Planner) checkPRCommentsForPlanRequests(pr *pr, module *tfaplv1beta1.Mo
 	for i := len(pr.Comments.Nodes) - 1; i >= 0; i-- {
 		comment := pr.Comments.Nodes[i]
 
+		// skip old comments
+		if time.Since(comment.UpdatedAt) > 24*time.Hour {
+			return nil, nil
+		}
+
 		// Skip if request already acknowledged for module
 		commentCluster, commentModule, commentPath, _, reqAt := parseRequestAcknowledgedMsg(comment.Body)
 		if commentCluster == p.ClusterEnvName &&

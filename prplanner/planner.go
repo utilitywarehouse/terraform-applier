@@ -94,6 +94,10 @@ func (p *Planner) processPullRequest(ctx context.Context, pr *pr, kubeModuleList
 	if pr.Closed && !pr.Merged {
 		return
 	}
+	// only process recently updated PR
+	if time.Since(pr.UpdatedAt) > 24*time.Hour {
+		return
+	}
 
 	// get list of commits and changed file for the PR branch
 	commitsInfo, err := p.Repos.BranchCommits(ctx, pr.BaseRepository.URL, pr.HeadRefName)
