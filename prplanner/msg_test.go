@@ -69,12 +69,12 @@ func Test_parsePlanReqMsg(t *testing.T) {
 		},
 		{
 			name:                 "do not trigger plan on our module request Acknowledged Msg",
-			args:                 args{commentBody: requestAcknowledgedMsg("default", "foo/one", "path/to/module/one", "hash1", mustParseMetaTime("2006-01-02T15:04:05+07:00"))},
+			args:                 args{commentBody: requestAcknowledgedMsg("default", types.NamespacedName{Name: "one", Namespace: "foo"}, "path/to/module/one", "hash1", mustParseMetaTime("2006-01-02T15:04:05+07:00"), "link")},
 			wantModuleNameOrPath: "",
 		},
 		{
 			name:                 "do not trigger plan on our module run Output Msg",
-			args:                 args{commentBody: runOutputMsg("default", "foo/one", "foo/one", &v1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy."})},
+			args:                 args{commentBody: runOutputMsg("default", types.NamespacedName{Name: "one", Namespace: "foo"}, "foo/one", &v1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy."}, "link")},
 			wantModuleNameOrPath: "",
 		},
 		{
@@ -106,7 +106,7 @@ func Test_parsePlanReqMsg(t *testing.T) {
 func Test_requestAcknowledgedMsg(t *testing.T) {
 	type args struct {
 		cluster  string
-		module   string
+		module   types.NamespacedName
 		path     string
 		commitID string
 		reqAt    *metav1.Time
@@ -118,17 +118,11 @@ func Test_requestAcknowledgedMsg(t *testing.T) {
 	}{
 		{
 			"1",
-			args{cluster: "default", module: "foo/one", path: "path/to/module/one", commitID: "hash1", reqAt: mustParseMetaTime("2006-01-02T15:04:05+07:00")},
-			"Received terraform plan request\n" +
-				"```\n" +
-				"Cluster: default\n" +
-				"Module: foo/one\n" +
-				"Path: path/to/module/one\n" +
-				"Commit ID: hash1\n" +
-				"Requested At: 2006-01-02T15:04:05+07:00\n" +
-				"```\n" +
-				"Do not edit this comment. This message will be updated once the plan run is completed.\n" +
-				"To manually trigger plan again please post `@terraform-applier plan path/to/module/one` as comment." +
+			args{cluster: "default", module: types.NamespacedName{Name: "one", Namespace: "foo"}, path: "path/to/module/one", commitID: "hash1", reqAt: mustParseMetaTime("2006-01-02T15:04:05+07:00")},
+			"### Received terraform plan request for `one`\n" +
+				"🏷️ **Commit:** hash1 | 🕒 **Requested At:** 2006-01-02T15:04:05+07:00 | 🔗 [View in default dashboard](https://dashboard-url/#foo-one)\n\n" +
+				"*(Do not edit this comment. This message will be updated once the plan run is completed.)*\n" +
+				">To manually trigger plan again please post `@terraform-applier plan path/to/module/one` as comment." +
 				embedMetadata(CommentMetadata{
 					Type:     MsgTypePlanRequest,
 					Cluster:  "default",
@@ -141,7 +135,7 @@ func Test_requestAcknowledgedMsg(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := requestAcknowledgedMsg(tt.args.cluster, tt.args.module, tt.args.path, tt.args.commitID, tt.args.reqAt)
+			got := requestAcknowledgedMsg(tt.args.cluster, tt.args.module, tt.args.path, tt.args.commitID, tt.args.reqAt, "https://dashboard-url")
 
 			if diff := cmp.Diff(tt.want, got); diff != "" {
 				t.Errorf("requestAcknowledgedMsg() mismatch (-want +got):\n%s", diff)
@@ -171,7 +165,7 @@ func Test_parseRequestAcknowledgedMsg(t *testing.T) {
 		},
 		{
 			name:        "NamespacedName + Requested At",
-			args:        args{commentBody: requestAcknowledgedMsg("default", "foo/one", "path/to/module/one", "hash1", mustParseMetaTime("2006-01-02T15:04:05+07:00"))},
+			args:        args{commentBody: requestAcknowledgedMsg("default", types.NamespacedName{Name: "one", Namespace: "foo"}, "path/to/module/one", "hash1", mustParseMetaTime("2006-01-02T15:04:05+07:00"), "link")},
 			wantModule:  types.NamespacedName{Namespace: "foo", Name: "one"},
 			wantCluster: "default",
 			wantPath:    "path/to/module/one",
@@ -180,7 +174,7 @@ func Test_parseRequestAcknowledgedMsg(t *testing.T) {
 		},
 		{
 			name:        "cluster env with spec char",
-			args:        args{commentBody: requestAcknowledgedMsg("clusterEnv-with_", "foo/one", "path/to/module/one", "hash1", mustParseMetaTime("2006-01-02T15:04:05+07:00"))},
+			args:        args{commentBody: requestAcknowledgedMsg("clusterEnv-with_", types.NamespacedName{Name: "one", Namespace: "foo"}, "path/to/module/one", "hash1", mustParseMetaTime("2006-01-02T15:04:05+07:00"), "link")},
 			wantModule:  types.NamespacedName{Namespace: "foo", Name: "one"},
 			wantCluster: "clusterEnv-with_",
 			wantPath:    "path/to/module/one",
@@ -189,7 +183,7 @@ func Test_parseRequestAcknowledgedMsg(t *testing.T) {
 		},
 		{
 			name:        "NamespacedName + Requested At UTC",
-			args:        args{commentBody: requestAcknowledgedMsg("default", "foo/one", "foo/one", "hash2", mustParseMetaTime("2023-04-02T15:04:05Z"))},
+			args:        args{commentBody: requestAcknowledgedMsg("default", types.NamespacedName{Name: "one", Namespace: "foo"}, "foo/one", "hash2", mustParseMetaTime("2023-04-02T15:04:05Z"), "link")},
 			wantModule:  types.NamespacedName{Namespace: "foo", Name: "one"},
 			wantCluster: "default",
 			wantPath:    "foo/one",
@@ -198,7 +192,7 @@ func Test_parseRequestAcknowledgedMsg(t *testing.T) {
 		},
 		{
 			name:        "Name + Requested At",
-			args:        args{commentBody: requestAcknowledgedMsg("default", "one", "foo/one", "hash3", mustParseMetaTime("2023-04-02T15:04:05Z"))},
+			args:        args{commentBody: requestAcknowledgedMsg("default", types.NamespacedName{Name: "one", Namespace: ""}, "foo/one", "hash3", mustParseMetaTime("2023-04-02T15:04:05Z"), "link")},
 			wantModule:  types.NamespacedName{Name: "one"},
 			wantCluster: "default",
 			wantPath:    "foo/one",
@@ -252,7 +246,7 @@ func Test_parseRequestAcknowledgedMsg(t *testing.T) {
 func Test_runOutputMsg(t *testing.T) {
 	type args struct {
 		cluster string
-		module  string
+		module  types.NamespacedName
 		path    string
 		run     *v1beta1.Run
 	}
@@ -263,21 +257,16 @@ func Test_runOutputMsg(t *testing.T) {
 	}{
 		{
 			"1",
-			args{cluster: "default", module: "baz/one", path: "path/baz/one", run: &v1beta1.Run{Status: v1beta1.StatusOk, CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy.", Output: "Terraform apply output...."}},
-			"Terraform run output for\n" +
-				"```\n" +
-				"Cluster: default\n" +
-				"Module: baz/one\n" +
-				"Path: path/baz/one\n" +
-				"Commit ID: hash2\n" +
-				"```\n" +
+			args{cluster: "default", module: types.NamespacedName{Name: "one", Namespace: "baz"}, path: "path/baz/one", run: &v1beta1.Run{Status: v1beta1.StatusOk, PlanOnly: true, CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy.", Output: "Terraform apply output...."}},
+			"### Terraform Plan Output for `one`\n" +
+				"🏷️ **Commit:** hash2 | 🔗 [View in default dashboard](https://dashboard-url/#baz-one)\n\n" +
+				"> To manually trigger plan again please post `@terraform-applier plan path/baz/one` as comment.\n" +
 				"<details><summary><b>✅ Run Status: Ok, Run Summary: Plan: x to add, x to change, x to destroy.</b></summary>\n\n" +
 				"```" +
 				"terraform\n" +
 				"Terraform apply output....\n" +
 				"```\n" +
 				"</details>\n" +
-				"\n> To manually trigger plan again please post `@terraform-applier plan path/baz/one` as comment." +
 				embedMetadata(CommentMetadata{
 					Type:     MsgTypeRunOutput,
 					Cluster:  "default",
@@ -288,21 +277,16 @@ func Test_runOutputMsg(t *testing.T) {
 		},
 		{
 			"2",
-			args{cluster: "default", module: "baz/one", path: "path/baz/one", run: &v1beta1.Run{Status: v1beta1.StatusErrored, CommitHash: "hash2", Summary: "unable to plan module", InitOutput: "Some Init Output...", Output: "Some TF Output ....."}},
-			"Terraform run output for\n" +
-				"```\n" +
-				"Cluster: default\n" +
-				"Module: baz/one\n" +
-				"Path: path/baz/one\n" +
-				"Commit ID: hash2\n" +
-				"```\n" +
+			args{cluster: "default", module: types.NamespacedName{Name: "one", Namespace: "baz"}, path: "path/baz/one", run: &v1beta1.Run{Status: v1beta1.StatusErrored, PlanOnly: true, CommitHash: "hash2", Summary: "unable to plan module", InitOutput: "Some Init Output...", Output: "Some TF Output ....."}},
+			"### Terraform Plan Output for `one`\n" +
+				"🏷️ **Commit:** hash2 | 🔗 [View in default dashboard](https://dashboard-url/#baz-one)\n\n" +
+				"> To manually trigger plan again please post `@terraform-applier plan path/baz/one` as comment.\n" +
 				"<details><summary><b>⛔ Run Status: Errored, Run Summary: unable to plan module</b></summary>\n\n" +
 				"```" +
 				"terraform\n" +
 				"Some Init Output...\nSome TF Output .....\n" +
 				"```\n" +
 				"</details>\n" +
-				"\n> To manually trigger plan again please post `@terraform-applier plan path/baz/one` as comment." +
 				embedMetadata(CommentMetadata{
 					Type:     MsgTypeRunOutput,
 					Cluster:  "default",
@@ -312,21 +296,16 @@ func Test_runOutputMsg(t *testing.T) {
 				}),
 		}, {
 			"3",
-			args{cluster: "default", module: "baz/one", path: "path/baz/one", run: &v1beta1.Run{Status: v1beta1.StatusOk, DiffDetected: true, CommitHash: "hash2", Summary: "Applied: x to add, x to change, x to destroy.", Output: "Terraform apply output...."}},
-			"Terraform run output for\n" +
-				"```\n" +
-				"Cluster: default\n" +
-				"Module: baz/one\n" +
-				"Path: path/baz/one\n" +
-				"Commit ID: hash2\n" +
-				"```\n" +
+			args{cluster: "default", module: types.NamespacedName{Name: "one", Namespace: "baz"}, path: "path/baz/one", run: &v1beta1.Run{Status: v1beta1.StatusOk, PlanOnly: false, DiffDetected: true, CommitHash: "hash2", Summary: "Applied: x to add, x to change, x to destroy.", Output: "Terraform apply output...."}},
+			"### Terraform Apply Output for `one`\n" +
+				"🏷️ **Commit:** hash2 | 🔗 [View in default dashboard](https://dashboard-url/#baz-one)\n\n" +
+				"> To manually trigger plan again please post `@terraform-applier plan path/baz/one` as comment.\n" +
 				"<details><summary><b>✅ Run Status: Ok, Run Summary: Applied: x to add, x to change, x to destroy.</b></summary>\n\n" +
 				"```" +
 				"terraform\n" +
 				"Terraform apply output....\n" +
 				"```\n" +
 				"</details>\n" +
-				"\n> To manually trigger plan again please post `@terraform-applier plan path/baz/one` as comment." +
 				embedMetadata(CommentMetadata{
 					Type:     MsgTypeRunOutput,
 					Cluster:  "default",
@@ -338,7 +317,7 @@ func Test_runOutputMsg(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := runOutputMsg(tt.args.cluster, tt.args.module, tt.args.path, tt.args.run)
+			got := runOutputMsg(tt.args.cluster, tt.args.module, tt.args.path, tt.args.run, "https://dashboard-url")
 
 			if diff := cmp.Diff(tt.want, got); diff != "" {
 				t.Errorf("runOutputMsg() mismatch (-want +got):\n%s", diff)
@@ -361,7 +340,7 @@ func Test_parseRunOutputMsg(t *testing.T) {
 	}{
 		{
 			name:        "NamespaceName + Commit ID",
-			args:        args{comment: runOutputMsg("default", "baz/one", "foo/one", &v1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy."})},
+			args:        args{comment: runOutputMsg("default", types.NamespacedName{Name: "one", Namespace: "baz"}, "foo/one", &v1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy."}, "dashboard-url")},
 			wantModule:  types.NamespacedName{Namespace: "baz", Name: "one"},
 			wantCluster: "default",
 			wantPath:    "foo/one",
@@ -369,7 +348,7 @@ func Test_parseRunOutputMsg(t *testing.T) {
 		},
 		{
 			name:        "cluster env with spec char",
-			args:        args{comment: runOutputMsg("default_-", "baz/one", "foo/one", &v1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy."})},
+			args:        args{comment: runOutputMsg("default_-", types.NamespacedName{Name: "one", Namespace: "baz"}, "foo/one", &v1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy."}, "dashboard-url")},
 			wantModule:  types.NamespacedName{Namespace: "baz", Name: "one"},
 			wantCluster: "default_-",
 			wantPath:    "foo/one",
@@ -377,7 +356,7 @@ func Test_parseRunOutputMsg(t *testing.T) {
 		},
 		{
 			name:        "Module Name only",
-			args:        args{comment: runOutputMsg("default", "one", "foo/one", &v1beta1.Run{CommitHash: "", Summary: "Plan: x to add..."})},
+			args:        args{comment: runOutputMsg("default", types.NamespacedName{Name: "one", Namespace: ""}, "foo/one", &v1beta1.Run{CommitHash: "", Summary: "Plan: x to add..."}, "dashboard-url")},
 			wantModule:  types.NamespacedName{Name: "one"},
 			wantCluster: "default",
 			wantPath:    "foo/one",
@@ -385,7 +364,7 @@ func Test_parseRunOutputMsg(t *testing.T) {
 		},
 		{
 			name:        "Module Name + Commit ID",
-			args:        args{comment: runOutputMsg("default", "one", "foo/one", &v1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy."})},
+			args:        args{comment: runOutputMsg("default", types.NamespacedName{Name: "one", Namespace: ""}, "foo/one", &v1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy."}, "dashboard-url")},
 			wantModule:  types.NamespacedName{Name: "one"},
 			wantCluster: "default",
 			wantPath:    "foo/one",
@@ -393,7 +372,7 @@ func Test_parseRunOutputMsg(t *testing.T) {
 		},
 		{
 			name:        "Path cluster only",
-			args:        args{comment: runOutputMsg("default", "baz/one", "foo/", &v1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy."})},
+			args:        args{comment: runOutputMsg("default", types.NamespacedName{Name: "one", Namespace: "baz"}, "foo/", &v1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy."}, "dashboard-url")},
 			wantModule:  types.NamespacedName{Namespace: "baz", Name: "one"},
 			wantCluster: "default",
 			wantPath:    "foo/",
@@ -401,7 +380,7 @@ func Test_parseRunOutputMsg(t *testing.T) {
 		},
 		{
 			name:        "Path Module Name only",
-			args:        args{comment: runOutputMsg("default", "baz/one", "/one", &v1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy."})},
+			args:        args{comment: runOutputMsg("default", types.NamespacedName{Name: "one", Namespace: "baz"}, "/one", &v1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy."}, "dashboard-url")},
 			wantModule:  types.NamespacedName{Namespace: "baz", Name: "one"},
 			wantCluster: "default",
 			wantPath:    "/one",
@@ -409,7 +388,7 @@ func Test_parseRunOutputMsg(t *testing.T) {
 		},
 		{
 			name:        "Path one word only",
-			args:        args{comment: runOutputMsg("default", "baz/one", "one", &v1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy."})},
+			args:        args{comment: runOutputMsg("default", types.NamespacedName{Name: "one", Namespace: "baz"}, "one", &v1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy."}, "dashboard-url")},
 			wantModule:  types.NamespacedName{Namespace: "baz", Name: "one"},
 			wantCluster: "default",
 			wantPath:    "one",
@@ -541,8 +520,8 @@ func Test_IsSelfComment(t *testing.T) {
 		{"empty", args{""}, false},
 		// Updated to simulate comments WITH metadata
 		{"autoPlanDisabledTml", args{autoPlanDisabledTml + embedMetadata(CommentMetadata{Type: MsgTypeAutoPlanDisabled})}, true},
-		{"requestAcknowledgedMsg", args{requestAcknowledgedMsg("default", "foo/one", "path/to/module/one", "hash1", mustParseMetaTime("2006-01-02T15:04:05+07:00"))}, true},
-		{"runOutputMsg", args{runOutputMsg("default", "one", "foo/one", &v1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy."})}, true},
+		{"requestAcknowledgedMsg", args{requestAcknowledgedMsg("default", types.NamespacedName{Name: "one", Namespace: "foo"}, "path/to/module/one", "hash1", mustParseMetaTime("2006-01-02T15:04:05+07:00"), "link")}, true},
+		{"runOutputMsg", args{runOutputMsg("default", types.NamespacedName{Name: "one", Namespace: "baz"}, "foo/one", &v1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy."}, "link")}, true},
 		{"other", args{"other"}, false},
 	}
 	for _, tt := range tests {

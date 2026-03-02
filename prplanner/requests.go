@@ -176,7 +176,7 @@ func (p *Planner) addNewRequest(module *tfaplv1beta1.Module, pr *pr, commitID st
 	req := module.NewRunRequest(tfaplv1beta1.PRPlan, "")
 
 	commentBody := prComment{
-		Body: requestAcknowledgedMsg(p.ClusterEnvName, module.NamespacedName().String(), module.Spec.Path, commitID, req.RequestedAt),
+		Body: requestAcknowledgedMsg(p.ClusterEnvName, module.NamespacedName(), module.Spec.Path, commitID, req.RequestedAt, p.WebserverURL),
 	}
 
 	commentID, err := p.github.postComment(pr.BaseRepository.Owner.Login, pr.BaseRepository.Name, 0, pr.Number, commentBody)

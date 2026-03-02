@@ -189,7 +189,7 @@ func TestCheckPRCommits(t *testing.T) {
 		planner.RedisClient = testRedis
 
 		p := generateMockPR(123, "ref1",
-			[]string{"random comment", runOutputMsg("default", "foo/two", "foo/two", &tfaplv1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy.", Output: "some output"}), "random comment"},
+			[]string{"random comment", runOutputMsg("default", types.NamespacedName{Name: "two", Namespace: "foo"}, "foo/two", &tfaplv1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy.", Output: "some output"}, "link"), "random comment"},
 		)
 
 		commitsInfo := []repository.CommitInfo{
@@ -225,7 +225,7 @@ func TestCheckPRCommits(t *testing.T) {
 		planner.RedisClient = testRedis
 
 		p := generateMockPR(123, "ref1",
-			[]string{"random comment", runOutputMsg("default", "foo/two", "foo/two", &tfaplv1beta1.Run{CommitHash: "hash3", Summary: "Plan: x to add, x to change, x to destroy.", Output: "some output"}), "random comment"},
+			[]string{"random comment", runOutputMsg("default", types.NamespacedName{Name: "two", Namespace: "foo"}, "foo/two", &tfaplv1beta1.Run{CommitHash: "hash3", Summary: "Plan: x to add, x to change, x to destroy.", Output: "some output"}, "link"), "random comment"},
 		)
 		commitsInfo := []repository.CommitInfo{
 			{Hash: "hash3", ChangedFiles: []string{"foo/two", "foo/three"}},
@@ -261,7 +261,7 @@ func TestCheckPRCommits(t *testing.T) {
 		planner.RedisClient = testRedis
 
 		p := generateMockPR(123, "ref1",
-			[]string{"random comment", runOutputMsg("diff-cluster", "foo/two", "foo/two", &tfaplv1beta1.Run{CommitHash: "hash3", Summary: "Plan: x to add, x to change, x to destroy.", Output: "some output"}), "random comment"},
+			[]string{"random comment", runOutputMsg("diff-cluster", types.NamespacedName{Name: "two", Namespace: "foo"}, "foo/two", &tfaplv1beta1.Run{CommitHash: "hash3", Summary: "Plan: x to add, x to change, x to destroy.", Output: "some output"}, "link"), "random comment"},
 		)
 		commitsInfo := []repository.CommitInfo{
 			{Hash: "hash3", ChangedFiles: []string{"foo/two", "foo/three"}},
@@ -327,7 +327,7 @@ func TestCheckPRCommits(t *testing.T) {
 		planner.RedisClient = testRedis
 
 		p := generateMockPR(123, "ref1",
-			[]string{"random comment", requestAcknowledgedMsg("default", "foo/two", "foo/two", "hash3", &metav1.Time{Time: time.Now()}), "random comment"},
+			[]string{"random comment", requestAcknowledgedMsg("default", types.NamespacedName{Name: "two", Namespace: "foo"}, "foo/two", "hash3", &metav1.Time{Time: time.Now()}, "link"), "random comment"},
 		)
 		commitsInfo := []repository.CommitInfo{
 			{Hash: "hash3", ChangedFiles: []string{"foo/two", "foo/three"}},
@@ -363,7 +363,7 @@ func TestCheckPRCommits(t *testing.T) {
 		planner.RedisClient = testRedis
 
 		p := generateMockPR(123, "ref1",
-			[]string{"random comment", requestAcknowledgedMsg("diff-cluster", "foo/two", "foo/two", "hash3", &metav1.Time{Time: time.Now()}), "random comment"},
+			[]string{"random comment", requestAcknowledgedMsg("diff-cluster", types.NamespacedName{Name: "two", Namespace: "foo"}, "foo/two", "hash3", &metav1.Time{Time: time.Now()}, "link"), "random comment"},
 		)
 		commitsInfo := []repository.CommitInfo{
 			{Hash: "hash3", ChangedFiles: []string{"foo/two", "foo/three"}},
@@ -429,7 +429,7 @@ func TestCheckPRCommits(t *testing.T) {
 		planner.RedisClient = testRedis
 
 		p := generateMockPR(123, "ref1",
-			[]string{"random comment", runOutputMsg("default", "foo/two", "foo/two", &tfaplv1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy.", Output: "some output"}), "random comment"},
+			[]string{"random comment", runOutputMsg("default", types.NamespacedName{Name: "two", Namespace: "foo"}, "foo/two", &tfaplv1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy.", Output: "some output"}, "link"), "random comment"},
 		)
 		commitsInfo := []repository.CommitInfo{
 			{Hash: "hash3", ChangedFiles: []string{"foo/two", "foo/three"}},
@@ -577,8 +577,8 @@ func Test_checkPRCommentsForPlanRequests(t *testing.T) {
 		pr := generateMockPR(123, "ref1",
 			[]string{
 				"@terraform-applier plan two",
-				requestAcknowledgedMsg("default", "foo/two", "path/foo/two", "hash2", mustParseMetaTime("2023-04-02T15:04:05Z")),
-				requestAcknowledgedMsg("default", "foo/three", "path/foo/three", "hash3", mustParseMetaTime("2023-04-02T15:04:05Z")),
+				requestAcknowledgedMsg("default", types.NamespacedName{Name: "two", Namespace: "foo"}, "path/foo/two", "hash2", mustParseMetaTime("2023-04-02T15:04:05Z"), "link"),
+				requestAcknowledgedMsg("default", types.NamespacedName{Name: "three", Namespace: "foo"}, "path/foo/three", "hash3", mustParseMetaTime("2023-04-02T15:04:05Z"), "link"),
 			},
 		)
 
@@ -600,8 +600,8 @@ func Test_checkPRCommentsForPlanRequests(t *testing.T) {
 		pr := generateMockPR(123, "ref1",
 			[]string{
 				"@terraform-applier plan path/foo/two",
-				requestAcknowledgedMsg("default", "foo/two", "path/foo/two", "hash2", mustParseMetaTime("2023-04-02T15:04:05Z")),
-				requestAcknowledgedMsg("default", "foo/three", "path/foo/three", "hash3", mustParseMetaTime("2023-04-02T15:04:05Z")),
+				requestAcknowledgedMsg("default", types.NamespacedName{Name: "two", Namespace: "foo"}, "path/foo/two", "hash2", mustParseMetaTime("2023-04-02T15:04:05Z"), "link"),
+				requestAcknowledgedMsg("default", types.NamespacedName{Name: "three", Namespace: "foo"}, "path/foo/three", "hash3", mustParseMetaTime("2023-04-02T15:04:05Z"), "link"),
 			},
 		)
 
@@ -619,8 +619,8 @@ func Test_checkPRCommentsForPlanRequests(t *testing.T) {
 		pr := generateMockPR(123, "ref1",
 			[]string{
 				"@terraform-applier plan two",
-				runOutputMsg("default", "foo/two", "path/foo/two", &tfaplv1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy.", Output: "tf plan output"}),
-				runOutputMsg("default", "foo/three", "path/foo/three", &tfaplv1beta1.Run{CommitHash: "hash3", Summary: "Plan: x to add, x to change, x to destroy.", Output: "tf plan output"}),
+				runOutputMsg("default", types.NamespacedName{Name: "two", Namespace: "foo"}, "path/foo/two", &tfaplv1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy.", Output: "tf plan output"}, "link"),
+				runOutputMsg("default", types.NamespacedName{Name: "three", Namespace: "foo"}, "path/foo/three", &tfaplv1beta1.Run{CommitHash: "hash3", Summary: "Plan: x to add, x to change, x to destroy.", Output: "tf plan output"}, "link"),
 			},
 		)
 
@@ -638,8 +638,8 @@ func Test_checkPRCommentsForPlanRequests(t *testing.T) {
 		pr := generateMockPR(123, "ref1",
 			[]string{
 				"@terraform-applier plan path/foo/two",
-				runOutputMsg("default", "foo/two", "path/foo/two", &tfaplv1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy.", Output: "tf plan output"}),
-				runOutputMsg("default", "foo/three", "path/foo/three", &tfaplv1beta1.Run{CommitHash: "hash3", Summary: "Plan: x to add, x to change, x to destroy.", Output: "tf plan output"}),
+				runOutputMsg("default", types.NamespacedName{Name: "two", Namespace: "foo"}, "path/foo/two", &tfaplv1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy.", Output: "tf plan output"}, "link"),
+				runOutputMsg("default", types.NamespacedName{Name: "three", Namespace: "foo"}, "path/foo/three", &tfaplv1beta1.Run{CommitHash: "hash3", Summary: "Plan: x to add, x to change, x to destroy.", Output: "tf plan output"}, "link"),
 			},
 		)
 
@@ -789,8 +789,8 @@ func Test_checkPRCommentsForPlanRequests(t *testing.T) {
 		pr := generateMockPR(123, "ref1",
 			[]string{
 				"@terraform-applier plan two",
-				requestAcknowledgedMsg("diff-cluster", "foo/two", "path/foo/two", "hash2", mustParseMetaTime("2023-04-02T15:04:05Z")),
-				requestAcknowledgedMsg("default", "foo/three", "path/foo/three", "hash3", mustParseMetaTime("2023-04-02T15:04:05Z")),
+				requestAcknowledgedMsg("diff-cluster", types.NamespacedName{Name: "two", Namespace: "foo"}, "path/foo/two", "hash2", mustParseMetaTime("2023-04-02T15:04:05Z"), "link"),
+				requestAcknowledgedMsg("default", types.NamespacedName{Name: "three", Namespace: "foo"}, "path/foo/three", "hash3", mustParseMetaTime("2023-04-02T15:04:05Z"), "link"),
 			},
 		)
 
@@ -841,8 +841,8 @@ func Test_checkPRCommentsForPlanRequests(t *testing.T) {
 		pr := generateMockPR(123, "ref1",
 			[]string{
 				"@terraform-applier plan two",
-				runOutputMsg("diff-cluster", "foo/two", "path/foo/two", &tfaplv1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy.", Output: "tf plan output"}),
-				runOutputMsg("default", "foo/three", "path/foo/three", &tfaplv1beta1.Run{CommitHash: "hash3", Summary: "Plan: x to add, x to change, x to destroy.", Output: "tf plan output"}),
+				runOutputMsg("diff-cluster", types.NamespacedName{Name: "two", Namespace: "foo"}, "path/foo/two", &tfaplv1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy.", Output: "tf plan output"}, "link"),
+				runOutputMsg("default", types.NamespacedName{Name: "three", Namespace: "foo"}, "path/foo/three", &tfaplv1beta1.Run{CommitHash: "hash3", Summary: "Plan: x to add, x to change, x to destroy.", Output: "tf plan output"}, "link"),
 			},
 		)
 
@@ -954,7 +954,7 @@ func Test_isPlanOutputPostedForCommit(t *testing.T) {
 				}{Nodes: []prComment{
 					{
 						DatabaseID: 01234567,
-						Body:       runOutputMsg("default", "foo/one", "foo/one", &tfaplv1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy."}),
+						Body:       runOutputMsg("default", types.NamespacedName{Name: "one", Namespace: "foo"}, "foo/one", &tfaplv1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy."}, "link"),
 					},
 				}}},
 				cluster:    "default",
@@ -972,7 +972,7 @@ func Test_isPlanOutputPostedForCommit(t *testing.T) {
 				}{Nodes: []prComment{
 					{
 						DatabaseID: 01234567,
-						Body:       runOutputMsg("diff-cluster", "foo/one", "foo/one", &tfaplv1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy."}),
+						Body:       runOutputMsg("diff-cluster", types.NamespacedName{Name: "one", Namespace: "foo"}, "foo/one", &tfaplv1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy."}, "link"),
 					},
 				}}},
 				cluster:    "default",
@@ -990,7 +990,7 @@ func Test_isPlanOutputPostedForCommit(t *testing.T) {
 				}{Nodes: []prComment{
 					{
 						DatabaseID: 01234567,
-						Body:       runOutputMsg("default", "one", "foo/one", &tfaplv1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy."}),
+						Body:       runOutputMsg("default", types.NamespacedName{Name: "one", Namespace: ""}, "foo/one", &tfaplv1beta1.Run{CommitHash: "hash2", Summary: "Plan: x to add, x to change, x to destroy."}, "link"),
 					},
 				}}},
 				cluster:    "default",
@@ -1116,7 +1116,7 @@ func Test_isPlanRequestAckPostedForCommit(t *testing.T) {
 				}{Nodes: []prComment{
 					{
 						DatabaseID: 01234567,
-						Body:       requestAcknowledgedMsg("default", "foo/one", "foo/one", "hash2", &metav1.Time{Time: time.Now()}),
+						Body:       requestAcknowledgedMsg("default", types.NamespacedName{Name: "one", Namespace: "foo"}, "foo/one", "hash2", &metav1.Time{Time: time.Now()}, "link"),
 					},
 				}}},
 				cluster:    "default",
@@ -1133,7 +1133,7 @@ func Test_isPlanRequestAckPostedForCommit(t *testing.T) {
 				}{Nodes: []prComment{
 					{
 						DatabaseID: 01234567,
-						Body:       requestAcknowledgedMsg("diff-cluster", "foo/one", "foo/one", "hash2", &metav1.Time{Time: time.Now()}),
+						Body:       requestAcknowledgedMsg("diff-cluster", types.NamespacedName{Name: "one", Namespace: "foo"}, "foo/one", "hash2", &metav1.Time{Time: time.Now()}, "link"),
 					},
 				}}},
 				cluster:    "default",
@@ -1150,7 +1150,7 @@ func Test_isPlanRequestAckPostedForCommit(t *testing.T) {
 				}{Nodes: []prComment{
 					{
 						DatabaseID: 01234567,
-						Body:       requestAcknowledgedMsg("default", "foo/one", "foo/one", "hash2", &metav1.Time{Time: time.Now().Add(-30 * time.Minute)}),
+						Body:       requestAcknowledgedMsg("default", types.NamespacedName{Name: "one", Namespace: "foo"}, "foo/one", "hash2", &metav1.Time{Time: time.Now().Add(-30 * time.Minute)}, "link"),
 					},
 				}}},
 				cluster:    "default",
@@ -1167,7 +1167,7 @@ func Test_isPlanRequestAckPostedForCommit(t *testing.T) {
 				}{Nodes: []prComment{
 					{
 						DatabaseID: 01234567,
-						Body:       requestAcknowledgedMsg("default", "foo/one", "foo/one", "hash2", &metav1.Time{Time: time.Now().Add(5 * time.Minute)}),
+						Body:       requestAcknowledgedMsg("default", types.NamespacedName{Name: "one", Namespace: "foo"}, "foo/one", "hash2", &metav1.Time{Time: time.Now().Add(5 * time.Minute)}, "link"),
 					},
 				}}},
 				cluster:    "default",
@@ -1184,7 +1184,7 @@ func Test_isPlanRequestAckPostedForCommit(t *testing.T) {
 				}{Nodes: []prComment{
 					{
 						DatabaseID: 01234567,
-						Body:       requestAcknowledgedMsg("default", "foo/one", "foo/one", "hash2", &metav1.Time{Time: time.Now()}),
+						Body:       requestAcknowledgedMsg("default", types.NamespacedName{Name: "one", Namespace: "foo"}, "foo/one", "hash2", &metav1.Time{Time: time.Now()}, "link"),
 					},
 				}}},
 				cluster:    "default",
@@ -1201,7 +1201,7 @@ func Test_isPlanRequestAckPostedForCommit(t *testing.T) {
 				}{Nodes: []prComment{
 					{
 						DatabaseID: 01234567,
-						Body:       requestAcknowledgedMsg("default", "foo/two", "foo/two", "hash3", &metav1.Time{Time: time.Now()}),
+						Body:       requestAcknowledgedMsg("default", types.NamespacedName{Name: "one", Namespace: "foo"}, "foo/two", "hash3", &metav1.Time{Time: time.Now()}, "link"),
 					},
 				}}},
 				cluster:    "default",
