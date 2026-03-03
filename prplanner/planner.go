@@ -30,6 +30,7 @@ type Planner struct {
 	github         GithubInterface
 	Interval       time.Duration
 	Log            *slog.Logger
+	WebserverURL   string
 }
 
 func (p *Planner) Init(ctx context.Context, ghApp sysutil.CredsProvider, ch <-chan *redis.Message) error {

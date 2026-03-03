@@ -28,27 +28,16 @@ var (
 	autoPlanDisabledTml = "Auto plan is disabled for this PR.\n" +
 		"Please post `@terraform-applier plan <module_name>` as comment if you want to request terraform plan for a particular module."
 
-	requestAcknowledgedMsgTml = "Received terraform plan request\n" +
-		"```\n" +
-		"Cluster: %s\n" +
-		"Module: %s\n" +
-		"Path: %s\n" +
-		"Commit ID: %s\n" +
-		"Requested At: %s\n" +
-		"```\n" +
-		"Do not edit this comment. This message will be updated once the plan run is completed.\n" +
-		"To manually trigger plan again please post `@terraform-applier plan %s` as comment."
+	requestAcknowledgedMsgTml = "### Received terraform plan request for `%s`\n" +
+		"🏷️ **Commit:** %s | 🕒 **Requested At:** %s | 🔗 [View in %s dashboard](%s)\n\n" +
+		"*(Do not edit this comment. This message will be updated once the plan run is completed.)*\n" +
+		">To manually trigger plan again please post `@terraform-applier plan %s` as comment."
 
-	runOutputMsgTml = "Terraform run output for\n" +
-		"```\n" +
-		"Cluster: %s\n" +
-		"Module: %s\n" +
-		"Path: %s\n" +
-		"Commit ID: %s\n" +
-		"```\n" +
+	runOutputMsgTml = "### Terraform Plan Output for `%s`\n" +
+		"🏷️ **Commit:** %s | 🔗 [View in %s dashboard](%s)\n\n" +
+		"> To manually trigger plan again please post `@terraform-applier plan %s` as comment.\n" +
 		"<details><summary><b>%s Run Status: %s, Run Summary: %s</b></summary>" +
-		"\n\n```terraform\n%s\n```\n</details>\n" +
-		"\n> To manually trigger plan again please post `@terraform-applier plan %s` as comment."
+		"\n\n```terraform\n%s\n```\n</details>\n"
 )
 
 type MsgType string
@@ -110,13 +99,15 @@ func parsePlanReqMsg(commentBody string) string {
 	return ""
 }
 
-func requestAcknowledgedMsg(cluster, module, path, commitID string, reqAt *metav1.Time) string {
-	display := fmt.Sprintf(requestAcknowledgedMsgTml, cluster, module, path, commitID, reqAt.Format(time.RFC3339), path)
+func requestAcknowledgedMsg(cluster string, module types.NamespacedName, path, commitID string, reqAt *metav1.Time, webserverURL string) string {
+	moduleURL := webserverURL + "/#" + module.Namespace + "_" + module.Name
+
+	display := fmt.Sprintf(requestAcknowledgedMsgTml, module.Name, commitID, reqAt.Format(time.RFC3339), cluster, moduleURL, path)
 
 	meta := CommentMetadata{
 		Type:     MsgTypePlanRequest,
 		Cluster:  cluster,
-		Module:   module,
+		Module:   module.String(),
 		Path:     path,
 		CommitID: commitID,
 		ReqAt:    reqAt.Format(time.RFC3339),
@@ -146,7 +137,7 @@ func parseRunOutputMsg(comment string) (cluster string, module types.NamespacedN
 	return meta.Cluster, parseNamespaceName(meta.Module), meta.Path, meta.CommitID
 }
 
-func runOutputMsg(cluster, module, path string, run *v1beta1.Run) string {
+func runOutputMsg(cluster string, module types.NamespacedName, path string, run *v1beta1.Run, webserverURL string) string {
 	// https://github.com/orgs/community/discussions/27190
 	characterLimit := 65000
 
@@ -160,19 +151,26 @@ func runOutputMsg(cluster, module, path string, run *v1beta1.Run) string {
 		runOutput = run.InitOutput + "\n" + run.Output
 	}
 
+	msgTml := runOutputMsgTml
+	if !run.PlanOnly {
+		msgTml = strings.Replace(msgTml, "Terraform Plan Output", "Terraform Apply Output", 1)
+	}
+
 	runes := []rune(runOutput)
 
 	if len(runes) > characterLimit {
-		runOutput = "Plan output has reached the max character limit of " + fmt.Sprintf("%d", characterLimit) + " characters. " +
+		runOutput = "Plan output has reached the max character limit of " + fmt.Sprintf("%d", characterLimit) + " characters.\n" +
 			"The output is truncated from the top.\n" + string(runes[(len(runes)-characterLimit):])
 	}
 
-	display := fmt.Sprintf(runOutputMsgTml, cluster, module, path, run.CommitHash, statusSymbol, run.Status, run.Summary, runOutput, path)
+	moduleURL := webserverURL + "/#" + module.Namespace + "_" + module.Name
+
+	display := fmt.Sprintf(msgTml, module.Name, run.CommitHash, cluster, moduleURL, path, statusSymbol, run.Status, run.Summary, runOutput)
 
 	meta := CommentMetadata{
 		Type:     MsgTypeRunOutput,
 		Cluster:  cluster,
-		Module:   module,
+		Module:   module.String(),
 		Path:     path,
 		CommitID: run.CommitHash,
 	}

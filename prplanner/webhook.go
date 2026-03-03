@@ -12,17 +12,17 @@ func (p *Planner) ProcessPRWebHookEvent(event GitHubWebhook, prNumber int) {
 
 	pr, err := p.github.PR(ctx, event.Repository.Owner.Login, event.Repository.Name, prNumber)
 	if err != nil {
-		p.Log.Error("unable to get PR info", "pr", prNumber, "err", err)
+		p.Log.Error("unable to get PR info", "repo", event.Repository.Name, "pr", prNumber, "err", err)
 		return
 	}
 
 	kubeModuleList := &tfaplv1beta1.ModuleList{}
 	if err := p.ClusterClt.List(ctx, kubeModuleList); err != nil {
-		p.Log.Error("error retrieving list of modules", "pr", prNumber, "error", err)
+		p.Log.Error("error retrieving list of modules", "repo", event.Repository.Name, "pr", prNumber, "error", err)
 		return
 	}
 
-	p.Log.Debug("processing PR event", "pr", prNumber)
+	p.Log.Debug("processing PR event", "repo", event.Repository.Name, "pr", prNumber)
 	p.processPullRequest(ctx, pr, kubeModuleList)
 }
 

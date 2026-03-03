@@ -844,6 +844,7 @@ func run(c *cli.Context) {
 			RedisClient:    sysutil.Redis{Client: rdb},
 			Runner:         &runner,
 			Log:            logger.With("logger", "pr-planner"),
+			WebserverURL:   c.String("oidc-callback-url"),
 		}
 
 		// setup subscription for key set
