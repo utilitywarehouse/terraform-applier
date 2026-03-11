@@ -29,12 +29,12 @@ var (
 		"Please post `@terraform-applier plan <module_name>` as comment if you want to request terraform plan for a particular module."
 
 	requestAcknowledgedMsgTml = "### Received terraform plan request for `%s`\n" +
-		"🏷️ **Commit:** %s | 🕒 **Requested At:** %s | 🔗 [View in %s dashboard](%s)\n\n" +
+		"🏷️ **Commit:** %s | 🕒 **Requested At:** %s | 🔗 [View in %s terraform-applier web UI](%s)\n\n" +
 		"*(Do not edit this comment. This message will be updated once the plan run is completed.)*\n" +
 		">To manually trigger plan again please post `@terraform-applier plan %s` as comment."
 
 	runOutputMsgTml = "### Terraform Plan Output for `%s`\n" +
-		"🏷️ **Commit:** %s | 🔗 [View in %s dashboard](%s)\n\n" +
+		"🏷️ **Commit:** %s | 🔗 [View in %s terraform-applier web UI](%s)\n\n" +
 		"> To manually trigger plan again please post `@terraform-applier plan %s` as comment.\n" +
 		"<details><summary><b>%s Run Status: %s, Run Summary: %s</b></summary>" +
 		"\n\n```terraform\n%s\n```\n</details>\n"
