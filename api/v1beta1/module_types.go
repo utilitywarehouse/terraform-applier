@@ -105,8 +105,19 @@ type ModuleSpec struct {
 	// +optional
 	Schedule string `json:"schedule,omitempty"`
 
+	// PlanOnly, when true, acts as a global safety lock. The controller will
+	// only ever perform 'terraform plan' operations. It overrides all other
+	// settings, including AutoApply and manual "Force Apply" requests from the UI.
 	// +optional
+	// +kubebuilder:default=false
 	PlanOnly *bool `json:"planOnly,omitempty"`
+
+	// AutoApply allows the controller to automatically proceed to 'terraform apply'
+	// for automated triggers (ScheduledRun and PollingRun). This field is
+	// ignored if PlanOnly is set to true.
+	// +optional
+	// +kubebuilder:default=false
+	AutoApply *bool `json:"autoApply,omitempty"`
 
 	// if PlanOnPR is true, plan-on-pr feature will be enabled for this module
 	// +optional
@@ -216,6 +227,7 @@ type ModuleStatus struct {
 //+kubebuilder:subresource:status
 //+kubebuilder:printcolumn:name="Schedule",type="string",JSONPath=".spec.schedule",description=""
 //+kubebuilder:printcolumn:name="PlanOnly",type="string",JSONPath=".spec.planOnly",description=""
+//+kubebuilder:printcolumn:name="AutoApply",type="string",JSONPath=".spec.autoApply",description=""
 //+kubebuilder:printcolumn:name="State",type="string",JSONPath=".status.currentState",description=""
 //+kubebuilder:printcolumn:name="Reason",type="string",JSONPath=".status.stateReason",description=""
 //+kubebuilder:printcolumn:name="Last Run Started At",type="string",JSONPath=`.status.lastDefaultRunStartedAt`,description=""

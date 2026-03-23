@@ -151,6 +151,11 @@ func (in *ModuleSpec) DeepCopyInto(out *ModuleSpec) {
 		*out = new(bool)
 		**out = **in
 	}
+	if in.AutoApply != nil {
+		in, out := &in.AutoApply, &out.AutoApply
+		*out = new(bool)
+		**out = **in
+	}
 	if in.PlanOnPR != nil {
 		in, out := &in.PlanOnPR, &out.PlanOnPR
 		*out = new(bool)
