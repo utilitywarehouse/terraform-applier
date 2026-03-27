@@ -60,7 +60,7 @@ type PullRequest struct {
 	CommentID  int    `json:"commentID,omitempty"`
 }
 
-func (req *Request) Validate() error {
+func (req *Request) Validate(module *Module) error {
 	if req.RequestedAt.IsZero() {
 		return fmt.Errorf("'reqAt' is required and must be in the '2006-01-02T15:04:05Z' format")
 	}
@@ -73,6 +73,11 @@ func (req *Request) Validate() error {
 		PRPlan:
 	default:
 		return fmt.Errorf("unknown Request type provided")
+	}
+
+	// reject request if apply req is downgraded to plan only to avoid confusion
+	if req.Type == ForcedApply && req.IsPlanOnly(module) {
+		return fmt.Errorf("Manual Apply rejected: Module.Spec.PlanOnly is true")
 	}
 
 	return nil

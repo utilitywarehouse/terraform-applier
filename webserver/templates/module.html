@@ -32,7 +32,7 @@
                         <button data-namespace=" {{ .Module.Namespace }}" data-name="{{ .Module.Name }}"
                             data-plan-only="false" class="force-button force-module-button btn btn-warning"
                             onclick="forceRun('{{.Module.Namespace}}','{{ .Module.Name }}','false')" {{ if
-                            .Module.IsPlanOnly }}disabled{{ end }}>
+                            .Module.IsPlanOnly }}disabled title="Apply is disabled because PlanOnly is true" {{ end }}>
                             <strong>Force Apply</strong>
                         </button>
                         {{end}}

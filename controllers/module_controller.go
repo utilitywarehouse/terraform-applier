@@ -117,6 +117,7 @@ func (r *ModuleReconciler) Reconcile(ctx context.Context, req reconcile.Request)
 	if err != nil {
 		log.Error("removing invalid run request", "err", err)
 		sysutil.RemoveCurrentRequest(ctx, r.Client, module.NamespacedName())
+		r.setFailedStatus(req, module, tfaplv1beta1.ReasonInvalidRequest, err.Error())
 		return ctrl.Result{RequeueAfter: pollIntervalDuration}, nil
 	}
 	if runReq != nil {

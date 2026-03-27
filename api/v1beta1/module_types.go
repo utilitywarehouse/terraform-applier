@@ -44,6 +44,7 @@ const (
 	ReasonInitialiseFailed     = "InitialiseFailed"
 	ReasonPlanFailed           = "PlanFailed"
 	ReasonApplyFailed          = "ApplyFailed"
+	ReasonInvalidRequest       = "InvalidRequest"
 
 	ReasonInitialised           = "Initialised"
 	ReasonPlanOnlyDriftDetected = "PlanOnlyDriftDetected"
@@ -403,5 +404,5 @@ func (m *Module) PendingRunRequest() (*Request, error) {
 	if err := json.Unmarshal([]byte(valueString), &value); err != nil {
 		return nil, err
 	}
-	return &value, value.Validate()
+	return &value, value.Validate(m)
 }
