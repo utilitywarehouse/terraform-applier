@@ -243,6 +243,12 @@ func (f *ForceRunHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		reqType = tfaplv1beta1.ForcedApply
 	}
 
+	if reqType == tfaplv1beta1.ForcedApply && module.IsPlanOnly() {
+		f.Log.Error("force apply rejected as module is in plan only mode", "module", namespacedName)
+		http.Error(w, "module is set to plan only mode", http.StatusBadRequest)
+		return
+	}
+
 	req := module.NewRunRequest(reqType, payload["lockID"])
 
 	err = sysutil.EnsureRequest(r.Context(), f.ClusterClt, module.NamespacedName(), req)

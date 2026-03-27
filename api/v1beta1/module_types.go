@@ -378,6 +378,10 @@ func (m *Module) IsPlanOnly() bool {
 	return m.Spec.PlanOnly != nil && *m.Spec.PlanOnly
 }
 
+func (m *Module) IsAutoApply() bool {
+	return m.Spec.AutoApply != nil && *m.Spec.AutoApply
+}
+
 func (m *Module) NewRunRequest(reqType, lockID string) *Request {
 	req := Request{
 		RequestedAt: &metav1.Time{Time: time.Now()},

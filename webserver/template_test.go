@@ -52,10 +52,11 @@ func Test_ExecuteTemplate(t *testing.T) {
 			TypeMeta:   metav1.TypeMeta{APIVersion: "terraform-applier.uw.systems/v1beta1", Kind: "Module"},
 			ObjectMeta: metav1.ObjectMeta{Name: "admins", Namespace: "foo"},
 			Spec: tfaplv1beta1.ModuleSpec{
-				Schedule: "00 */1 * * *",
-				RepoURL:  "https://github.com/utilitywarehouse/terraform-applier.git",
-				RepoRef:  "prj-dev",
-				Path:     "foo/admins",
+				Schedule:  "00 */1 * * *",
+				RepoURL:   "https://github.com/utilitywarehouse/terraform-applier.git",
+				RepoRef:   "prj-dev",
+				Path:      "foo/admins",
+				AutoApply: new(false),
 			},
 			Status: tfaplv1beta1.ModuleStatus{
 				CurrentState:            "Running",
@@ -70,10 +71,11 @@ func Test_ExecuteTemplate(t *testing.T) {
 				Annotations: map[string]string{tfaplv1beta1.RunRequestAnnotationKey: `'{"id":"VMqlQIIX","reqAt":"2024-04-11T15:05:46Z","type":"ForcedPlan"}'`},
 			},
 			Spec: tfaplv1beta1.ModuleSpec{
-				RepoURL:  "git@github.com:utilitywarehouse/terraform-applier.git",
-				RepoRef:  "master",
-				Path:     "foo/users",
-				PlanOnly: &boolTrue,
+				RepoURL:   "git@github.com:utilitywarehouse/terraform-applier.git",
+				RepoRef:   "master",
+				Path:      "foo/users",
+				PlanOnly:  new(true),
+				AutoApply: new(true),
 			},
 			Status: tfaplv1beta1.ModuleStatus{
 				CurrentState:            "Errored",
@@ -89,10 +91,11 @@ func Test_ExecuteTemplate(t *testing.T) {
 				Annotations: map[string]string{tfaplv1beta1.RunRequestAnnotationKey: `'{"id":"VMqlQIIX","reqAt":"2024-04-11T15:05:46Z","type":"ForcedPlan"}'`},
 			},
 			Spec: tfaplv1beta1.ModuleSpec{
-				RepoURL:  "ssh://git@github.com/utilitywarehouse/terraform-applier.git",
-				RepoRef:  "as-test-module",
-				Schedule: "00 */2 * * *",
-				Path:     "integration_test/src/modules/hello",
+				RepoURL:   "ssh://git@github.com/utilitywarehouse/terraform-applier.git",
+				RepoRef:   "as-test-module",
+				Schedule:  "00 */2 * * *",
+				Path:      "integration_test/src/modules/hello",
+				AutoApply: new(true),
 			},
 			Status: tfaplv1beta1.ModuleStatus{
 				CurrentState:             string(tfaplv1beta1.StatusDriftDetected),
@@ -106,8 +109,9 @@ func Test_ExecuteTemplate(t *testing.T) {
 			TypeMeta:   metav1.TypeMeta{APIVersion: "terraform-applier.uw.systems/v1beta1", Kind: "Module"},
 			ObjectMeta: metav1.ObjectMeta{Name: "users", Namespace: "bar"},
 			Spec: tfaplv1beta1.ModuleSpec{
-				RepoURL: "git@github.com:utilitywarehouse/terraform-applier.git",
-				Path:    "dev/users",
+				RepoURL:   "git@github.com:utilitywarehouse/terraform-applier.git",
+				Path:      "dev/users",
+				AutoApply: new(true),
 			},
 			Status: tfaplv1beta1.ModuleStatus{
 				CurrentState:            string(tfaplv1beta1.StatusOk),
