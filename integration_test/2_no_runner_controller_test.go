@@ -7,7 +7,9 @@ import (
 	"time"
 
 	"github.com/golang/mock/gomock"
+	"github.com/utilitywarehouse/terraform-applier/api/v1beta1"
 	tfaplv1beta1 "github.com/utilitywarehouse/terraform-applier/api/v1beta1"
+	"github.com/utilitywarehouse/terraform-applier/sysutil"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
@@ -305,7 +307,7 @@ func TestModuleController_NoRunner(t *testing.T) {
 		}
 	})
 
-	t.Run("Should send module to job queue on pending run request", func(t *testing.T) {
+	t.Run("Should send module to job queue on pending run request (ForcedPlan)", func(t *testing.T) {
 		runCh := make(chan *tfaplv1beta1.Run, 1)
 		ctrl := setup(t, runCh)
 		defer ctrl.Finish()
@@ -326,7 +328,7 @@ func TestModuleController_NoRunner(t *testing.T) {
 					tfaplv1beta1.RunRequestAnnotationKey: `{"id":"ueLMEbQj","reqAt":"2024-04-11T14:55:04Z","type":"ForcedPlan"}`,
 				},
 			},
-			Spec: tfaplv1beta1.ModuleSpec{RepoURL: repoURL, Path: path},
+			Spec: tfaplv1beta1.ModuleSpec{RepoURL: repoURL, Path: path, PlanOnly: new(true)},
 		}
 
 		if err := k8sClient.Create(ctx, module); err != nil {
@@ -349,6 +351,117 @@ func TestModuleController_NoRunner(t *testing.T) {
 			}
 		case <-time.After(10 * time.Second):
 			t.Fatal("Timeout waiting for forced run")
+		}
+	})
+
+	t.Run("Should send module to job queue on pending run request (ForcedApply)", func(t *testing.T) {
+		runCh := make(chan *tfaplv1beta1.Run, 1)
+		ctrl := setup(t, runCh)
+		defer ctrl.Finish()
+
+		const (
+			moduleName = "test-module5"
+			repoURL    = "https://host.xy/dummy/repo2.git"
+			path       = "dev/" + moduleName
+		)
+
+		ctx := context.Background()
+		module := &tfaplv1beta1.Module{
+			TypeMeta: metav1.TypeMeta{APIVersion: "terraform-applier.uw.systems/v1beta1", Kind: "Module"},
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      moduleName,
+				Namespace: moduleNamespace,
+				Annotations: map[string]string{
+					tfaplv1beta1.RunRequestAnnotationKey: `{"id":"ueLMEbQj","reqAt":"2024-04-11T14:55:04Z","type":"ForcedApply"}`,
+				},
+			},
+			Spec: tfaplv1beta1.ModuleSpec{RepoURL: repoURL, Path: path},
+		}
+
+		if err := k8sClient.Create(ctx, module); err != nil {
+			t.Fatalf("Failed to create module: %v", err)
+		}
+		// delete module to stopping requeue
+		defer func() {
+			if err := k8sClient.Delete(ctx, module); err != nil {
+				t.Errorf("Failed to delete module: %v", err)
+			}
+		}()
+
+		select {
+		case run := <-runCh:
+			if run.Module.Name != moduleName {
+				t.Errorf("Expected run for %s, got %v", moduleName, run.Module)
+			}
+			if run.Request.Type != "ForcedApply" {
+				t.Errorf("Expected ForcedPlan run for %s, got %v", moduleName, run.Request.Type)
+			}
+		case <-time.After(10 * time.Second):
+			t.Fatal("Timeout waiting for forced run")
+		}
+	})
+
+	t.Run("Should not trigger run on pending ForcedApply request on PlanOnly", func(t *testing.T) {
+		runCh := make(chan *tfaplv1beta1.Run, 1)
+		ctrl := setup(t, runCh)
+		defer ctrl.Finish()
+
+		const (
+			moduleName = "test-module6"
+			repoURL    = "https://host.xy/dummy/repo2.git"
+			path       = "dev/" + moduleName
+		)
+
+		ctx := context.Background()
+		module := &tfaplv1beta1.Module{
+			TypeMeta: metav1.TypeMeta{APIVersion: "terraform-applier.uw.systems/v1beta1", Kind: "Module"},
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      moduleName,
+				Namespace: moduleNamespace,
+			},
+			Spec: tfaplv1beta1.ModuleSpec{RepoURL: repoURL, Path: path, PlanOnly: new(true)},
+		}
+
+		if err := k8sClient.Create(ctx, module); err != nil {
+			t.Fatalf("Failed to create module: %v", err)
+		}
+		// delete module to stopping requeue
+		defer func() {
+			if err := k8sClient.Delete(ctx, module); err != nil {
+				t.Errorf("Failed to delete module: %v", err)
+			}
+		}()
+
+		// absorb initial run
+		select {
+		case <-runCh:
+			module.Status.LastDefaultRunCommitHash = "CommitAbc123"
+			module.Status.CurrentState = "OK"
+			if err := k8sClient.Status().Update(ctx, module); err != nil {
+				t.Fatalf("Failed to update status: %v", err)
+			}
+		case <-time.After(10 * time.Second):
+			t.Fatal("Timeout waiting for initial run")
+		}
+
+		// for Reconcile loop
+		testRepos.EXPECT().Hash(gomock.Any(), repoURL, "HEAD", path).Return("CommitAbc123", nil).AnyTimes()
+
+		sysutil.EnsureRequest(t.Context(), k8sClient, module.NamespacedName(), &v1beta1.Request{Type: "ForcedApply", RequestedAt: &metav1.Time{Time: time.Now()}})
+
+		// Verify no run is triggered
+		select {
+		case r := <-runCh:
+			t.Fatal("Run should NOT have been triggered for plan-only module", "module", moduleName, "run", r.Module)
+		case <-time.After(2 * time.Second):
+			// Success
+		}
+
+		fetchedModule := &tfaplv1beta1.Module{}
+		k8sClient.Get(ctx, types.NamespacedName{Name: moduleName, Namespace: moduleNamespace}, fetchedModule)
+
+		if fetchedModule.Status.CurrentState != string(tfaplv1beta1.StatusErrored) {
+			t.Fatal("Expected module state to be Errored", "got", fetchedModule.Status.CurrentState, "module", moduleName)
 		}
 	})
 
