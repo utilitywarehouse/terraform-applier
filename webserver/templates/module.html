@@ -7,18 +7,22 @@
             <div href="#{{ sanitizedUniqueName .Module.NamespacedName}}-info">
                 <div class="d-flex justify-content-between align-items-center mb-1">
                     <h3 class="fw-bold" style="color: #550091;">{{.Module.Name}}
-                        {{ if .Module.IsPlanOnly}}
-                        <span class='badge text-bg-secondary'>plan only</span>
-                        {{end}}
+                        {{ if .Module.IsPlanOnly }}
+                        <span class='badge text-bg-secondary'
+                            title="Module is locked to Plan-Only mode in the Spec.">Plan Only</span>
+                        {{else if not .Module.IsAutoApply }}
+                        <span class='badge border border-info text-info'
+                            title="Auto-Apply is disabled. Manual apply required.">Manual Apply</span>
+                        {{ end }}
                     </h3>
                     <div>
                         {{if index .Module.ObjectMeta.Annotations "terraform-applier.uw.systems/run-request"}}
                         <button type="button" class="btn btn-info" disabled>Queued</button>
                         {{else}}
                         {{ if eq .Module.Status.CurrentState "Errored"}}
-                          <button type="button" class="btn btn-outline-danger" onclick="toggleLockIdInput()">
+                        <button type="button" class="btn btn-outline-danger" onclick="toggleLockIdInput()">
                             Unlock State
-                          </button>
+                        </button>
                         {{ end }}
                         <button data-namespace="{{ .Module.Namespace }}" data-name="{{ .Module.Name }}"
                             data-plan-only="true" class="force-button force-module-button btn btn-info"
@@ -27,7 +31,8 @@
                         </button>
                         <button data-namespace=" {{ .Module.Namespace }}" data-name="{{ .Module.Name }}"
                             data-plan-only="false" class="force-button force-module-button btn btn-warning"
-                            onclick="forceRun('{{.Module.Namespace}}','{{ .Module.Name }}','false')">
+                            onclick="forceRun('{{.Module.Namespace}}','{{ .Module.Name }}','false')" {{ if
+                            .Module.IsPlanOnly }}disabled title="Apply is disabled because PlanOnly is true" {{ end }}>
                             <strong>Force Apply</strong>
                         </button>
                         {{end}}
@@ -38,11 +43,11 @@
                     </div>
                 </div>
                 <div id="lockIdInputContainer" class="align-items-center mt-2" style="display: none;">
-                  <input type="text" id="lockIdInput" class="form-control me-2" placeholder="Enter Lock ID">
-                  <button type="button" class="btn btn-outline-danger" style="white-space: nowrap;"
-                    onclick="forceRun('{{.Module.Namespace}}','{{ .Module.Name }}','true')">
-                    <strong>Force Unlock</strong>
-                  </button>
+                    <input type="text" id="lockIdInput" class="form-control me-2" placeholder="Enter Lock ID">
+                    <button type="button" class="btn btn-outline-danger" style="white-space: nowrap;"
+                        onclick="forceRun('{{.Module.Namespace}}','{{ .Module.Name }}','true')">
+                        <strong>Force Unlock</strong>
+                    </button>
                 </div>
 
                 <dl>

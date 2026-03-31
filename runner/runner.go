@@ -76,10 +76,30 @@ func (r *Runner) Init(enablePluginCache bool, maxRunners int) error {
 // Start will start given run and return true if run is successful
 // This function is concurrency safe
 func (r *Runner) Start(run *tfaplv1beta1.Run, cancelChan chan struct{}) bool {
-	if err := run.Request.Validate(); err != nil {
+	// remove any pending run request regardless of run outcome
+	defer func() {
+		// there are no annotations for schedule and polling runs
+		if run.Request.Type == tfaplv1beta1.ScheduledRun ||
+			run.Request.Type == tfaplv1beta1.PollingRun ||
+			run.Request.Type == tfaplv1beta1.PRPlan {
+			return
+		}
+		if err := sysutil.RemoveRequest(context.Background(), r.ClusterClt, run.Module, run.Request); err != nil {
+			r.Log.Error("unable to remove run request", "err", err)
+		}
+	}()
+
+	module, err := sysutil.GetModule(context.Background(), r.ClusterClt, run.Module)
+	if err != nil {
+		r.Log.Error("unable to fetch terraform module", "err", err)
+		return false
+	}
+
+	if err := run.Request.Validate(module); err != nil {
 		r.Log.Error("run triggered with invalid request", "req", run, "err", err)
 		return false
 	}
+
 	envs := make(map[string]string)
 	maps.Copy(envs, r.GlobalENV)
 
@@ -97,7 +117,7 @@ func (r *Runner) Start(run *tfaplv1beta1.Run, cancelChan chan struct{}) bool {
 		}
 	}
 
-	success := r.process(run, cancelChan, envs)
+	success := r.process(run, module, cancelChan, envs)
 
 	dur := time.Since(start).Seconds()
 
@@ -114,8 +134,12 @@ func (r *Runner) Start(run *tfaplv1beta1.Run, cancelChan chan struct{}) bool {
 }
 
 // process will prepare and run module it returns bool indicating failed run
-func (r *Runner) process(run *tfaplv1beta1.Run, cancelChan <-chan struct{}, envs map[string]string) bool {
+func (r *Runner) process(run *tfaplv1beta1.Run, module *tfaplv1beta1.Module, cancelChan <-chan struct{}, envs map[string]string) bool {
 	log := r.Log.With("module", run.Module)
+
+	// create new context
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	// make sure module is not already running
 	_, ok := r.RunStatus.Load(run.Module.String())
@@ -129,35 +153,11 @@ func (r *Runner) process(run *tfaplv1beta1.Run, cancelChan <-chan struct{}, envs
 
 	run.Status = tfaplv1beta1.StatusRunning
 
-	// remove pending run request regardless of run outcome
 	defer func() {
-		// there are no annotations for schedule and polling runs
-		if run.Request.Type == tfaplv1beta1.ScheduledRun ||
-			run.Request.Type == tfaplv1beta1.PollingRun ||
-			run.Request.Type == tfaplv1beta1.PRPlan {
-			return
-		}
-		if err := sysutil.RemoveRequest(context.Background(), r.ClusterClt, run.Module, run.Request); err != nil {
-			log.Error("unable to remove run request", "err", err)
-		}
-	}()
-
-	defer func() {
-		if err := r.updateRedis(context.Background(), run); err != nil {
+		if err := r.updateRedis(ctx, run); err != nil {
 			log.Error("unable to store run details", "err", err)
 		}
 	}()
-
-	// create new context
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	// get Object
-	module, err := sysutil.GetModule(ctx, r.ClusterClt, run.Module)
-	if err != nil {
-		log.Error("unable to fetch terraform module", "err", err)
-		return false
-	}
 
 	// setup go routine for graceful shutdown of current run
 	go func() {

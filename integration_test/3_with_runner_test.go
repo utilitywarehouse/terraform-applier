@@ -25,10 +25,6 @@ func TestModuleController_WithRunner(t *testing.T) {
 		commitMsg       = "test commit"
 	)
 
-	var (
-		boolTrue = true
-	)
-
 	sbKeyringData, err := os.ReadFile(".tests_strongbox_keyring")
 	if err != nil {
 		fmt.Println(err)
@@ -103,9 +99,10 @@ func TestModuleController_WithRunner(t *testing.T) {
 			TypeMeta:   metav1.TypeMeta{APIVersion: "terraform-applier.uw.systems/v1beta1", Kind: "Module"},
 			ObjectMeta: metav1.ObjectMeta{Name: moduleName, Namespace: moduleNamespace},
 			Spec: tfaplv1beta1.ModuleSpec{
-				Schedule: "50 * * * *",
-				RepoURL:  repoURL,
-				Path:     path,
+				Schedule:  "50 * * * *",
+				RepoURL:   repoURL,
+				Path:      path,
+				AutoApply: new(true),
 				Env: []tfaplv1beta1.EnvVar{
 					{Name: "TF_APPLIER_STRONGBOX_KEYRING", Value: string(sbKeyringData)},
 					{Name: "TF_APPLIER_STRONGBOX_IDENTITY", Value: string(sbIdentityData)},
@@ -190,10 +187,86 @@ func TestModuleController_WithRunner(t *testing.T) {
 			TypeMeta:   metav1.TypeMeta{APIVersion: "terraform-applier.uw.systems/v1beta1", Kind: "Module"},
 			ObjectMeta: metav1.ObjectMeta{Name: moduleName, Namespace: moduleNamespace},
 			Spec: tfaplv1beta1.ModuleSpec{
-				Schedule: "50 * * * *",
-				RepoURL:  repoURL,
-				Path:     path,
-				PlanOnly: &boolTrue,
+				Schedule:  "50 * * * *",
+				RepoURL:   repoURL,
+				Path:      path,
+				AutoApply: new(false),
+				Env: []tfaplv1beta1.EnvVar{
+					{Name: "TF_APPLIER_STRONGBOX_KEYRING", Value: string(sbKeyringData)},
+					{Name: "TF_APPLIER_STRONGBOX_IDENTITY", Value: string(sbIdentityData)},
+				},
+			},
+		}
+		if err := k8sClient.Create(ctx, module); err != nil {
+			t.Fatalf("Failed to create module: %v", err)
+		}
+		// delete module to stopping requeue
+		defer func() {
+			if err := k8sClient.Delete(ctx, module); err != nil {
+				t.Errorf("Failed to delete module: %v", err)
+			}
+		}()
+
+		// Setup FakeDelegation
+		fakeClient := fake.NewSimpleClientset()
+		testDelegate.EXPECT().DelegateToken(gomock.Any(), gomock.Any(), moduleNamespace, "terraform-applier-delegate").Return("token.X2", nil)
+		testDelegate.EXPECT().SetupDelegation(gomock.Any(), "token.X2").Return(fakeClient, nil)
+
+		select {
+		case <-redisDoneCh:
+		case <-time.After(30 * time.Second):
+			t.Fatal("Timeout waiting for runner to complete")
+		}
+
+		fetchedModule := &tfaplv1beta1.Module{}
+		for range 20 {
+			k8sClient.Get(ctx, types.NamespacedName{Name: moduleName, Namespace: moduleNamespace}, fetchedModule)
+			if fetchedModule.Status.CurrentState == string(tfaplv1beta1.StatusDriftDetected) {
+				break
+			}
+			time.Sleep(100 * time.Millisecond)
+		}
+
+		if fetchedModule.Status.CurrentState != string(tfaplv1beta1.StatusDriftDetected) {
+			t.Errorf("Expected state 'StatusDriftDetected', got %s", fetchedModule.Status.CurrentState)
+		}
+		if !strings.Contains(lastRun.Output, "Plan:") {
+			t.Error("Expected Plan output")
+		}
+		if fetchedModule.Status.LastAppliedCommitHash != "" {
+			t.Error("Expected no LastAppliedCommitHash for PlanOnly")
+		}
+	})
+
+	t.Run("Should send module to job queue on initial run and runner should only do plan (autoApply:true)", func(t *testing.T) {
+		redisDoneCh := make(chan struct{})
+		ctrl := setup(t)
+		defer ctrl.Finish()
+
+		const (
+			moduleName = "hello-plan-only-with-auto-apply"
+			repoURL    = "https://host.xy/dummy/repo.git"
+			path       = "hello"
+		)
+
+		var lastRun *tfaplv1beta1.Run
+		testRedis.EXPECT().SetDefaultLastRun(gomock.Any(), gomock.Any()).
+			DoAndReturn(func(ctx context.Context, run *tfaplv1beta1.Run) error {
+				lastRun = run
+				close(redisDoneCh) // Only Plan runs
+				return nil
+			})
+
+		ctx := context.Background()
+		module := &tfaplv1beta1.Module{
+			TypeMeta:   metav1.TypeMeta{APIVersion: "terraform-applier.uw.systems/v1beta1", Kind: "Module"},
+			ObjectMeta: metav1.ObjectMeta{Name: moduleName, Namespace: moduleNamespace},
+			Spec: tfaplv1beta1.ModuleSpec{
+				Schedule:  "50 * * * *",
+				RepoURL:   repoURL,
+				Path:      path,
+				PlanOnly:  new(true),
+				AutoApply: new(true),
 				Env: []tfaplv1beta1.EnvVar{
 					{Name: "TF_APPLIER_STRONGBOX_KEYRING", Value: string(sbKeyringData)},
 					{Name: "TF_APPLIER_STRONGBOX_IDENTITY", Value: string(sbIdentityData)},
@@ -270,9 +343,10 @@ func TestModuleController_WithRunner(t *testing.T) {
 			TypeMeta:   metav1.TypeMeta{APIVersion: "terraform-applier.uw.systems/v1beta1", Kind: "Module"},
 			ObjectMeta: metav1.ObjectMeta{Name: moduleName, Namespace: moduleNamespace},
 			Spec: tfaplv1beta1.ModuleSpec{
-				Schedule: "50 * * * *",
-				RepoURL:  repoURL,
-				Path:     path,
+				Schedule:  "50 * * * *",
+				RepoURL:   repoURL,
+				Path:      path,
+				AutoApply: new(true),
 				Backend: []tfaplv1beta1.EnvVar{
 					{Name: "path", Value: testStateFilePath},
 				},
@@ -413,6 +487,7 @@ func TestModuleController_WithRunner(t *testing.T) {
 				Schedule:      "50 * * * *",
 				RepoURL:       repoURL,
 				Path:          path,
+				AutoApply:     new(true),
 				VaultRequests: &vaultReq,
 				Env: []tfaplv1beta1.EnvVar{
 					{Name: "TF_APPLIER_STRONGBOX_KEYRING", Value: string(sbKeyringData)},
@@ -505,6 +580,7 @@ func TestModuleController_WithRunner(t *testing.T) {
 				Schedule:            "50 * * * *",
 				RepoURL:             repoURL,
 				Path:                path,
+				AutoApply:           new(true),
 				VaultRequests:       &vaultReq,
 				RunAsServiceAccount: runAsSA,
 				Env: []tfaplv1beta1.EnvVar{

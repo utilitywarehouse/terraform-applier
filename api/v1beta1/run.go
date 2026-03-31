@@ -60,7 +60,7 @@ type PullRequest struct {
 	CommentID  int    `json:"commentID,omitempty"`
 }
 
-func (req *Request) Validate() error {
+func (req *Request) Validate(module *Module) error {
 	if req.RequestedAt.IsZero() {
 		return fmt.Errorf("'reqAt' is required and must be in the '2006-01-02T15:04:05Z' format")
 	}
@@ -75,14 +75,26 @@ func (req *Request) Validate() error {
 		return fmt.Errorf("unknown Request type provided")
 	}
 
+	// reject request if apply req is downgraded to plan only to avoid confusion
+	if req.Type == ForcedApply && req.IsPlanOnly(module) {
+		return fmt.Errorf("Manual Apply rejected: Module.Spec.PlanOnly is true")
+	}
+
 	return nil
 }
 
-// IsPlanOnly will return is req is plan-only
+// IsPlanOnly determines the final execution mode based on the trigger type
+// and the module's safety/automation settings.
 func (req *Request) IsPlanOnly(module *Module) bool {
+	// If the module is locked to PlanOnly, all request should be plan only.
+	// Even a 'ForcedApply' from the GUI should be downgraded to a Plan.
+	if module.IsPlanOnly() {
+		return true
+	}
+
 	// for scheduled and polling run respect module spec
 	if req.Type == ScheduledRun || req.Type == PollingRun {
-		return module.IsPlanOnly()
+		return !module.IsAutoApply()
 	}
 
 	// this is override triggered by user

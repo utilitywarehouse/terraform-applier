@@ -12,10 +12,6 @@ import (
 
 // EnsureRequest will try to add run request annotation with back-off
 func EnsureRequest(ctx context.Context, client client.Client, key types.NamespacedName, req *tfaplv1beta1.Request) error {
-	if err := req.Validate(); err != nil {
-		return err
-	}
-
 	tryUpdate := func(ctx context.Context) error {
 		// refetch module on every try
 		module, err := GetModule(ctx, client, key)
