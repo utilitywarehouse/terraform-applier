@@ -12,7 +12,7 @@ require (
 	github.com/hashicorp/go-version v1.8.0
 	github.com/hashicorp/hc-install v0.9.3
 	github.com/hashicorp/terraform-exec v0.25.0
-	github.com/hashicorp/vault/api v1.22.0
+	github.com/hashicorp/vault/api v1.23.0
 	github.com/prometheus/client_golang v1.23.2
 	github.com/redis/go-redis/v9 v9.18.0
 	github.com/robfig/cron/v3 v3.0.1
