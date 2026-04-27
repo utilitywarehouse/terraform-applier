@@ -383,7 +383,7 @@ func (r *Runner) runTF(
 	}
 
 	// return if plan only mode
-	if run.PlanOnly {
+	if run.Mode != tfaplv1beta1.ModeApply {
 		reason := tfaplv1beta1.ReasonNoDriftDetected
 		if diffDetected {
 			reason = tfaplv1beta1.ReasonPlanOnlyDriftDetected
@@ -514,7 +514,7 @@ func (r *Runner) updateRedis(ctx context.Context, run *tfaplv1beta1.Run) error {
 		return err
 	}
 
-	if run.DiffDetected && !run.PlanOnly {
+	if run.DiffDetected && run.Mode == tfaplv1beta1.ModeApply {
 		// set default last applied run
 		if err := r.Redis.SetDefaultApply(ctx, run); err != nil {
 			return err

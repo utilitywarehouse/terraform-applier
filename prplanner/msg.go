@@ -152,7 +152,7 @@ func runOutputMsg(cluster string, module types.NamespacedName, path string, run 
 	}
 
 	msgTml := runOutputMsgTml
-	if !run.PlanOnly {
+	if strings.Contains(run.Summary, "Apply complete!") {
 		msgTml = strings.Replace(msgTml, "Terraform Plan Output", "Terraform Apply Output", 1)
 	}
 
