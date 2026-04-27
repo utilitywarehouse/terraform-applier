@@ -360,7 +360,7 @@ func TestModuleController_NoRunner(t *testing.T) {
 		defer ctrl.Finish()
 
 		const (
-			moduleName = "test-module5"
+			moduleName = "test-module6"
 			repoURL    = "https://host.xy/dummy/repo2.git"
 			path       = "dev/" + moduleName
 		)
@@ -394,7 +394,7 @@ func TestModuleController_NoRunner(t *testing.T) {
 				t.Errorf("Expected run for %s, got %v", moduleName, run.Module)
 			}
 			if run.Request.Type != "ForcedApply" {
-				t.Errorf("Expected ForcedPlan run for %s, got %v", moduleName, run.Request.Type)
+				t.Errorf("Expected ForcedApply run for %s, got %v", run.Module, run.Request.Type)
 			}
 		case <-time.After(10 * time.Second):
 			t.Fatal("Timeout waiting for forced run")
@@ -407,7 +407,7 @@ func TestModuleController_NoRunner(t *testing.T) {
 		defer ctrl.Finish()
 
 		const (
-			moduleName = "test-module6"
+			moduleName = "test-module7"
 			repoURL    = "https://host.xy/dummy/repo2.git"
 			path       = "dev/" + moduleName
 		)
@@ -452,7 +452,7 @@ func TestModuleController_NoRunner(t *testing.T) {
 		// Verify no run is triggered
 		select {
 		case r := <-runCh:
-			t.Fatal("Run should NOT have been triggered for plan-only module", "module", moduleName, "run", r.Module)
+			t.Fatal("Run should NOT have been triggered for plan-only module", "module", moduleName, "run", r.Module, "type", r.Request.Type)
 		case <-time.After(2 * time.Second):
 			// Success
 		}

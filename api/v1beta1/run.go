@@ -81,7 +81,7 @@ func (req *Request) Validate(module *Module) error {
 	}
 
 	// reject request if apply req is downgraded to plan only to avoid confusion
-	if req.Type == ForcedApply && req.IsApply(module) {
+	if req.Type == ForcedApply && !req.IsApply(module) {
 		return fmt.Errorf("Manual Apply rejected: Module.Spec.PlanOnly is true")
 	}
 
