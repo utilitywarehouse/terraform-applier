@@ -109,13 +109,18 @@
                             {{ range $i, $run := .Runs }}
                             <a class="nav-link {{if eq $i 0}}active{{end}}"
                                 href="#{{sanitizedUniqueName .Module}}-{{$i}}" data-bs-toggle="tab" role="tab">
-                                {{if $run.Request.PR}}
-                                PR #{{$run.Request.PR.Number}} Run
-                                {{else if and $run.DiffDetected (not $run.PlanOnly)}}
-                                Last Applied Run
-                                {{else}}
-                                Last Planned Run
-                                {{end}}
+
+                                {{ if $run.Request.PR }}
+                                PR #{{$run.Request.PR.Number}}
+                                {{ else if eq $run.Mode "Apply" }}
+                                Applied Run
+                                {{ else }}
+                                Planned Run
+                                {{ end }}
+
+                                <small class="d-block text-muted" style="font-size: 0.7rem;">
+                                    {{ $run.Request.Type }}
+                                </small>
                             </a>
                             {{end}}
                         </div>

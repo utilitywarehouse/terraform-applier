@@ -14,6 +14,13 @@ var (
 	ErrRunRequestMismatch = fmt.Errorf("run request ID doesn't match pending request id")
 )
 
+type RunMode string
+
+const (
+	ModePlanOnly RunMode = "Plan_Only"
+	ModeApply    RunMode = "Apply"
+)
+
 // Run represents a complete run result of the terraform run
 type Run struct {
 	Module  types.NamespacedName `json:"module,omitempty"`
@@ -22,7 +29,7 @@ type Run struct {
 	Status       state         `json:"status,omitempty"` // 'Running','Success','Error'
 	StartedAt    *metav1.Time  `json:"startedAT,omitempty"`
 	Duration     time.Duration `json:"duration,omitempty"`
-	PlanOnly     bool          `json:"planOnly,omitempty"`
+	Mode         RunMode       `json:"mode,omitempty"`
 	RepoRef      string        `json:"repoRef,omitempty"`
 	CommitHash   string        `json:"commitHash,omitempty"`
 	CommitMsg    string        `json:"commitMsg,omitempty"`
@@ -33,17 +40,15 @@ type Run struct {
 }
 
 func NewRun(module *Module, req *Request) Run {
-	run := Run{
+	return Run{
 		Module: types.NamespacedName{
 			Namespace: module.Namespace,
 			Name:      module.Name,
 		},
 		Request: req,
+		Mode:    req.GetRunMode(module),
+		RepoRef: req.RepoRef(module),
 	}
-
-	run.PlanOnly = req.IsPlanOnly(module)
-	run.RepoRef = req.RepoRef(module)
-	return run
 }
 
 // Request represents terraform run request
@@ -76,40 +81,46 @@ func (req *Request) Validate(module *Module) error {
 	}
 
 	// reject request if apply req is downgraded to plan only to avoid confusion
-	if req.Type == ForcedApply && req.IsPlanOnly(module) {
+	if req.Type == ForcedApply && !req.IsApply(module) {
 		return fmt.Errorf("Manual Apply rejected: Module.Spec.PlanOnly is true")
 	}
 
 	return nil
 }
 
-// IsPlanOnly determines the final execution mode based on the trigger type
+func (req *Request) GetRunMode(module *Module) RunMode {
+	if req.IsApply(module) {
+		return ModeApply
+	}
+	return ModePlanOnly
+}
+
+// IsApply determines the final run mode based on the trigger type
 // and the module's safety/automation settings.
-func (req *Request) IsPlanOnly(module *Module) bool {
+func (req *Request) IsApply(module *Module) bool {
 	// If the module is locked to PlanOnly, all request should be plan only.
 	// Even a 'ForcedApply' from the GUI should be downgraded to a Plan.
 	if module.IsPlanOnly() {
-		return true
+		return false
 	}
 
 	// for scheduled and polling run respect module spec
 	if req.Type == ScheduledRun || req.Type == PollingRun {
-		return !module.IsAutoApply()
+		return module.IsAutoApply()
 	}
 
 	// this is override triggered by user
 	if req.Type == ForcedApply {
-		return false
+		return true
 	}
 
 	// these are plan only override requests
 	if req.Type == PRPlan ||
 		req.Type == ForcedPlan {
-		return true
+		return false
 	}
 
-	// its always safe to default to plan-only
-	return true
+	return false
 }
 
 // SkipStatusUpdate will return if run info/stats needs to be added to CRD

@@ -172,7 +172,7 @@ func TestMain(m *testing.M) {
 	}()
 
 	// Setup Runner
-	fakeClient := fake.NewSimpleClientset()
+	fakeClient := fake.NewClientset()
 	execPath, err := hcinstall.NewInstaller().Ensure(context.Background(), []src.Source{
 		&releases.LatestVersion{
 			Product: product.Terraform,
