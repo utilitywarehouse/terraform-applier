@@ -23,7 +23,8 @@ spec:
   repoRef: master
   path: dev/hello
   schedule: "00 */1 * * *"
-  planOnly: false
+  planOnly: false 
+  autoApply: false
   pollInterval: 60
   runTimeout: 900
   delegateServiceAccountSecretRef: terraform-applier-delegate-token
@@ -70,6 +71,25 @@ spec:
 See the documentation on the Module CRD
 [spec](api/v1beta1/module_types.go)
 for more details.
+
+### Run Policy Logic
+
+The controller determines the execution intent based on the following priority:
+
+**Global Lock (`planOnly`: true):** The module is strictly "Read-Only." 
+No applies are allowed, even if manually requested.
+
+**Manual Intent:** If a user triggers a Forced Apply from the UI/API, 
+the controller will attempt an apply (provided the Global Lock is off).
+
+**Automation Policy (autoApply):** For automated runs (Schedule/Git Polling), 
+the controller will only apply if `autoApply` is set to true.
+
+| Trigger Type | planOnly: true | autoApply: true | autoApply: false | 
+|--|--|--|--|
+| Scheduled / Polling | Plan Only | Apply | Plan Only  | 
+| Forced Apply (UI) | Plan Only (Rejected) | Apply | Apply | 
+| Pull Request | Plan Only | Plan Only | Plan Only | 
 
 ### Delegate ServiceAccount
 
