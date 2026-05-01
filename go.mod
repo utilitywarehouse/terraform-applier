@@ -10,8 +10,8 @@ require (
 	github.com/gorilla/mux v1.8.1
 	github.com/gorilla/securecookie v1.1.2
 	github.com/hashicorp/go-version v1.9.0
-	github.com/hashicorp/hc-install v0.9.4
-	github.com/hashicorp/terraform-exec v0.25.1
+	github.com/hashicorp/hc-install v0.9.5
+	github.com/hashicorp/terraform-exec v0.25.2
 	github.com/hashicorp/vault/api v1.23.0
 	github.com/prometheus/client_golang v1.23.2
 	github.com/redis/go-redis/v9 v9.18.0
