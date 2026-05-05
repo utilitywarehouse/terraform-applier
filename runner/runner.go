@@ -187,13 +187,17 @@ func (r *Runner) process(run *tfaplv1beta1.Run, module *tfaplv1beta1.Module, can
 
 	commitHash, err := r.Repos.Hash(ctx, module.Spec.RepoURL, run.RepoRef, module.Spec.Path)
 	if err != nil {
-		log.Error("unable to get commit hash", "err", err)
+		msg := fmt.Sprintf("unable to get commit hash: err:%s", err)
+		log.Error(msg)
+		r.setFailedStatus(run, module, tfaplv1beta1.ReasonDelegationFailed, msg)
 		return false
 	}
 
 	commitLog, err := r.Repos.Subject(ctx, module.Spec.RepoURL, commitHash)
 	if err != nil {
-		log.Error("unable to get commit log subject", "err", err)
+		msg := fmt.Sprintf("unable to get commit log subject: err:%s", err)
+		log.Error(msg)
+		r.setFailedStatus(run, module, tfaplv1beta1.ReasonDelegationFailed, msg)
 		return false
 	}
 

@@ -85,7 +85,7 @@ the controller will attempt an apply (provided the Global Lock is off).
 **Automation Policy (autoApply):** For automated runs (Schedule/Git Polling), 
 the controller will only apply if `autoApply` is set to true.
 
-| Trigger Type | planOnly: true | autoApply: true | autoApply: false | 
+| Trigger Type | planOnly: true<br>autoApply:any | planOnly: false<br>autoApply: true | planOnly: false<br>autoApply: false | 
 |--|--|--|--|
 | Scheduled / Polling | Plan Only | Apply | Plan Only  | 
 | Forced Apply (UI) | Plan Only (Rejected) | Apply | Apply | 
