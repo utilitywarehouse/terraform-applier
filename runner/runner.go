@@ -185,6 +185,8 @@ func (r *Runner) process(run *tfaplv1beta1.Run, module *tfaplv1beta1.Module, can
 		}
 	}()
 
+	run.StartedAt = &metav1.Time{Time: r.Clock.Now()}
+
 	commitHash, err := r.Repos.Hash(ctx, module.Spec.RepoURL, run.RepoRef, module.Spec.Path)
 	if err != nil {
 		msg := fmt.Sprintf("unable to get commit hash: err:%s", err)
@@ -434,7 +436,6 @@ func (r *Runner) runTF(
 }
 
 func (r *Runner) SetRunStartedStatus(run *tfaplv1beta1.Run, m *tfaplv1beta1.Module, msg, commitHash, commitMsg, remoteURL string, now time.Time) error {
-	run.StartedAt = &metav1.Time{Time: now}
 	run.CommitHash = commitHash
 	run.CommitMsg = commitMsg
 
