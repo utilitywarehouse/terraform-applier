@@ -95,6 +95,7 @@ type ModulePageHandler struct {
 	Template      *template.Template
 	Authenticator *oidc.Authenticator
 	ClusterClt    client.Client
+	KubeClient    kubernetes.Interface
 	Redis         sysutil.RedisInterface
 	Log           *slog.Logger
 }
@@ -131,7 +132,7 @@ func (m *ModulePageHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		Name:      payload["module"],
 	}
 
-	module, err := moduleWithRunsInfo(r.Context(), m.ClusterClt, m.Redis, namespacedName)
+	module, err := moduleWithRunsInfo(r.Context(), m.ClusterClt, m.KubeClient, m.Redis, namespacedName)
 	if err != nil {
 		http.Error(w, "unable to get modules", http.StatusInternalServerError)
 		m.Log.Error("unable to get modules", "err", err)
@@ -317,6 +318,7 @@ func (ws *WebServer) Start(ctx context.Context) error {
 		moduleTempt,
 		ws.Authenticator,
 		ws.ClusterClt,
+		ws.KubeClient,
 		ws.Redis,
 		ws.Log,
 	}
