@@ -2,12 +2,16 @@ package webserver
 
 import (
 	"context"
+	"fmt"
 	"slices"
 	"sort"
 
 	tfaplv1beta1 "github.com/utilitywarehouse/terraform-applier/api/v1beta1"
 	"github.com/utilitywarehouse/terraform-applier/sysutil"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/kubernetes"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -21,6 +25,7 @@ type Namespace struct {
 type Module struct {
 	Module tfaplv1beta1.Module
 	Runs   []*tfaplv1beta1.Run
+	Events []corev1.Event
 }
 
 func createNamespaceMap(modules []tfaplv1beta1.Module) map[string]*Namespace {
@@ -53,7 +58,7 @@ func listModules(ctx context.Context, clt client.Client) ([]tfaplv1beta1.Module,
 	return moduleList.Items, nil
 }
 
-func moduleWithRunsInfo(ctx context.Context, clt client.Client, redis sysutil.RedisInterface, namespacedName types.NamespacedName) (*Module, error) {
+func moduleWithRunsInfo(ctx context.Context, clt client.Client, kubeClient kubernetes.Interface, redis sysutil.RedisInterface, namespacedName types.NamespacedName) (*Module, error) {
 	var m tfaplv1beta1.Module
 
 	err := clt.Get(ctx, namespacedName, &m)
@@ -64,6 +69,22 @@ func moduleWithRunsInfo(ctx context.Context, clt client.Client, redis sysutil.Re
 	module := Module{Module: m}
 
 	module.Runs = runInfo(ctx, redis, namespacedName)
+
+	// get events
+	fieldSelector := fmt.Sprintf("involvedObject.kind=Module,involvedObject.name=%s", namespacedName.Name)
+	eventList, err := kubeClient.CoreV1().Events(namespacedName.Namespace).List(ctx, metav1.ListOptions{
+		FieldSelector: fieldSelector,
+	})
+	if err != nil {
+		return &module, nil
+	}
+
+	module.Events = eventList.Items
+
+	// Sort events by LastTimestamp descending
+	sort.Slice(module.Events, func(i, j int) bool {
+		return module.Events[j].LastTimestamp.Before(&module.Events[i].LastTimestamp)
+	})
 
 	return &module, nil
 }

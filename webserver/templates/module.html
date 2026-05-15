@@ -1,5 +1,13 @@
 <!-- modules -->
 {{define "module"}}
+<style>
+    /* Force Prism.js blocks to wrap text */
+    pre code[class*="language-"] {
+        white-space: pre-wrap !important;
+        word-break: break-word !important;
+        overflow-wrap: anywhere !important;
+    }
+</style>
 {{$m := .}}
 <div id="{{sanitizedUniqueName .Module.NamespacedName}}">
     <div class='card {{if eq .Module.Status.CurrentState "Running"}}border-info{{end}}' style="max-height: 90vh;">
@@ -123,6 +131,14 @@
                                 </small>
                             </a>
                             {{end}}
+
+                            <a class="nav-link {{if not .Runs}}active{{end}}"
+                                href="#{{sanitizedUniqueName $m.Module.NamespacedName}}-events" data-bs-toggle="tab" role="tab">
+                                Events
+                                <small class="d-block text-muted" style="font-size: 0.7rem;">
+                                    Kubernetes History
+                                </small>
+                            </a>
                         </div>
                     </nav>
                     {{if .Runs}}
@@ -173,6 +189,38 @@
                             </div>
                         </div>
                         {{end}}
+
+                        <div class="tab-pane fade {{if not .Runs}}active show{{end}}"
+                            id="{{sanitizedUniqueName $m.Module.NamespacedName}}-events" role="tabpanel">
+                            <div class="table-responsive p-2">
+                                <table class="table table-sm table-striped mt-2">
+                                    <thead>
+                                        <tr>
+                                            <th style="width: 200px;">Last Seen</th>
+                                            <th>Reason</th>
+                                            <th>Message</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {{ range .Events }}
+                                        <tr>
+                                            <td class="text-nowrap">{{ formattedTime .LastTimestamp }}</td>
+                                            <td>
+                                                <span class="badge {{if eq .Type "Warning"}}text-danger{{else}}text-info{{end}}">
+                                                    {{.Reason}}
+                                                </span>
+                                            </td>
+                                            <td>{{ .Message }}</td>
+                                        </tr>
+                                        {{ else }}
+                                        <tr>
+                                            <td colspan="4" class="text-center text-muted py-3">No events available.</td>
+                                        </tr>
+                                        {{ end }}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
                     </div>
                     {{end}}
                 </div>
