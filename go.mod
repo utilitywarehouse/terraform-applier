@@ -22,7 +22,7 @@ require (
 	golang.org/x/oauth2 v0.36.0
 	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/api v0.36.0
-	k8s.io/apimachinery v0.36.0
+	k8s.io/apimachinery v0.36.1
 	k8s.io/client-go v0.36.0
 	sigs.k8s.io/controller-runtime v0.24.0
 	sigs.k8s.io/controller-runtime/tools/setup-envtest v0.24.0
