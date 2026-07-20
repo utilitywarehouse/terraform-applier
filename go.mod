@@ -1,6 +1,6 @@
 module github.com/utilitywarehouse/terraform-applier
 
-go 1.26.0
+go 1.26.5
 
 require (
 	filippo.io/age v1.3.1
