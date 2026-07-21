@@ -28,8 +28,7 @@ func TestModuleController_Filter(t *testing.T) {
 		testReconciler.Runner = testMockRunner1
 
 		// add label selector
-		testFilter.LabelSelectorKey = labelSelectorKey
-		testFilter.LabelSelectorValue = "true"
+		testFilter.SetLabelSelector(labelSelectorKey, "true")
 
 		// Trigger Job run as soon as module is created
 		testRepos.EXPECT().Hash(gomock.Any(), "https://host.xy/dummy/repo.git", "HEAD", "hello-filter-test").

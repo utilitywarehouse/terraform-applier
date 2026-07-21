@@ -27,8 +27,7 @@ func TestModuleController_NoRunner(t *testing.T) {
 		testReconciler.Runner = testMockRunner2
 
 		// remove any label selector
-		testFilter.LabelSelectorKey = ""
-		testFilter.LabelSelectorValue = ""
+		testFilter.SetLabelSelector("", "")
 
 		testMetrics.EXPECT().SetRunPending(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 

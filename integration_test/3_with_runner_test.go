@@ -45,8 +45,7 @@ func TestModuleController_WithRunner(t *testing.T) {
 		testReconciler.Runner = &testRunner
 
 		// remove any label selector
-		testFilter.LabelSelectorKey = ""
-		testFilter.LabelSelectorValue = ""
+		testFilter.SetLabelSelector("", "")
 
 		// all jobs will be triggered automatically as they do not have initial commit hash
 		testRepos.EXPECT().Hash(gomock.Any(), "https://host.xy/dummy/repo.git", "HEAD", "hello").
@@ -109,6 +108,13 @@ func TestModuleController_WithRunner(t *testing.T) {
 				},
 			},
 		}
+
+		// Setup FakeDelegation before creating the module so the mock is
+		// fully configured before the controller can reconcile it.
+		fakeClient := fake.NewSimpleClientset()
+		testDelegate.EXPECT().DelegateToken(gomock.Any(), gomock.Any(), moduleNamespace, "terraform-applier-delegate").Return("token.X1", nil)
+		testDelegate.EXPECT().SetupDelegation(gomock.Any(), "token.X1").Return(fakeClient, nil)
+
 		if err := k8sClient.Create(ctx, module); err != nil {
 			t.Fatalf("Failed to create module: %v", err)
 		}
@@ -118,11 +124,6 @@ func TestModuleController_WithRunner(t *testing.T) {
 				t.Errorf("Failed to delete module: %v", err)
 			}
 		}()
-
-		// Setup FakeDelegation
-		fakeClient := fake.NewSimpleClientset()
-		testDelegate.EXPECT().DelegateToken(gomock.Any(), gomock.Any(), moduleNamespace, "terraform-applier-delegate").Return("token.X1", nil)
-		testDelegate.EXPECT().SetupDelegation(gomock.Any(), "token.X1").Return(fakeClient, nil)
 
 		// Wait for completion via channel
 		select {
@@ -197,6 +198,13 @@ func TestModuleController_WithRunner(t *testing.T) {
 				},
 			},
 		}
+
+		// Setup FakeDelegation before creating the module so the mock is
+		// fully configured before the controller can reconcile it.
+		fakeClient := fake.NewSimpleClientset()
+		testDelegate.EXPECT().DelegateToken(gomock.Any(), gomock.Any(), moduleNamespace, "terraform-applier-delegate").Return("token.X2", nil)
+		testDelegate.EXPECT().SetupDelegation(gomock.Any(), "token.X2").Return(fakeClient, nil)
+
 		if err := k8sClient.Create(ctx, module); err != nil {
 			t.Fatalf("Failed to create module: %v", err)
 		}
@@ -206,11 +214,6 @@ func TestModuleController_WithRunner(t *testing.T) {
 				t.Errorf("Failed to delete module: %v", err)
 			}
 		}()
-
-		// Setup FakeDelegation
-		fakeClient := fake.NewSimpleClientset()
-		testDelegate.EXPECT().DelegateToken(gomock.Any(), gomock.Any(), moduleNamespace, "terraform-applier-delegate").Return("token.X2", nil)
-		testDelegate.EXPECT().SetupDelegation(gomock.Any(), "token.X2").Return(fakeClient, nil)
 
 		select {
 		case <-redisDoneCh:
@@ -273,6 +276,13 @@ func TestModuleController_WithRunner(t *testing.T) {
 				},
 			},
 		}
+
+		// Setup FakeDelegation before creating the module so the mock is
+		// fully configured before the controller can reconcile it.
+		fakeClient := fake.NewSimpleClientset()
+		testDelegate.EXPECT().DelegateToken(gomock.Any(), gomock.Any(), moduleNamespace, "terraform-applier-delegate").Return("token.X2", nil)
+		testDelegate.EXPECT().SetupDelegation(gomock.Any(), "token.X2").Return(fakeClient, nil)
+
 		if err := k8sClient.Create(ctx, module); err != nil {
 			t.Fatalf("Failed to create module: %v", err)
 		}
@@ -282,11 +292,6 @@ func TestModuleController_WithRunner(t *testing.T) {
 				t.Errorf("Failed to delete module: %v", err)
 			}
 		}()
-
-		// Setup FakeDelegation
-		fakeClient := fake.NewSimpleClientset()
-		testDelegate.EXPECT().DelegateToken(gomock.Any(), gomock.Any(), moduleNamespace, "terraform-applier-delegate").Return("token.X2", nil)
-		testDelegate.EXPECT().SetupDelegation(gomock.Any(), "token.X2").Return(fakeClient, nil)
 
 		select {
 		case <-redisDoneCh:
@@ -376,17 +381,10 @@ func TestModuleController_WithRunner(t *testing.T) {
 				},
 			},
 		}
-		if err := k8sClient.Create(ctx, module); err != nil {
-			t.Fatalf("Failed to create module: %v", err)
-		}
-		// delete module to stopping requeue
-		defer func() {
-			if err := k8sClient.Delete(ctx, module); err != nil {
-				t.Errorf("Failed to delete module: %v", err)
-			}
-		}()
 
-		// Setup FakeDelegation with Secrets and ConfigMaps
+		// Setup FakeDelegation with Secrets and ConfigMaps before creating
+		// the module so the mock is fully configured before the controller
+		// can reconcile it.
 		fakeClient := fake.NewSimpleClientset(
 			&corev1.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{Name: "test-configmap", Namespace: moduleNamespace},
@@ -405,6 +403,16 @@ func TestModuleController_WithRunner(t *testing.T) {
 		)
 		testDelegate.EXPECT().DelegateToken(gomock.Any(), gomock.Any(), moduleNamespace, "terraform-applier-delegate").Return("token.X3", nil)
 		testDelegate.EXPECT().SetupDelegation(gomock.Any(), "token.X3").Return(fakeClient, nil)
+
+		if err := k8sClient.Create(ctx, module); err != nil {
+			t.Fatalf("Failed to create module: %v", err)
+		}
+		// delete module to stopping requeue
+		defer func() {
+			if err := k8sClient.Delete(ctx, module); err != nil {
+				t.Errorf("Failed to delete module: %v", err)
+			}
+		}()
 
 		select {
 		case <-redisDoneCh:
@@ -495,6 +503,18 @@ func TestModuleController_WithRunner(t *testing.T) {
 				},
 			},
 		}
+
+		// Setup FakeDelegation and Vault Mocks before creating the module so
+		// the mocks are fully configured before the controller can reconcile it.
+		fakeClient := fake.NewSimpleClientset()
+		testDelegate.EXPECT().DelegateToken(gomock.Any(), gomock.Any(), moduleNamespace, "terraform-applier-delegate").Return("token.X4", nil)
+		testDelegate.EXPECT().SetupDelegation(gomock.Any(), "token.X4").Return(fakeClient, nil)
+
+		testVaultAWSConf.EXPECT().GenerateAWSCreds(gomock.Any(), "token.X4", gomock.Any()).
+			Return(&vault.AWSCredentials{AccessKeyID: "AWS_KEY_ABCD1234", SecretAccessKey: "secret", Token: "token"}, nil)
+		testVaultAWSConf.EXPECT().GenerateGCPToken(gomock.Any(), "token.X4", gomock.Any()).
+			Return("ya29.c.c0ASRK0GZ2fzoXHQakYwhwQhSJZ3gFQT5V0Ro_E94zL3fo", nil)
+
 		if err := k8sClient.Create(ctx, module); err != nil {
 			t.Fatalf("Failed to create module: %v", err)
 		}
@@ -504,16 +524,6 @@ func TestModuleController_WithRunner(t *testing.T) {
 				t.Errorf("Failed to delete module: %v", err)
 			}
 		}()
-
-		// Setup FakeDelegation and Vault Mocks
-		fakeClient := fake.NewSimpleClientset()
-		testDelegate.EXPECT().DelegateToken(gomock.Any(), gomock.Any(), moduleNamespace, "terraform-applier-delegate").Return("token.X4", nil)
-		testDelegate.EXPECT().SetupDelegation(gomock.Any(), "token.X4").Return(fakeClient, nil)
-
-		testVaultAWSConf.EXPECT().GenerateAWSCreds(gomock.Any(), "token.X4", gomock.Any()).
-			Return(&vault.AWSCredentials{AccessKeyID: "AWS_KEY_ABCD1234", SecretAccessKey: "secret", Token: "token"}, nil)
-		testVaultAWSConf.EXPECT().GenerateGCPToken(gomock.Any(), "token.X4", gomock.Any()).
-			Return("ya29.c.c0ASRK0GZ2fzoXHQakYwhwQhSJZ3gFQT5V0Ro_E94zL3fo", nil)
 
 		select {
 		case <-redisDoneCh:
@@ -593,17 +603,9 @@ func TestModuleController_WithRunner(t *testing.T) {
 				},
 			},
 		}
-		if err := k8sClient.Create(ctx, module); err != nil {
-			t.Fatalf("Failed to create module: %v", err)
-		}
-		// delete module to stopping requeue
-		defer func() {
-			if err := k8sClient.Delete(ctx, module); err != nil {
-				t.Errorf("Failed to delete module: %v", err)
-			}
-		}()
 
-		// Setup FakeDelegation
+		// Setup FakeDelegation before creating the module so the mock is
+		// fully configured before the controller can reconcile it.
 		fakeClient := fake.NewSimpleClientset()
 		testDelegate.EXPECT().DelegateToken(gomock.Any(), gomock.Any(), moduleNamespace, "terraform-applier-delegate").Return("token.X4", nil)
 		testDelegate.EXPECT().SetupDelegation(gomock.Any(), "token.X4").Return(fakeClient, nil)
@@ -625,6 +627,16 @@ func TestModuleController_WithRunner(t *testing.T) {
 			Return(&vault.AWSCredentials{AccessKeyID: "AWS_KEY_ABCD1234", SecretAccessKey: "secret", Token: "token"}, nil)
 		testVaultAWSConf.EXPECT().GenerateGCPToken(gomock.Any(), "token.X4_run_as", gomock.Any()).
 			Return("ya29.c.c0ASRK0GZ2fzoXHQakYwhwQhSJZ3gFQT5V0Ro_E94zL3fo", nil)
+
+		if err := k8sClient.Create(ctx, module); err != nil {
+			t.Fatalf("Failed to create module: %v", err)
+		}
+		// delete module to stopping requeue
+		defer func() {
+			if err := k8sClient.Delete(ctx, module); err != nil {
+				t.Errorf("Failed to delete module: %v", err)
+			}
+		}()
 
 		select {
 		case <-redisDoneCh:
