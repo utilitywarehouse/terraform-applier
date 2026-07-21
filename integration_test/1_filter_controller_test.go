@@ -24,7 +24,7 @@ func TestModuleController_Filter(t *testing.T) {
 		ctrl := setupTest(t)
 
 		// reset Time
-		fakeClock.T = time.Date(2022, 02, 01, 01, 00, 00, 0000, time.UTC)
+		fakeClock.SetTime(time.Date(2022, 02, 01, 01, 00, 00, 0000, time.UTC))
 		testReconciler.Runner = testMockRunner1
 
 		// add label selector

@@ -41,7 +41,7 @@ func TestModuleController_WithRunner(t *testing.T) {
 	setup := func(t *testing.T) *gomock.Controller {
 		ctrl := setupTest(t)
 
-		fakeClock.T = time.Date(2022, 02, 01, 01, 00, 00, 0000, time.UTC)
+		fakeClock.SetTime(time.Date(2022, 02, 01, 01, 00, 00, 0000, time.UTC))
 		testReconciler.Runner = &testRunner
 
 		// remove any label selector
@@ -146,8 +146,8 @@ func TestModuleController_WithRunner(t *testing.T) {
 		if fetchedModule.Status.CurrentState != string(tfaplv1beta1.StatusOk) {
 			t.Errorf("Expected state 'StatusOk', got %s", fetchedModule.Status.CurrentState)
 		}
-		if !fetchedModule.Status.LastDefaultRunStartedAt.UTC().Equal(fakeClock.T.UTC()) {
-			t.Errorf("Expected Start Time %v, got %v", fakeClock.T.UTC(), fetchedModule.Status.LastDefaultRunStartedAt.UTC())
+		if !fetchedModule.Status.LastDefaultRunStartedAt.UTC().Equal(fakeClock.Now().UTC()) {
+			t.Errorf("Expected Start Time %v, got %v", fakeClock.Now().UTC(), fetchedModule.Status.LastDefaultRunStartedAt.UTC())
 		}
 
 		if !strings.Contains(lastRun.Output, "Plan:") {
