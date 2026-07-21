@@ -1,6 +1,9 @@
 package sysutil
 
-import "time"
+import (
+	"sync"
+	"time"
+)
 
 // ClockInterface allows for mocking out the functionality of the standard time library when testing.
 type ClockInterface interface {
@@ -15,9 +18,21 @@ func (c *Clock) Now() time.Time {
 	return time.Now()
 }
 
-// Used for testing purpose
+// FakeClock is used for testing purpose. Safe for concurrent use via SetTime/Now.
 type FakeClock struct {
-	T time.Time
+	mu sync.RWMutex
+	T  time.Time
 }
 
-func (c *FakeClock) Now() time.Time { return c.T }
+// SetTime updates the fake clock's time. Safe for concurrent use with Now.
+func (c *FakeClock) SetTime(t time.Time) {
+	c.mu.Lock()
+	c.T = t
+	c.mu.Unlock()
+}
+
+func (c *FakeClock) Now() time.Time {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.T
+}

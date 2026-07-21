@@ -23,12 +23,11 @@ func TestModuleController_NoRunner(t *testing.T) {
 		ctrl := setupTest(t)
 
 		// reset Time
-		fakeClock.T = time.Date(2022, 02, 01, 01, 00, 00, 0000, time.UTC)
+		fakeClock.SetTime(time.Date(2022, 02, 01, 01, 00, 00, 0000, time.UTC))
 		testReconciler.Runner = testMockRunner2
 
 		// remove any label selector
-		testFilter.LabelSelectorKey = ""
-		testFilter.LabelSelectorValue = ""
+		testFilter.SetLabelSelector("", "")
 
 		testMetrics.EXPECT().SetRunPending(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 
@@ -102,7 +101,7 @@ func TestModuleController_NoRunner(t *testing.T) {
 		testRepos.EXPECT().Hash(gomock.Any(), repoURL, "HEAD", path).Return("CommitAbc123", nil).Times(2)
 
 		// Advance time but NOT enough for schedule (40s vs 60s)
-		fakeClock.T = time.Date(2022, 02, 01, 01, 00, 40, 0000, time.UTC)
+		fakeClock.SetTime(time.Date(2022, 02, 01, 01, 00, 40, 0000, time.UTC))
 		triggerReconcile(ctx, k8sClient, moduleLookupKey) // Force check
 
 		select {
@@ -113,7 +112,7 @@ func TestModuleController_NoRunner(t *testing.T) {
 		}
 
 		// Advance time PAST schedule
-		fakeClock.T = time.Date(2022, 02, 01, 01, 01, 00, 0000, time.UTC)
+		fakeClock.SetTime(time.Date(2022, 02, 01, 01, 01, 00, 0000, time.UTC))
 		triggerReconcile(ctx, k8sClient, moduleLookupKey) // Force check
 
 		select {
@@ -233,7 +232,7 @@ func TestModuleController_NoRunner(t *testing.T) {
 		testRepos.EXPECT().Hash(gomock.Any(), repoURL, "HEAD", path).Return("CommitAbc123", nil)
 
 		// Advance time
-		fakeClock.T = time.Date(2022, 02, 01, 01, 01, 00, 0000, time.UTC)
+		fakeClock.SetTime(time.Date(2022, 02, 01, 01, 01, 00, 0000, time.UTC))
 		triggerReconcile(ctx, k8sClient, types.NamespacedName{Name: moduleName, Namespace: moduleNamespace})
 
 		// Check for Error state
@@ -294,7 +293,7 @@ func TestModuleController_NoRunner(t *testing.T) {
 
 		testRepos.EXPECT().Hash(gomock.Any(), repoURL, "HEAD", path).Return("", fmt.Errorf("some git error"))
 
-		fakeClock.T = time.Date(2022, 02, 01, 01, 02, 00, 0000, time.UTC)
+		fakeClock.SetTime(time.Date(2022, 02, 01, 01, 02, 00, 0000, time.UTC))
 		triggerReconcile(ctx, k8sClient, types.NamespacedName{Name: moduleName, Namespace: moduleNamespace})
 
 		// Check state remains OK

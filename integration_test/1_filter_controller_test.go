@@ -24,12 +24,11 @@ func TestModuleController_Filter(t *testing.T) {
 		ctrl := setupTest(t)
 
 		// reset Time
-		fakeClock.T = time.Date(2022, 02, 01, 01, 00, 00, 0000, time.UTC)
+		fakeClock.SetTime(time.Date(2022, 02, 01, 01, 00, 00, 0000, time.UTC))
 		testReconciler.Runner = testMockRunner1
 
 		// add label selector
-		testFilter.LabelSelectorKey = labelSelectorKey
-		testFilter.LabelSelectorValue = "true"
+		testFilter.SetLabelSelector(labelSelectorKey, "true")
 
 		// Trigger Job run as soon as module is created
 		testRepos.EXPECT().Hash(gomock.Any(), "https://host.xy/dummy/repo.git", "HEAD", "hello-filter-test").

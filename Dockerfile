@@ -17,7 +17,9 @@ COPY go.mod go.mod
 COPY go.sum go.sum
 # cache deps before building and copying source so that we don't need to re-download as much
 # and so that source changes don't invalidate our downloaded layer
-RUN go mod download
+# GOTOOLCHAIN pins the exact toolchain declared by go.mod's `go` line, so the
+# build isn't at the mercy of whatever patch version the base image ships.
+RUN GOTOOLCHAIN=go$(awk '/^go /{print $2; exit}' go.mod) go mod download
 
 # Copy the go source
 COPY . .
@@ -29,7 +31,10 @@ COPY . .
 # by leaving it empty we can ensure that the container and binary shipped on it will have the same platform.
 RUN \
  go test -v -cover ./... && \
-    CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -a -o tf-applier
+    CGO_ENABLED=0 GOOS=${TARGETOS:-linux} \
+    GOARCH=${TARGETARCH} \
+    GOTOOLCHAIN=go$(awk '/^go /{print $2; exit}' go.mod) \
+    go build -a -o tf-applier
 
 FROM alpine:3.23
 

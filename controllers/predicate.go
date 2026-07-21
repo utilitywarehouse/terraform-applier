@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"sync"
 
 	tfaplv1beta1 "github.com/utilitywarehouse/terraform-applier/api/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -13,19 +14,30 @@ import (
 
 type Filter struct {
 	predicate.Funcs
+	Log *slog.Logger
+
+	mu                 sync.RWMutex
 	LabelSelectorKey   string
 	LabelSelectorValue string
-	Log                *slog.Logger
 }
 
-func (f Filter) Create(e event.CreateEvent) bool {
+// SetLabelSelector updates the label selector used to filter events. Safe
+// for concurrent use with the predicate callbacks below.
+func (f *Filter) SetLabelSelector(key, value string) {
+	f.mu.Lock()
+	f.LabelSelectorKey = key
+	f.LabelSelectorValue = value
+	f.mu.Unlock()
+}
+
+func (f *Filter) Create(e event.CreateEvent) bool {
 	if e.Object == nil {
 		return false
 	}
 	return f.LabelSelectorFilter(e.Object)
 }
 
-func (f Filter) Delete(e event.DeleteEvent) bool {
+func (f *Filter) Delete(e event.DeleteEvent) bool {
 	if !f.LabelSelectorFilter(e.Object) {
 		return false
 	}
@@ -33,14 +45,14 @@ func (f Filter) Delete(e event.DeleteEvent) bool {
 	return !e.DeleteStateUnknown
 }
 
-func (f Filter) Generic(e event.GenericEvent) bool {
+func (f *Filter) Generic(e event.GenericEvent) bool {
 	if e.Object == nil {
 		return false
 	}
 	return f.LabelSelectorFilter(e.Object)
 }
 
-func (f Filter) Update(e event.UpdateEvent) bool {
+func (f *Filter) Update(e event.UpdateEvent) bool {
 	if e.ObjectOld == nil || e.ObjectNew == nil {
 		return false
 	}
@@ -67,11 +79,16 @@ func (f Filter) Update(e event.UpdateEvent) bool {
 	return false
 }
 
-func (f Filter) LabelSelectorFilter(object client.Object) bool {
+func (f *Filter) LabelSelectorFilter(object client.Object) bool {
+	f.mu.RLock()
+	key := f.LabelSelectorKey
+	value := f.LabelSelectorValue
+	f.mu.RUnlock()
+
 	// allow all if selector Labels is not set
-	if f.LabelSelectorKey == "" {
+	if key == "" {
 		return true
 	}
 
-	return object.GetLabels()[f.LabelSelectorKey] == f.LabelSelectorValue
+	return object.GetLabels()[key] == value
 }
