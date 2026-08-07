@@ -161,27 +161,20 @@ func (r *Runner) process(run *tfaplv1beta1.Run, module *tfaplv1beta1.Module, can
 
 	// setup go routine for graceful shutdown of current run
 	go func() {
-		moduleRunTimeout := time.NewTicker(time.Duration(module.Spec.RunTimeout) * time.Second)
+		moduleRunTimeout := time.NewTimer(time.Duration(module.Spec.RunTimeout) * time.Second)
+		defer moduleRunTimeout.Stop()
 		gracePeriod := r.TerminationGracePeriod
-		for {
-			select {
-			case <-moduleRunTimeout.C:
-				log.Error("module run timed out stopping run", "RunTimeout", module.Spec.RunTimeout)
-				cancel()
-				return
-			case _, ok := <-cancelChan:
-				if ok {
-					continue
-				}
-				// if channel is Closed start timeout and then cancel run Context
-				log.Info("shutdown signal received waiting for termination grace period", "GracePeriod", gracePeriod.Seconds())
-				time.Sleep(gracePeriod)
-				log.Info("module termination grace period timed out stopping run")
-				cancel()
-				return
-			case <-ctx.Done():
-				return
-			}
+		select {
+		case <-moduleRunTimeout.C:
+			log.Error("module run timed out stopping run", "RunTimeout", module.Spec.RunTimeout)
+			cancel()
+		case <-cancelChan:
+			// channel is Closed, start timeout and then cancel run Context
+			log.Info("shutdown signal received waiting for termination grace period", "GracePeriod", gracePeriod.Seconds())
+			time.Sleep(gracePeriod)
+			log.Info("module termination grace period timed out stopping run")
+			cancel()
+		case <-ctx.Done():
 		}
 	}()
 

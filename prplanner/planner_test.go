@@ -52,8 +52,8 @@ func Test_processPullRequest(t *testing.T) {
 				}, nil
 			})
 
-		testGithub.EXPECT().postComment(gomock.Any(), gomock.Any(), 0, 123, gomock.Any()).
-			DoAndReturn(func(repoOwner, repoName string, commentID, prNumber int, commentBody prComment) (int, error) {
+		testGithub.EXPECT().postComment(gomock.Any(), gomock.Any(), gomock.Any(), 0, 123, gomock.Any()).
+			DoAndReturn(func(ctx context.Context, repoOwner, repoName string, commentID, prNumber int, commentBody prComment) (int, error) {
 				t.Skip("comment posted. test passed")
 				return 111, nil
 			})
@@ -118,8 +118,8 @@ func Test_processPullRequest(t *testing.T) {
 				}, nil
 			})
 
-		testGithub.EXPECT().postComment(gomock.Any(), gomock.Any(), 0, 123, gomock.Any()).
-			DoAndReturn(func(repoOwner, repoName string, commentID, prNumber int, commentBody prComment) (int, error) {
+		testGithub.EXPECT().postComment(gomock.Any(), gomock.Any(), gomock.Any(), 0, 123, gomock.Any()).
+			DoAndReturn(func(ctx context.Context, repoOwner, repoName string, commentID, prNumber int, commentBody prComment) (int, error) {
 				t.Skip("comment posted. test passed")
 				return 111, nil
 			})

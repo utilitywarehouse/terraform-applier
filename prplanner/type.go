@@ -35,7 +35,7 @@ mergeCommit {
 author {
   login
 }
-comments(last:50) {
+comments(last:100) {
   nodes {
     databaseId
     body

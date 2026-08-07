@@ -52,7 +52,7 @@ func (p *Planner) ensurePlanRequest(ctx context.Context, pr *pr, commitsInfo []r
 	}
 
 	// loop through comments
-	return p.checkPRCommentsForPlanRequests(pr, module)
+	return p.checkPRCommentsForPlanRequests(ctx, pr, module)
 }
 
 func (p *Planner) checkPRCommits(ctx context.Context, pr *pr, commitsInfo []repository.CommitInfo, module *tfaplv1beta1.Module) (*tfaplv1beta1.Request, error) {
@@ -83,13 +83,13 @@ func (p *Planner) checkPRCommits(ctx context.Context, pr *pr, commitsInfo []repo
 
 		// request run
 		p.Log.Info("triggering plan due to new commit", "module", module.NamespacedName(), "pr", pr.Number, "author", pr.Author.Login)
-		return p.addNewRequest(module, pr, commit.Hash)
+		return p.addNewRequest(ctx, module, pr, commit.Hash)
 	}
 
 	return nil, nil
 }
 
-func (p *Planner) checkPRCommentsForPlanRequests(pr *pr, module *tfaplv1beta1.Module) (*tfaplv1beta1.Request, error) {
+func (p *Planner) checkPRCommentsForPlanRequests(ctx context.Context, pr *pr, module *tfaplv1beta1.Module) (*tfaplv1beta1.Request, error) {
 	// Go through PR comments in reverse order
 	for i := len(pr.Comments.Nodes) - 1; i >= 0; i-- {
 		comment := pr.Comments.Nodes[i]
@@ -125,13 +125,13 @@ func (p *Planner) checkPRCommentsForPlanRequests(pr *pr, module *tfaplv1beta1.Mo
 		// match either given name or path
 		if requestedModuleNameOrPath == module.Name || requestedModuleNameOrPath == module.Spec.Path {
 			// get current hash of the module path to create new plan request
-			modulePathHash, err := p.Repos.Hash(context.Background(), module.Spec.RepoURL, pr.HeadRefName, module.Spec.Path)
+			modulePathHash, err := p.Repos.Hash(ctx, module.Spec.RepoURL, pr.HeadRefName, module.Spec.Path)
 			if err != nil {
 				return nil, err
 			}
 
 			p.Log.Info("triggering plan requested via comment", "module", module.NamespacedName(), "pr", pr.Number, "author", comment.Author.Login)
-			return p.addNewRequest(module, pr, modulePathHash)
+			return p.addNewRequest(ctx, module, pr, modulePathHash)
 		}
 	}
 
@@ -172,14 +172,14 @@ func isPlanRequestAckPostedForCommit(cluster string, pr *pr, commitID, modulePat
 	return false
 }
 
-func (p *Planner) addNewRequest(module *tfaplv1beta1.Module, pr *pr, commitID string) (*tfaplv1beta1.Request, error) {
+func (p *Planner) addNewRequest(ctx context.Context, module *tfaplv1beta1.Module, pr *pr, commitID string) (*tfaplv1beta1.Request, error) {
 	req := module.NewRunRequest(tfaplv1beta1.PRPlan, "")
 
 	commentBody := prComment{
 		Body: requestAcknowledgedMsg(p.ClusterEnvName, module.NamespacedName(), module.Spec.Path, commitID, req.RequestedAt, p.WebserverURL),
 	}
 
-	commentID, err := p.github.postComment(pr.BaseRepository.Owner.Login, pr.BaseRepository.Name, 0, pr.Number, commentBody)
+	commentID, err := p.github.postComment(ctx, pr.BaseRepository.Owner.Login, pr.BaseRepository.Name, 0, pr.Number, commentBody)
 	if err != nil {
 		return req, fmt.Errorf("unable to post pending request comment: %w", err)
 	}
