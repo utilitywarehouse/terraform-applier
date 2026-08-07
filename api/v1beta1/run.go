@@ -80,6 +80,11 @@ func (req *Request) Validate(module *Module) error {
 		return fmt.Errorf("unknown Request type provided")
 	}
 
+	// PRPlan requests must carry PR info
+	if req.Type == PRPlan && (req.PR == nil || req.PR.HeadBranch == "") {
+		return fmt.Errorf("'pr' with 'headBranch' is required for %q request type", PRPlan)
+	}
+
 	// reject request if apply req is downgraded to plan only to avoid confusion
 	if req.Type == ForcedApply && !req.IsApply(module) {
 		return fmt.Errorf("Manual Apply rejected: Module.Spec.PlanOnly is true")
