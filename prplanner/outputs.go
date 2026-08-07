@@ -38,7 +38,7 @@ func (p *Planner) uploadRequestOutput(ctx context.Context, pr *pr) {
 			Body: runOutputMsg(p.ClusterEnvName, moduleNamespacedName, path, run, p.WebserverURL),
 		}
 
-		_, err = p.github.postComment(pr.BaseRepository.Owner.Login, pr.BaseRepository.Name, comment.DatabaseID, pr.Number, payload)
+		_, err = p.github.postComment(ctx, pr.BaseRepository.Owner.Login, pr.BaseRepository.Name, comment.DatabaseID, pr.Number, payload)
 		if err != nil {
 			p.Log.Error("error posting PR comment:", "error", err)
 			continue
@@ -113,7 +113,7 @@ func (p *Planner) processRedisKeySetMsg(ctx context.Context, ch <-chan *redis.Me
 			continue
 		}
 
-		_, err = p.github.postComment(repo.Path, strings.TrimSuffix(repo.Repo, ".git"), CommentID, prNum, comment)
+		_, err = p.github.postComment(ctx, repo.Path, strings.TrimSuffix(repo.Repo, ".git"), CommentID, prNum, comment)
 		if err != nil {
 			p.Log.Error("error posting PR comment:", "module", run.Module, "pr", prNum, "error", err)
 			continue

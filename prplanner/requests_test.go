@@ -77,8 +77,8 @@ func TestCheckPRCommits(t *testing.T) {
 			Return(nil, sysutil.ErrKeyNotFound)
 
 		// mock github API Call adding new request info
-		testGithub.EXPECT().postComment(gomock.Any(), gomock.Any(), 0, 123, gomock.Any()).
-			DoAndReturn(func(repoOwner, repoName string, commentID, prNumber int, commentBody prComment) (int, error) {
+		testGithub.EXPECT().postComment(gomock.Any(), gomock.Any(), gomock.Any(), 0, 123, gomock.Any()).
+			DoAndReturn(func(ctx context.Context, repoOwner, repoName string, commentID, prNumber int, commentBody prComment) (int, error) {
 				// validate comment message
 				_, parsedModule, _, parsedCommitID, _ := parseRequestAcknowledgedMsg(commentBody.Body)
 				if parsedModule.Name == "" {
@@ -145,8 +145,8 @@ func TestCheckPRCommits(t *testing.T) {
 			Return(nil, sysutil.ErrKeyNotFound)
 
 		// mock github API Call adding new request info
-		testGithub.EXPECT().postComment(gomock.Any(), gomock.Any(), 0, 123, gomock.Any()).
-			DoAndReturn(func(repoOwner, repoName string, commentID, prNumber int, commentBody prComment) (int, error) {
+		testGithub.EXPECT().postComment(gomock.Any(), gomock.Any(), gomock.Any(), 0, 123, gomock.Any()).
+			DoAndReturn(func(ctx context.Context, repoOwner, repoName string, commentID, prNumber int, commentBody prComment) (int, error) {
 				// validate comment message
 				_, parsedModule, _, parsedCommitID, _ := parseRequestAcknowledgedMsg(commentBody.Body)
 				if parsedModule.Name == "" {
@@ -283,8 +283,8 @@ func TestCheckPRCommits(t *testing.T) {
 			Return(nil, sysutil.ErrKeyNotFound)
 
 		// mock github API Call adding new request info
-		testGithub.EXPECT().postComment(gomock.Any(), gomock.Any(), 0, 123, gomock.Any()).
-			DoAndReturn(func(repoOwner, repoName string, commentID, prNumber int, commentBody prComment) (int, error) {
+		testGithub.EXPECT().postComment(gomock.Any(), gomock.Any(), gomock.Any(), 0, 123, gomock.Any()).
+			DoAndReturn(func(ctx context.Context, repoOwner, repoName string, commentID, prNumber int, commentBody prComment) (int, error) {
 				// validate comment message
 				_, parsedModule, _, parsedCommitID, _ := parseRequestAcknowledgedMsg(commentBody.Body)
 				if parsedModule.Name == "" {
@@ -385,8 +385,8 @@ func TestCheckPRCommits(t *testing.T) {
 			Return(nil, sysutil.ErrKeyNotFound)
 
 		// mock github API Call adding new request info
-		testGithub.EXPECT().postComment(gomock.Any(), gomock.Any(), 0, 123, gomock.Any()).
-			DoAndReturn(func(repoOwner, repoName string, commentID, prNumber int, commentBody prComment) (int, error) {
+		testGithub.EXPECT().postComment(gomock.Any(), gomock.Any(), gomock.Any(), 0, 123, gomock.Any()).
+			DoAndReturn(func(ctx context.Context, repoOwner, repoName string, commentID, prNumber int, commentBody prComment) (int, error) {
 				// validate comment message
 				_, parsedModule, _, parsedCommitID, _ := parseRequestAcknowledgedMsg(commentBody.Body)
 				if parsedModule.Name == "" {
@@ -451,8 +451,8 @@ func TestCheckPRCommits(t *testing.T) {
 			Return(nil, sysutil.ErrKeyNotFound)
 
 		// mock github API Call adding new request info
-		testGithub.EXPECT().postComment(gomock.Any(), gomock.Any(), 0, 123, gomock.Any()).
-			DoAndReturn(func(repoOwner, repoName string, commentID, prNumber int, commentBody prComment) (int, error) {
+		testGithub.EXPECT().postComment(gomock.Any(), gomock.Any(), gomock.Any(), 0, 123, gomock.Any()).
+			DoAndReturn(func(ctx context.Context, repoOwner, repoName string, commentID, prNumber int, commentBody prComment) (int, error) {
 				// validate comment message
 				_, parsedModule, _, parsedCommitID, _ := parseRequestAcknowledgedMsg(commentBody.Body)
 				if parsedModule.Name == "" {
@@ -559,7 +559,7 @@ func Test_checkPRCommentsForPlanRequests(t *testing.T) {
 		)
 		pr.Comments.Nodes[0].UpdatedAt = time.Now().Add(-24 * time.Hour)
 
-		gotReq, err := planner.checkPRCommentsForPlanRequests(pr, module)
+		gotReq, err := planner.checkPRCommentsForPlanRequests(context.Background(), pr, module)
 		if err != nil {
 			t.Fatalf("unexpected error: %s", err)
 		}
@@ -582,7 +582,7 @@ func Test_checkPRCommentsForPlanRequests(t *testing.T) {
 			},
 		)
 
-		gotReq, err := planner.checkPRCommentsForPlanRequests(pr, module)
+		gotReq, err := planner.checkPRCommentsForPlanRequests(context.Background(), pr, module)
 		if err != nil {
 			t.Fatalf("unexpected error: %s", err)
 		}
@@ -605,7 +605,7 @@ func Test_checkPRCommentsForPlanRequests(t *testing.T) {
 			},
 		)
 
-		gotReq, err := planner.checkPRCommentsForPlanRequests(pr, module)
+		gotReq, err := planner.checkPRCommentsForPlanRequests(context.Background(), pr, module)
 		if err != nil {
 			t.Fatalf("unexpected error: %s", err)
 		}
@@ -624,7 +624,7 @@ func Test_checkPRCommentsForPlanRequests(t *testing.T) {
 			},
 		)
 
-		gotReq, err := planner.checkPRCommentsForPlanRequests(pr, module)
+		gotReq, err := planner.checkPRCommentsForPlanRequests(context.Background(), pr, module)
 		if err != nil {
 			t.Fatalf("unexpected error: %s", err)
 		}
@@ -643,7 +643,7 @@ func Test_checkPRCommentsForPlanRequests(t *testing.T) {
 			},
 		)
 
-		gotReq, err := planner.checkPRCommentsForPlanRequests(pr, module)
+		gotReq, err := planner.checkPRCommentsForPlanRequests(context.Background(), pr, module)
 		if err != nil {
 			t.Fatalf("unexpected error: %s", err)
 		}
@@ -662,7 +662,7 @@ func Test_checkPRCommentsForPlanRequests(t *testing.T) {
 			},
 		)
 
-		gotReq, err := planner.checkPRCommentsForPlanRequests(pr, module)
+		gotReq, err := planner.checkPRCommentsForPlanRequests(context.Background(), pr, module)
 		if err != nil {
 			t.Fatalf("unexpected error: %s", err)
 		}
@@ -688,8 +688,8 @@ func Test_checkPRCommentsForPlanRequests(t *testing.T) {
 			Return("hash1", nil)
 
 		// mock github API Call adding new request info
-		testGithub.EXPECT().postComment(gomock.Any(), gomock.Any(), 0, 123, gomock.Any()).
-			DoAndReturn(func(repoOwner, repoName string, commentID, prNumber int, commentBody prComment) (int, error) {
+		testGithub.EXPECT().postComment(gomock.Any(), gomock.Any(), gomock.Any(), 0, 123, gomock.Any()).
+			DoAndReturn(func(ctx context.Context, repoOwner, repoName string, commentID, prNumber int, commentBody prComment) (int, error) {
 				// validate comment message
 				_, parsedModule, _, parsedCommitID, _ := parseRequestAcknowledgedMsg(commentBody.Body)
 				if parsedModule.Name == "" {
@@ -706,7 +706,7 @@ func Test_checkPRCommentsForPlanRequests(t *testing.T) {
 			})
 
 		// Call Test function
-		gotReq, err := planner.checkPRCommentsForPlanRequests(p, module)
+		gotReq, err := planner.checkPRCommentsForPlanRequests(context.Background(), p, module)
 		if err != nil {
 			t.Fatalf("unexpected error: %s", err)
 		}
@@ -738,8 +738,8 @@ func Test_checkPRCommentsForPlanRequests(t *testing.T) {
 		)
 
 		// mock github API Call adding new request info
-		testGithub.EXPECT().postComment(gomock.Any(), gomock.Any(), 0, 123, gomock.Any()).
-			DoAndReturn(func(repoOwner, repoName string, commentID, prNumber int, commentBody prComment) (int, error) {
+		testGithub.EXPECT().postComment(gomock.Any(), gomock.Any(), gomock.Any(), 0, 123, gomock.Any()).
+			DoAndReturn(func(ctx context.Context, repoOwner, repoName string, commentID, prNumber int, commentBody prComment) (int, error) {
 				// validate comment message
 				_, parsedModule, _, parsedCommitID, _ := parseRequestAcknowledgedMsg(commentBody.Body)
 				if parsedModule.Name == "" {
@@ -759,7 +759,7 @@ func Test_checkPRCommentsForPlanRequests(t *testing.T) {
 			Return("hash1", nil)
 
 		// Call Test function
-		gotReq, err := planner.checkPRCommentsForPlanRequests(p, module)
+		gotReq, err := planner.checkPRCommentsForPlanRequests(context.Background(), p, module)
 		if err != nil {
 			t.Fatalf("unexpected error: %s", err)
 		}
@@ -795,8 +795,8 @@ func Test_checkPRCommentsForPlanRequests(t *testing.T) {
 		)
 
 		// mock github API Call adding new request info
-		testGithub.EXPECT().postComment(gomock.Any(), gomock.Any(), 0, 123, gomock.Any()).
-			DoAndReturn(func(repoOwner, repoName string, commentID, prNumber int, commentBody prComment) (int, error) {
+		testGithub.EXPECT().postComment(gomock.Any(), gomock.Any(), gomock.Any(), 0, 123, gomock.Any()).
+			DoAndReturn(func(ctx context.Context, repoOwner, repoName string, commentID, prNumber int, commentBody prComment) (int, error) {
 				// validate comment message
 				_, parsedModule, _, parsedCommitID, _ := parseRequestAcknowledgedMsg(commentBody.Body)
 				if parsedModule.Name == "" {
@@ -815,7 +815,7 @@ func Test_checkPRCommentsForPlanRequests(t *testing.T) {
 		testGit.EXPECT().Hash(gomock.Any(), gomock.Any(), "ref1", "path/foo/two").
 			Return("hash1", nil)
 
-		gotReq, err := planner.checkPRCommentsForPlanRequests(pr, module)
+		gotReq, err := planner.checkPRCommentsForPlanRequests(context.Background(), pr, module)
 		if err != nil {
 			t.Fatalf("unexpected error: %s", err)
 		}
@@ -847,8 +847,8 @@ func Test_checkPRCommentsForPlanRequests(t *testing.T) {
 		)
 
 		// mock github API Call adding new request info
-		testGithub.EXPECT().postComment(gomock.Any(), gomock.Any(), 0, 123, gomock.Any()).
-			DoAndReturn(func(repoOwner, repoName string, commentID, prNumber int, commentBody prComment) (int, error) {
+		testGithub.EXPECT().postComment(gomock.Any(), gomock.Any(), gomock.Any(), 0, 123, gomock.Any()).
+			DoAndReturn(func(ctx context.Context, repoOwner, repoName string, commentID, prNumber int, commentBody prComment) (int, error) {
 				// validate comment message
 				_, parsedModule, _, parsedCommitID, _ := parseRequestAcknowledgedMsg(commentBody.Body)
 				if parsedModule.Name == "" {
@@ -867,7 +867,7 @@ func Test_checkPRCommentsForPlanRequests(t *testing.T) {
 		testGit.EXPECT().Hash(gomock.Any(), gomock.Any(), "ref1", "path/foo/two").
 			Return("hash1", nil)
 
-		gotReq, err := planner.checkPRCommentsForPlanRequests(pr, module)
+		gotReq, err := planner.checkPRCommentsForPlanRequests(context.Background(), pr, module)
 		if err != nil {
 			t.Fatalf("unexpected error: %s", err)
 		}
@@ -898,7 +898,7 @@ func Test_checkPRCommentsForPlanRequests(t *testing.T) {
 		)
 
 		// Call Test function
-		gotReq, err := planner.checkPRCommentsForPlanRequests(p, module)
+		gotReq, err := planner.checkPRCommentsForPlanRequests(context.Background(), p, module)
 		if err != nil {
 			t.Fatalf("unexpected error: %s", err)
 		}
@@ -921,7 +921,7 @@ func Test_checkPRCommentsForPlanRequests(t *testing.T) {
 		)
 
 		// Call Test function
-		gotReq, err := planner.checkPRCommentsForPlanRequests(p, module)
+		gotReq, err := planner.checkPRCommentsForPlanRequests(context.Background(), p, module)
 		if err != nil {
 			t.Fatalf("unexpected error: %s", err)
 		}

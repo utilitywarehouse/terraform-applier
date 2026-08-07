@@ -62,7 +62,8 @@ type CommentMetadata struct {
 func embedMetadata(meta CommentMetadata) string {
 	b, err := json.Marshal(meta)
 	if err != nil {
-		panic(fmt.Sprintf("unable to marshal pr comment metadata: %v", meta))
+		slog.Error("unable to marshal pr comment metadata", "logger", "pr-planner", "meta", meta, "err", err)
+		return ""
 	}
 	return fmt.Sprintf("\n\n%s %s %s", metaStart, string(b), metaEnd)
 }

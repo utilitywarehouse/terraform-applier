@@ -83,7 +83,7 @@ func Test_processRedisKeySetMsg(t *testing.T) {
 			Return(&tfaplv1beta1.Run{Module: types.NamespacedName{Namespace: "foo", Name: "admins"}, Request: &tfaplv1beta1.Request{PR: &tfaplv1beta1.PullRequest{Number: 4, CommentID: 123}}, CommitHash: "hash1", Output: "terraform plan output"}, nil)
 
 		// mock github API Call adding new request info
-		testGithub.EXPECT().postComment("utilitywarehouse", "terraform-applier", 123, 4, gomock.Any()).
+		testGithub.EXPECT().postComment(gomock.Any(), "utilitywarehouse", "terraform-applier", 123, 4, gomock.Any()).
 			Return(123, nil)
 
 		ch <- &redis.Message{Channel: "__keyevent@0__:set", Payload: key}
@@ -97,7 +97,7 @@ func Test_processRedisKeySetMsg(t *testing.T) {
 			Return(&tfaplv1beta1.Run{Module: types.NamespacedName{Namespace: "foo", Name: "users"}, Request: &tfaplv1beta1.Request{PR: &tfaplv1beta1.PullRequest{Number: 4, CommentID: 123}}, CommitHash: "hash1", Output: "terraform plan output"}, nil)
 
 		// mock github API Call adding new request info
-		testGithub.EXPECT().postComment("utilitywarehouse", "terraform-applier", 123, 4, gomock.Any()).
+		testGithub.EXPECT().postComment(gomock.Any(), "utilitywarehouse", "terraform-applier", 123, 4, gomock.Any()).
 			Return(123, nil)
 
 		ch <- &redis.Message{Channel: "__keyevent@0__:set", Payload: key}
@@ -114,7 +114,7 @@ func Test_processRedisKeySetMsg(t *testing.T) {
 			Return("4", nil)
 
 		// mock github API Call adding new request info
-		testGithub.EXPECT().postComment("utilitywarehouse", "terraform-applier", 0, 4, gomock.Any()).
+		testGithub.EXPECT().postComment(gomock.Any(), "utilitywarehouse", "terraform-applier", 0, 4, gomock.Any()).
 			Return(123, nil)
 
 		testRedis.EXPECT().CleanupPRKeys(gomock.Any(), types.NamespacedName{Namespace: "foo", Name: "admins"}, 4, "hash1").

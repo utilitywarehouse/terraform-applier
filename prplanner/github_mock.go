@@ -65,16 +65,16 @@ func (mr *MockGithubInterfaceMockRecorder) openPRs(arg0, arg1, arg2 interface{})
 }
 
 // postComment mocks base method.
-func (m *MockGithubInterface) postComment(arg0, arg1 string, arg2, arg3 int, arg4 prComment) (int, error) {
+func (m *MockGithubInterface) postComment(arg0 context.Context, arg1, arg2 string, arg3, arg4 int, arg5 prComment) (int, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "postComment", arg0, arg1, arg2, arg3, arg4)
+	ret := m.ctrl.Call(m, "postComment", arg0, arg1, arg2, arg3, arg4, arg5)
 	ret0, _ := ret[0].(int)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // postComment indicates an expected call of postComment.
-func (mr *MockGithubInterfaceMockRecorder) postComment(arg0, arg1, arg2, arg3, arg4 interface{}) *gomock.Call {
+func (mr *MockGithubInterfaceMockRecorder) postComment(arg0, arg1, arg2, arg3, arg4, arg5 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "postComment", reflect.TypeOf((*MockGithubInterface)(nil).postComment), arg0, arg1, arg2, arg3, arg4)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "postComment", reflect.TypeOf((*MockGithubInterface)(nil).postComment), arg0, arg1, arg2, arg3, arg4, arg5)
 }

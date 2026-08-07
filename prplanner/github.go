@@ -18,7 +18,7 @@ import (
 type GithubInterface interface {
 	openPRs(ctx context.Context, repoOwner, repoName string) ([]*pr, error)
 	PR(ctx context.Context, repoOwner, repoName string, prNumber int) (*pr, error)
-	postComment(repoOwner, repoName string, commentID, prNumber int, commentBody prComment) (int, error)
+	postComment(ctx context.Context, repoOwner, repoName string, commentID, prNumber int, commentBody prComment) (int, error)
 }
 
 type gitHubClient struct {
@@ -107,7 +107,7 @@ func (gc *gitHubClient) query(ctx context.Context, q gitPRRequest, result any) e
 	return json.NewDecoder(resp.Body).Decode(&result)
 }
 
-func (gc *gitHubClient) postComment(repoOwner, repoName string, commentID, prNumber int, commentBody prComment) (int, error) {
+func (gc *gitHubClient) postComment(ctx context.Context, repoOwner, repoName string, commentID, prNumber int, commentBody prComment) (int, error) {
 	repoName = strings.TrimSuffix(repoName, ".git")
 	method := "POST"
 	reqURL := fmt.Sprintf("%s/repos/%s/%s/issues/%d/comments", gc.rootURL, repoOwner, repoName, prNumber)
@@ -124,13 +124,13 @@ func (gc *gitHubClient) postComment(repoOwner, repoName string, commentID, prNum
 	}
 
 	// Create a new HTTP request
-	req, err := http.NewRequest(method, reqURL, bytes.NewBuffer(payload))
+	req, err := http.NewRequestWithContext(ctx, method, reqURL, bytes.NewBuffer(payload))
 	if err != nil {
 		return 0, fmt.Errorf("error creating HTTP request: %w", err)
 	}
 
 	// Set headers
-	_, token, err := gc.credsProvider.Creds(context.Background())
+	_, token, err := gc.credsProvider.Creds(ctx)
 	if err != nil {
 		return 0, fmt.Errorf("unable to provide creds err:%w", err)
 	}
