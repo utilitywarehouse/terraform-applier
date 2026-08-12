@@ -107,6 +107,18 @@ var (
 			Usage:   "The maximum number of concurrent module runs allowed on controller. if its 0 there is no limit",
 		},
 		&cli.IntFlag{
+			Name:    "run-retries",
+			EnvVars: []string{"RUN_RETRIES"},
+			Value:   3,
+			Usage:   "The maximum number of run attempts before a module is marked as errored. 1 disables retries.",
+		},
+		&cli.IntFlag{
+			Name:    "run-retry-delay",
+			EnvVars: []string{"RUN_RETRY_DELAY"},
+			Value:   10,
+			Usage:   "Base delay in seconds between run retries, doubled on each subsequent retry.",
+		},
+		&cli.IntFlag{
 			Name:    "termination-grace-period",
 			EnvVars: []string{"TERMINATION_GRACE_PERIOD"},
 			Value:   60,
@@ -743,13 +755,15 @@ func run(c *cli.Context) {
 			GCPSecretsEngPath: c.String("vault-gcp-secret-engine-path"),
 			AuthPath:          c.String("vault-kube-auth-path"),
 		},
-		GlobalENV:    globalRunEnv,
-		RunStatus:    runStatus,
-		Redis:        sysutil.Redis{Client: rdb},
-		Delegate:     &runner.Delegate{},
-		ClusterClt:   mgr.GetClient(),
-		Recorder:     mgr.GetEventRecorderFor("terraform-applier"),
-		DataRootPath: dataRootPath,
+		GlobalENV:     globalRunEnv,
+		RunStatus:     runStatus,
+		Redis:         sysutil.Redis{Client: rdb},
+		Delegate:      &runner.Delegate{},
+		ClusterClt:    mgr.GetClient(),
+		Recorder:      mgr.GetEventRecorderFor("terraform-applier"),
+		DataRootPath:  dataRootPath,
+		RunRetries:    c.Int("run-retries"),
+		RunRetryDelay: time.Duration(c.Int("run-retry-delay")) * time.Second,
 	}
 
 	if err := runner.Init(!c.Bool("disable-plugin-cache"), c.Int("max-concurrent-runs")); err != nil {
