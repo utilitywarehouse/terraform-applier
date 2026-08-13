@@ -178,7 +178,7 @@ type ModuleSpec struct {
 	// The module is re-run once per poll interval until it succeeds or this
 	// limit is reached. 0 disables automatic retries.
 	// +optional
-	// +kubebuilder:default=0
+	// +kubebuilder:default=3
 	// +kubebuilder:validation:Minimum=0
 	MaxAttempts int `json:"maxAttempts,omitempty"`
 

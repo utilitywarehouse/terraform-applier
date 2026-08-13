@@ -191,7 +191,7 @@ spec:
                   type: object
                 type: array
               maxAttempts:
-                default: 0
+                default: 3
                 description: |-
                   MaxAttempts specifies the maximum number of attempts an automated run
                   (ScheduledRun or PollingRun) will make when the previous attempt failed.

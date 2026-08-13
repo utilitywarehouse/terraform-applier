@@ -51,8 +51,6 @@ type Runner struct {
 	Vault                  vault.ProviderInterface
 	RunStatus              *sysutil.RunStatus
 	GlobalENV              map[string]string
-	RunRetries             int
-	RunRetryDelay          time.Duration
 	pluginCacheEnabled     bool
 	pluginCache            *pluginCache
 	DataRootPath           string
@@ -312,58 +310,6 @@ func (r *Runner) process(run *tfaplv1beta1.Run, module *tfaplv1beta1.Module, can
 	return r.runTF(ctx, run, module, te, backendConf, commitHash, cancelChan)
 }
 
-const (
-	// defaultRunRetryDelay is used when the runner is constructed without an
-	// explicit value (e.g. in tests).
-	defaultRunRetryDelay = 10 * time.Second
-	// maxRunRetryDelay caps the exponential backoff between run attempts.
-	maxRunRetryDelay = 5 * time.Minute
-)
-
-// runError carries the state reason and the underlying error used when a run
-// finally fails after all retries have been exhausted.
-type runError struct {
-	reason string
-	msg    string
-	err    error
-}
-
-func (e *runError) Error() string {
-	if e.err != nil {
-		return fmt.Sprintf("%s: %s", e.msg, e.err)
-	}
-	return e.msg
-}
-
-func newRunError(reason, msg string, err error) *runError {
-	return &runError{reason: reason, msg: msg, err: err}
-}
-
-// waitForRunRetry sleeps between retry attempts with exponential backoff,
-// returning false early if the run is cancelled or the context is done.
-func (r *Runner) waitForRunRetry(ctx context.Context, cancelChan <-chan struct{}, attempt int) bool {
-	delay := r.RunRetryDelay
-	if delay <= 0 {
-		delay = defaultRunRetryDelay
-	}
-	delay *= time.Duration(1 << (attempt - 1))
-	if delay > maxRunRetryDelay {
-		delay = maxRunRetryDelay
-	}
-
-	t := time.NewTimer(delay)
-	defer t.Stop()
-
-	select {
-	case <-t.C:
-		return true
-	case <-cancelChan:
-		return false
-	case <-ctx.Done():
-		return false
-	}
-}
-
 // runTF executes terraform commands and updates module status when required.
 // it returns bool indicating success or failure
 func (r *Runner) runTF(
@@ -376,142 +322,110 @@ func (r *Runner) runTF(
 	cancelChan <-chan struct{},
 ) bool {
 	log := r.Log.With("module", run.Module, "ref", run.RepoRef)
+	var err error
 
-	// attempt runs the full init -> plan -> apply sequence once. A single
-	// attempt can fail on transient errors (e.g. a kube-apiserver restart
-	// causing a short-lived RBAC denial), so the whole sequence is retried
-	// with backoff before the module is marked as errored.
-	attempt := func() *runError {
-		// reset per-attempt outputs so a retry does not accumulate stale output
-		run.Output = ""
-		run.InitOutput = ""
-		run.Summary = ""
-		run.DiffDetected = false
-
-		initOut, err := te.init(ctx, backendConf)
-		if err != nil {
-			// tf err contains new lines not suitable logging
-			log.Error("unable to init module", "err", fmt.Sprintf("%q", err))
-			return newRunError(tfaplv1beta1.ReasonInitialiseFailed, "unable to init module", err)
-		}
-		run.InitOutput = initOut
-		log.Info("Initialised successfully")
-		r.Recorder.Event(module, corev1.EventTypeNormal, tfaplv1beta1.ReasonInitialised, "Initialised successfully")
-
-		// run `terraform force-unlock <lock-id>`
-		if run.Request.LockID != "" {
-			if _, err := te.forceUnlock(ctx, run.Request.LockID); err != nil {
-				log.Error("unable to force unlock state", "err", fmt.Sprintf("%q", err))
-			} else {
-				log.Info("force unlock successful")
-			}
-		}
-
-		// if termination signal received its safe to return here
-		if isChannelClosed(cancelChan) {
-			return newRunError(tfaplv1beta1.ReasonControllerShutdown, "unable to plan module: terraform run interrupted as runner is shutting down", nil)
-		}
-
-		diffDetected, planOut, err := te.plan(ctx)
-		if err != nil {
-			run.Output = planOut
-			// tf err contains new lines not suitable logging
-			log.Error("unable to plan module", "err", fmt.Sprintf("%q", err))
-			return newRunError(tfaplv1beta1.ReasonPlanFailed, "unable to plan module", err)
-		}
-
-		run.DiffDetected = diffDetected
-
-		// extract last line of output
-		// Plan: X to add, 0 to change, 0 to destroy.
-		// OR
-		// No changes. Your infrastructure matches the configuration.
-		planStatus := rePlanStatus.FindString(planOut)
-
-		log.Info("planned", "status", planStatus)
-		run.Summary = planStatus
-
-		// get saved plan to update status
-		run.Output, err = te.showPlanFileRaw(ctx)
-		if err != nil {
-			// tf err contains new lines not suitable logging
-			log.Error("unable to get saved plan", "err", fmt.Sprintf("%q", err))
-			return newRunError(tfaplv1beta1.ReasonPlanFailed, "unable to get saved plan", err)
-		}
-
-		// return if plan only mode
-		if run.Mode != tfaplv1beta1.ModeApply {
-			reason := tfaplv1beta1.ReasonNoDriftDetected
-			if diffDetected {
-				reason = tfaplv1beta1.ReasonPlanOnlyDriftDetected
-			}
-			if err = r.SetRunFinishedStatus(run, module, reason, planStatus, r.Clock.Now()); err != nil {
-				log.Error("unable to set drift status", "err", err)
-				return newRunError(tfaplv1beta1.ReasonPlanFailed, "unable to set drift status", err)
-			}
-			return nil
-		}
-
-		// if termination signal received its safe to return here
-		if isChannelClosed(cancelChan) {
-			return newRunError(tfaplv1beta1.ReasonControllerShutdown, "unable to apply module: terraform run interrupted as runner is shutting down", nil)
-		}
-
-		applyOut, err := te.apply(ctx)
-		run.Output += applyOut
-		if err != nil {
-			// tf err contains new lines not suitable logging
-			log.Error("unable to apply module", "err", fmt.Sprintf("%q", err))
-			return newRunError(tfaplv1beta1.ReasonApplyFailed, "unable to apply module", err)
-		}
-		module.Status.LastAppliedAt = &metav1.Time{Time: r.Clock.Now()}
-		module.Status.LastAppliedCommitHash = commitHash
-
-		// extract last line of output
-		// Apply complete! Resources: 1 added, 0 changed, 0 destroyed.
-		applyStatus := reApplyStatus.FindString(applyOut)
-
-		log.Info("applied", "status", applyStatus)
-		run.Summary = applyStatus
-
-		if err = r.SetRunFinishedStatus(run, module, tfaplv1beta1.ReasonApplied, applyStatus, r.Clock.Now()); err != nil {
-			log.Error("unable to set finished status", "err", err)
-			return newRunError(tfaplv1beta1.ReasonApplyFailed, "unable to set finished status", err)
-		}
-		return nil
+	run.InitOutput, err = te.init(ctx, backendConf)
+	if err != nil {
+		// tf err contains new lines not suitable logging
+		log.Error("unable to init module", "err", fmt.Sprintf("%q", err))
+		r.setFailedStatus(run, module, tfaplv1beta1.ReasonInitialiseFailed, "unable to init module")
+		return false
 	}
+	log.Info("Initialised successfully")
+	r.Recorder.Event(module, corev1.EventTypeNormal, tfaplv1beta1.ReasonInitialised, "Initialised successfully")
 
-	// retry the whole sequence on transient failures before failing the run.
-	// RunRetries is the maximum number of attempts, so 0 or 1 disables retries.
-	retries := r.RunRetries
-	if retries < 1 {
-		retries = 1
-	}
-
-	var lastErr *runError
-	for attemptNum := 1; ; attemptNum++ {
-		if lastErr = attempt(); lastErr == nil {
-			return true
-		}
-
-		// do not retry runs that were cancelled or timed out
-		if isChannelClosed(cancelChan) || ctx.Err() != nil {
-			log.Error("run interrupted", "module", run.Module, "err", lastErr.Error())
-			break
-		}
-
-		if attemptNum >= retries {
-			break
-		}
-
-		log.Warn("run attempt failed, retrying", "attempt", attemptNum, "max", retries, "reason", lastErr.reason)
-		if !r.waitForRunRetry(ctx, cancelChan, attemptNum) {
-			break
+	// run `terraform force-unlock <lock-id>`
+	if run.Request.LockID != "" {
+		_, err := te.forceUnlock(ctx, run.Request.LockID)
+		if err != nil {
+			log.Error("unable to force unlock state", "err", fmt.Sprintf("%q", err))
+		} else {
+			log.Info("force unlock successful")
 		}
 	}
 
-	r.setFailedStatus(run, module, lastErr.reason, lastErr.Error())
-	return false
+	// if termination signal received its safe to return here
+	if isChannelClosed(cancelChan) {
+		msg := "unable to plan module: terraform run interrupted as runner is shutting down"
+		log.Error(msg)
+		r.setFailedStatus(run, module, tfaplv1beta1.ReasonControllerShutdown, msg)
+		return false
+	}
+
+	diffDetected, planOut, err := te.plan(ctx)
+	if err != nil {
+		run.Output = planOut
+		// tf err contains new lines not suitable logging
+		log.Error("unable to plan module", "err", fmt.Sprintf("%q", err))
+		r.setFailedStatus(run, module, tfaplv1beta1.ReasonPlanFailed, "unable to plan module")
+		return false
+	}
+
+	run.DiffDetected = diffDetected
+
+	// extract last line of output
+	// Plan: X to add, 0 to change, 0 to destroy.
+	// OR
+	// No changes. Your infrastructure matches the configuration.
+	planStatus := rePlanStatus.FindString(planOut)
+
+	log.Info("planned", "status", planStatus)
+	run.Summary = planStatus
+
+	// get saved plan to update status
+	run.Output, err = te.showPlanFileRaw(ctx)
+	if err != nil {
+		// tf err contains new lines not suitable logging
+		log.Error("unable to get saved plan", "err", fmt.Sprintf("%q", err))
+		r.setFailedStatus(run, module, tfaplv1beta1.ReasonPlanFailed, "unable to get saved plan")
+		return false
+	}
+
+	// return if plan only mode
+	if run.Mode != tfaplv1beta1.ModeApply {
+		reason := tfaplv1beta1.ReasonNoDriftDetected
+		if diffDetected {
+			reason = tfaplv1beta1.ReasonPlanOnlyDriftDetected
+		}
+		if err = r.SetRunFinishedStatus(run, module, reason, planStatus, r.Clock.Now()); err != nil {
+			log.Error("unable to set drift status", "err", err)
+			return false
+		}
+		return true
+	}
+
+	// if termination signal received its safe to return here
+	if isChannelClosed(cancelChan) {
+		msg := "unable to apply module: terraform run interrupted as runner is shutting down"
+		log.Error(msg)
+		r.setFailedStatus(run, module, tfaplv1beta1.ReasonControllerShutdown, msg)
+		return false
+	}
+
+	applyOut, err := te.apply(ctx)
+	run.Output += applyOut
+	if err != nil {
+		// tf err contains new lines not suitable logging
+		log.Error("unable to apply module", "err", fmt.Sprintf("%q", err))
+		r.setFailedStatus(run, module, tfaplv1beta1.ReasonApplyFailed, "unable to apply module")
+		return false
+	}
+	module.Status.LastAppliedAt = &metav1.Time{Time: r.Clock.Now()}
+	module.Status.LastAppliedCommitHash = commitHash
+
+	// extract last line of output
+	// Apply complete! Resources: 1 added, 0 changed, 0 destroyed.
+	applyStatus := reApplyStatus.FindString(applyOut)
+
+	log.Info("applied", "status", applyStatus)
+	run.Summary = applyStatus
+
+	if err = r.SetRunFinishedStatus(run, module, tfaplv1beta1.ReasonApplied, applyStatus, r.Clock.Now()); err != nil {
+		log.Error("unable to set finished status", "err", err)
+		return false
+	}
+
+	return true
 }
 
 func (r *Runner) SetRunStartedStatus(run *tfaplv1beta1.Run, m *tfaplv1beta1.Module, msg, commitHash, commitMsg, remoteURL string, now time.Time) error {
