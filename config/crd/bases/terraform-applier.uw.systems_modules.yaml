@@ -3,7 +3,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.20.1
+    controller-gen.kubebuilder.io/version: v0.21.0
   name: modules.terraform-applier.uw.systems
 spec:
   group: terraform-applier.uw.systems
@@ -190,6 +190,15 @@ spec:
                   - name
                   type: object
                 type: array
+              maxAttempts:
+                default: 3
+                description: |-
+                  MaxAttempts specifies the maximum number of attempts an automated run
+                  (ScheduledRun or PollingRun) will make when the previous attempt failed.
+                  The module is re-run once per poll interval until it succeeds or this
+                  limit is reached. 0 disables automatic retries.
+                minimum: 0
+                type: integer
               path:
                 description: Path to the directory containing Terraform Root Module
                   (.tf) files.
@@ -429,6 +438,12 @@ spec:
               observedGeneration:
                 description: ObservedGeneration is the last reconciled generation.
                 format: int64
+                type: integer
+              retryAttempts:
+                description: |-
+                  RetryAttempts is the number of consecutive failed attempts for the
+                  current error state. It is incremented on each failed automated run and
+                  reset to 0 on the next successful run.
                 type: integer
               runType:
                 description: LastRunType is a short description of the kind of terraform
