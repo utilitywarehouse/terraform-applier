@@ -39,6 +39,19 @@ import (
 
 const trace = slog.Level(-8)
 
+// retryableStateReasons are the failure reasons for which an automated run
+// will be retried. Config/spec failures (e.g. SpecsParsingFailure,
+// InvalidRequest) are not retried as fixing them requires a spec change.
+var retryableStateReasons = map[string]bool{
+	tfaplv1beta1.ReasonDelegationFailed:     true,
+	tfaplv1beta1.ReasonRunPreparationFailed: true,
+	tfaplv1beta1.ReasonControllerShutdown:   true,
+	tfaplv1beta1.ReasonInitialiseFailed:     true,
+	tfaplv1beta1.ReasonPlanFailed:           true,
+	tfaplv1beta1.ReasonApplyFailed:          true,
+	tfaplv1beta1.ReasonUnknown:              true,
+}
+
 // ModuleReconciler reconciles a Module object
 type ModuleReconciler struct {
 	client.Client
@@ -161,6 +174,21 @@ func (r *ModuleReconciler) Reconcile(ctx context.Context, req reconcile.Request)
 	}
 
 	// case 4:
+	// check if last automated run errored and needs to be retried
+	//
+	// retries only apply to automated runs (ScheduledRun and PollingRun) as
+	// manually triggered runs are retried by the user from UI
+	if module.Status.CurrentState == string(tfaplv1beta1.StatusErrored) &&
+		retryableStateReasons[module.Status.StateReason] &&
+		module.Status.RetryAttempts < module.Spec.MaxAttempts &&
+		(module.Status.LastRunType == tfaplv1beta1.ScheduledRun || module.Status.LastRunType == tfaplv1beta1.PollingRun) {
+		log.Debug("requesting retry run as last run errored", "retryAttempts", module.Status.RetryAttempts, "maxAttempts", module.Spec.MaxAttempts, "lastRunType", module.Status.LastRunType)
+		// use next poll internal as minimum queue duration as status change will not trigger Reconcile
+		r.triggerRun(ctx, module, module.NewRunRequest(module.Status.LastRunType, ""))
+		return ctrl.Result{RequeueAfter: pollIntervalDuration}, nil
+	}
+
+	// case 5:
 	// check if schedule run required
 	//
 

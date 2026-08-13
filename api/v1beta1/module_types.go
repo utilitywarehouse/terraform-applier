@@ -173,6 +173,15 @@ type ModuleSpec struct {
 	// +kubebuilder:validation:Maximum=1800
 	RunTimeout int `json:"runTimeout,omitempty"`
 
+	// MaxAttempts specifies the maximum number of attempts an automated run
+	// (ScheduledRun or PollingRun) will make when the previous attempt failed.
+	// The module is re-run once per poll interval until it succeeds or this
+	// limit is reached. 0 disables automatic retries.
+	// +optional
+	// +kubebuilder:default=0
+	// +kubebuilder:validation:Minimum=0
+	MaxAttempts int `json:"maxAttempts,omitempty"`
+
 	// List of roles and subjects assigned to that role for the module.
 	// +optional
 	RBAC []RBAC `json:"rbac,omitempty"`
@@ -202,6 +211,12 @@ type ModuleStatus struct {
 	// LastRunType is a short description of the kind of terraform run that was attempted.
 	// +optional
 	LastRunType string `json:"runType,omitempty"`
+
+	// RetryAttempts is the number of consecutive failed attempts for the
+	// current error state. It is incremented on each failed automated run and
+	// reset to 0 on the next successful run.
+	// +optional
+	RetryAttempts int `json:"retryAttempts,omitempty"`
 
 	// LastDefaultRunStartedAt when was the last time the run was started.
 	// Default Runs are runs happens on default repo ref set by user.

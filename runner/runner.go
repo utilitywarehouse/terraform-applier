@@ -549,6 +549,8 @@ func (r *Runner) SetRunFinishedStatus(run *tfaplv1beta1.Run, m *tfaplv1beta1.Mod
 	if reason == tfaplv1beta1.ReasonPlanOnlyDriftDetected {
 		m.Status.CurrentState = string(tfaplv1beta1.StatusDriftDetected)
 	}
+	// a successful run proves the module is healthy, reset retry counter
+	m.Status.RetryAttempts = 0
 
 	return sysutil.PatchModuleStatus(context.Background(), r.ClusterClt, m.NamespacedName(), m.Status)
 }
@@ -568,6 +570,12 @@ func (r *Runner) setFailedStatus(run *tfaplv1beta1.Run, module *tfaplv1beta1.Mod
 
 	module.Status.CurrentState = string(tfaplv1beta1.StatusErrored)
 	module.Status.StateReason = reason
+
+	// only count automated runs towards the retry budget, manually triggered
+	// runs are retried by the user
+	if run.Request.Type == tfaplv1beta1.ScheduledRun || run.Request.Type == tfaplv1beta1.PollingRun {
+		module.Status.RetryAttempts++
+	}
 
 	if err := sysutil.PatchModuleStatus(context.Background(), r.ClusterClt, run.Module, module.Status); err != nil {
 		r.Log.With("module", run).Error("unable to set failed status", "err", err)
