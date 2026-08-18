@@ -145,13 +145,11 @@ func (p *Prometheus) Init() {
 
 // UpdateModuleSuccess increments the given module's Counter for either successful or failed run attempts.
 func (p *Prometheus) UpdateModuleSuccess(module, namespace, runType string, success bool) {
-	if success {
-		p.moduleRunTimestamp.With(prometheus.Labels{
-			"module":    module,
-			"namespace": namespace,
-			"run_type":  runType,
-		}).Set(float64(time.Now().Unix()))
-	}
+	p.moduleRunTimestamp.With(prometheus.Labels{
+		"module":    module,
+		"namespace": namespace,
+		"run_type":  runType,
+	}).Set(float64(time.Now().Unix()))
 	p.moduleRunCount.With(prometheus.Labels{
 		"module":    module,
 		"namespace": namespace,
