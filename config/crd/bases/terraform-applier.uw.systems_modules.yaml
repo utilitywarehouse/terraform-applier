@@ -129,6 +129,9 @@ spec:
                   - name
                   type: object
                 type: array
+                x-kubernetes-list-map-keys:
+                - name
+                x-kubernetes-list-type: map
               delegateServiceAccount:
                 default: terraform-applier-delegate
                 description: |-
@@ -190,6 +193,9 @@ spec:
                   - name
                   type: object
                 type: array
+                x-kubernetes-list-map-keys:
+                - name
+                x-kubernetes-list-type: map
               maxAttempts:
                 default: 3
                 description: |-
@@ -253,11 +259,17 @@ spec:
                         - name
                         type: object
                       type: array
+                      x-kubernetes-list-map-keys:
+                      - name
+                      x-kubernetes-list-type: map
                   required:
                   - role
                   - subjects
                   type: object
                 type: array
+                x-kubernetes-list-map-keys:
+                - role
+                x-kubernetes-list-type: map
               repoRef:
                 default: HEAD
                 description: |-
@@ -339,6 +351,9 @@ spec:
                   - name
                   type: object
                 type: array
+                x-kubernetes-list-map-keys:
+                - name
+                x-kubernetes-list-type: map
               vaultRequests:
                 description: |-
                   VaultRequests specifies credential generate requests from the vault
