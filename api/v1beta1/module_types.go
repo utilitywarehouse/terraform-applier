@@ -128,14 +128,20 @@ type ModuleSpec struct {
 	// List of backend config attributes passed to the Terraform init
 	// for terraform backend configuration
 	// +optional
+	// +listType=map
+	// +listMapKey=name
 	Backend []EnvVar `json:"backend,omitempty"`
 
 	// List of environment variables passed to the Terraform execution.
 	// +optional
+	// +listType=map
+	// +listMapKey=name
 	Env []EnvVar `json:"env,omitempty"`
 
 	// List of input variables passed to the Terraform execution.
 	// +optional
+	// +listType=map
+	// +listMapKey=name
 	Var []EnvVar `json:"var,omitempty"`
 
 	// VaultRequests specifies credential generate requests from the vault
@@ -184,6 +190,8 @@ type ModuleSpec struct {
 
 	// List of roles and subjects assigned to that role for the module.
 	// +optional
+	// +listType=map
+	// +listMapKey=role
 	RBAC []RBAC `json:"rbac,omitempty"`
 }
 
@@ -328,6 +336,8 @@ type RBAC struct {
 	Role string `json:"role,omitempty"`
 	// Subjects holds references to the objects the role applies to.
 	// +required
+	// +listType=map
+	// +listMapKey=name
 	Subjects []Subject `json:"subjects,omitempty"`
 }
 type Subject struct {
