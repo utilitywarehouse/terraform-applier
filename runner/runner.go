@@ -13,6 +13,7 @@ import (
 	tfaplv1beta1 "github.com/utilitywarehouse/terraform-applier/api/v1beta1"
 	"github.com/utilitywarehouse/terraform-applier/git"
 	"github.com/utilitywarehouse/terraform-applier/metrics"
+	"github.com/utilitywarehouse/terraform-applier/policy"
 	"github.com/utilitywarehouse/terraform-applier/sysutil"
 	"github.com/utilitywarehouse/terraform-applier/vault"
 	corev1 "k8s.io/api/core/v1"
@@ -54,6 +55,7 @@ type Runner struct {
 	pluginCacheEnabled     bool
 	pluginCache            *pluginCache
 	DataRootPath           string
+	PolicyEngine           *policy.Engine
 }
 
 func (r *Runner) Init(enablePluginCache bool, maxRunners int) error {
@@ -381,6 +383,13 @@ func (r *Runner) runTF(
 		return false
 	}
 
+	// evaluate OPA policies when an engine is configured
+	if r.PolicyEngine != nil {
+		if ok := r.evaluatePolicies(ctx, run, module, te, commitHash, log); !ok {
+			return false
+		}
+	}
+
 	// return if plan only mode
 	if run.Mode != tfaplv1beta1.ModeApply {
 		reason := tfaplv1beta1.ReasonNoDriftDetected
@@ -420,12 +429,96 @@ func (r *Runner) runTF(
 	log.Info("applied", "status", applyStatus)
 	run.Summary = applyStatus
 
-	if err = r.SetRunFinishedStatus(run, module, tfaplv1beta1.ReasonApplied, applyStatus, r.Clock.Now()); err != nil {
+	// If this apply ran because an admin overrode the soft_deny gate, surface
+	// ReasonPolicyOverridden.
+	reason := tfaplv1beta1.ReasonApplied
+	if run.Request.PolicyOverride {
+		reason = tfaplv1beta1.ReasonPolicyOverridden
+	}
+
+	if err = r.SetRunFinishedStatus(run, module, reason, applyStatus, r.Clock.Now()); err != nil {
 		log.Error("unable to set finished status", "err", err)
 		return false
 	}
 
 	return true
+}
+
+// evaluatePolicies renders the structured plan and evaluates it against the
+// configured OPA policies. It returns true to continue the run, or false to
+// abort it because a policy gate failed or policies could not be evaluated.
+//
+// commitHash is the commit being run; a requested policy override is only
+// honored when Request.OverriddenHash pins it to this commit.
+func (r *Runner) evaluatePolicies(
+	ctx context.Context,
+	run *tfaplv1beta1.Run,
+	module *tfaplv1beta1.Module,
+	te TFExecuter,
+	commitHash string,
+	log *slog.Logger,
+) bool {
+	plan, err := te.showPlanFileJSON(ctx)
+	if err != nil {
+		// if the plan cannot be rendered, the policy outcome is unknown, so the run must not proceed to apply.
+		msg := fmt.Sprintf("unable to render structured plan for policy evaluation: %s", err)
+		log.Error(msg)
+		run.PolicyResult = nil
+		r.setPolicyFailedStatus(run, module, string(tfaplv1beta1.StatusErrored), tfaplv1beta1.ReasonPolicyEvalFailed, msg)
+		return false
+	}
+
+	run.PolicyResult, err = r.PolicyEngine.Eval(ctx, plan)
+	if err != nil {
+		// the policy outcome is unknown, so the run must not proceed to apply.
+		msg := fmt.Sprintf("policy evaluation error: %s", err)
+		log.Error(msg)
+		run.PolicyResult = nil
+		r.setPolicyFailedStatus(run, module, string(tfaplv1beta1.StatusErrored), tfaplv1beta1.ReasonPolicyEvalFailed, msg)
+		return false
+	}
+
+	if run.PolicyResult.Allowed {
+		return true
+	}
+
+	// hard_deny is unconditional and never bypassable
+	if len(run.PolicyResult.HardDenies) > 0 {
+		msg := "hard_deny policy violations detected"
+		log.Error(msg, "violations", len(run.PolicyResult.HardDenies))
+		r.setPolicyFailedStatus(run, module, string(tfaplv1beta1.StatusPolicyViolation), tfaplv1beta1.ReasonHardDenyViolation, msg)
+		return false
+	}
+	//
+	// process soft_deny violations
+	//
+	if run.Mode != tfaplv1beta1.ModeApply && run.Request.Type != tfaplv1beta1.PRPlan {
+		// advisory for scheduled/forced plan-only runs: record but do not fail
+		log.Warn("soft_deny policy violations on plan-only run", "violations", len(run.PolicyResult.SoftDenies))
+		return true
+	}
+
+	if run.Request.PolicyOverride &&
+		run.Mode == tfaplv1beta1.ModeApply &&
+		run.Request.OverriddenHash == commitHash {
+		run.PolicyResult.Overridden = true
+		log.Info("policy override requested, bypassing soft_deny gate", "by", run.Request.OverriddenBy, "reason", run.Request.OverrideReason)
+		return true
+	}
+
+	if run.Request.PolicyOverride &&
+		run.Mode == tfaplv1beta1.ModeApply &&
+		run.Request.OverriddenHash != commitHash {
+		log.Error("policy override is stale, ignoring: approved for a different commit",
+			"approvedFor", run.Request.OverriddenHash, "running", commitHash,
+			"by", run.Request.OverriddenBy, "reason", run.Request.OverrideReason)
+	}
+
+	// everything else (apply without override, or any PR plan) requires an override
+	msg := "soft_deny policy violations detected, override required"
+	log.Error(msg, "violations", len(run.PolicyResult.SoftDenies))
+	r.setPolicyFailedStatus(run, module, string(tfaplv1beta1.StatusOverrideRequired), tfaplv1beta1.ReasonSoftDenyViolation, msg)
+	return false
 }
 
 func (r *Runner) SetRunStartedStatus(run *tfaplv1beta1.Run, m *tfaplv1beta1.Module, msg, commitHash, commitMsg, remoteURL string, now time.Time) error {
@@ -469,7 +562,20 @@ func (r *Runner) SetRunFinishedStatus(run *tfaplv1beta1.Run, m *tfaplv1beta1.Mod
 	return sysutil.PatchModuleStatus(context.Background(), r.ClusterClt, m.NamespacedName(), m.Status)
 }
 
+// setPolicyFailedStatus records a policy-driven run failure without incrementing RetryAttempts.
+func (r *Runner) setPolicyFailedStatus(run *tfaplv1beta1.Run, module *tfaplv1beta1.Module, state, reason, msg string) {
+	r.setStatusFailed(run, module, state, reason, msg, false)
+}
+
 func (r *Runner) setFailedStatus(run *tfaplv1beta1.Run, module *tfaplv1beta1.Module, reason, msg string) {
+	r.setStatusFailed(run, module, string(tfaplv1beta1.StatusErrored), reason, msg, true)
+}
+
+// setStatusFailed records a failed run on the run and module statuses.
+// currentState is the module state to persist (StatusErrored for ordinary
+// failures, policy states for policy-driven ones). bumpRetry controls whether
+// the run counts towards the module's retry budget:
+func (r *Runner) setStatusFailed(run *tfaplv1beta1.Run, module *tfaplv1beta1.Module, state, reason, msg string, bumpRetry bool) {
 	run.Status = tfaplv1beta1.StatusErrored
 	run.Duration = time.Since(run.StartedAt.Time)
 	run.Summary = msg
@@ -482,12 +588,12 @@ func (r *Runner) setFailedStatus(run *tfaplv1beta1.Run, module *tfaplv1beta1.Mod
 		return
 	}
 
-	module.Status.CurrentState = string(tfaplv1beta1.StatusErrored)
+	module.Status.CurrentState = state
 	module.Status.StateReason = reason
 
 	// only count automated runs towards the retry budget, manually triggered
 	// runs are retried by the user
-	if run.Request.Type == tfaplv1beta1.ScheduledRun || run.Request.Type == tfaplv1beta1.PollingRun {
+	if bumpRetry && (run.Request.Type == tfaplv1beta1.ScheduledRun || run.Request.Type == tfaplv1beta1.PollingRun) {
 		module.Status.RetryAttempts++
 	}
 
