@@ -35,8 +35,10 @@ type Run struct {
 	CommitMsg    string        `json:"commitMsg,omitempty"`
 	DiffDetected bool          `json:"diffDetected,omitempty"`
 	InitOutput   string        `json:"initOutput,omitempty"`
-	Output       string        `json:"output,omitempty"`
-	Summary      string        `json:"summary,omitempty"`
+
+	Output       string            `json:"output,omitempty"`
+	Summary      string            `json:"summary,omitempty"`
+	PolicyResult *PolicyEvalResult `json:"policyResult,omitempty"`
 }
 
 func NewRun(module *Module, req *Request) Run {
@@ -51,12 +53,41 @@ func NewRun(module *Module, req *Request) Run {
 	}
 }
 
+// PolicyEvalResult captures the outcome of an OPA policy evaluation for a run.
+type PolicyEvalResult struct {
+	Allowed    bool              `json:"allowed"`
+	HardDenies []PolicyViolation `json:"hardDenies,omitempty"`
+	SoftDenies []PolicyViolation `json:"softDenies,omitempty"`
+	// Overridden records that a soft_deny gate was bypassed by an admin.
+	Overridden bool `json:"overridden,omitempty"`
+	// Warnings are advisory conftest warn-rule results. They never block the
+	// run or affect Allowed; they are surfaced for operator visibility only.
+	Warnings []PolicyViolation `json:"warnings,omitempty"`
+}
+
+// PolicyViolation is a single deny-set element from a policy tier, shaped
+// like conftest's failure entries: the message plus metadata passthrough.
+type PolicyViolation struct {
+	Msg      string            `json:"msg"`
+	Metadata map[string]string `json:"metadata,omitempty"` // element fields minus "msg", plus "query"
+}
+
 // Request represents terraform run request
 type Request struct {
 	RequestedAt *metav1.Time `json:"reqAt,omitempty"`
 	Type        string       `json:"type,omitempty"`
 	PR          *PullRequest `json:"pr,omitempty"`
 	LockID      string       `json:"lockID,omitempty"`
+
+	// PolicyOverride requests that the soft_deny policy gate be bypassed for this run (admin-only).
+	PolicyOverride bool `json:"policyOverride,omitempty"`
+	// OverrideReason is the admin-provided justification for a policy override.
+	OverrideReason string `json:"overrideReason,omitempty"`
+	// OverriddenBy is the identity of the admin who requested the override.
+	OverriddenBy string `json:"overriddenBy,omitempty"`
+	// OverriddenHash is the module commit this override applies to. The runner
+	// verifies it matches the commit being run before honoring the override.
+	OverriddenHash string `json:"overriddenHash,omitempty"`
 }
 
 type PullRequest struct {
