@@ -49,23 +49,33 @@ function filterModulesList(hash) {
 }
 
 // Send an XHR request to the server to force a run.
-function forceRun(namespace, module, planOnly) {
+function forceRun(namespace, module, planOnly, override) {
   // Disable the buttons and close existing alert
   setForcedButtonDisabled(true)
 
   const lockID = document.getElementById("lockIdInput").value
   url = window.location.origin + "/api/v1/forceRun"
 
+  const body = {
+    namespace: namespace,
+    module: module,
+    planOnly: planOnly,
+    lockID: lockID,
+  }
+
+  if (override === true) {
+    const overrideReason = document.getElementById("overrideReasonInput").value
+    const commitHash = document.getElementById("overrideRunButton").dataset.commitHash
+    body.override = "true"
+    body.overrideReason = overrideReason
+    body.commitHash = commitHash
+  }
+
   fetch(url, {
     method: "post",
     headers: { "Content-Type": "application/json" },
 
-    body: JSON.stringify({
-      namespace: namespace,
-      module: module,
-      planOnly: planOnly,
-      lockID: lockID,
-    }),
+    body: JSON.stringify(body),
   })
     .then(function (resp) {
       if (!resp.ok) {
@@ -211,8 +221,25 @@ function closeOpenAlert() {
   }
 }
 
+// tracks whether a force run request is in flight so the "Override & Apply"
+// button stays disabled until the request completes
+var forceRunInFlight = false
+
 function setForcedButtonDisabled(disabled) {
+  forceRunInFlight = disabled
   document.querySelectorAll(".force-button").forEach(function (btn) {
     btn.disabled = disabled
   })
+  updateOverrideButton()
+}
+
+// keep the "Override & Apply" button disabled while the override reason is
+// empty (or while a force run request is in flight)
+function updateOverrideButton() {
+  const input = document.getElementById("overrideReasonInput")
+  const btn = document.getElementById("overrideRunButton")
+  if (!input || !btn) {
+    return
+  }
+  btn.disabled = forceRunInFlight || input.value.trim() === ""
 }

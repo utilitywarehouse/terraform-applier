@@ -37,6 +37,14 @@
             background-color: rgba(var(--bs-success-rgb), 1) !important;
         }
 
+        .moduleStateList[module-state="Policy_Violation"] {
+            background-color: rgba(var(--bs-danger-rgb), 1) !important;
+        }
+
+        .moduleStateList[module-state="Override_Required"] {
+            background-color: rgba(var(--bs-warning-rgb), 1) !important;
+        }
+
         .moduleState[module-state="Running"] {
             color: rgba(var(--bs-info-rgb), 1) !important;
         }
@@ -51,6 +59,14 @@
 
         .moduleState[module-state="Ok"] {
             color: rgba(var(--bs-success-rgb), 1) !important;
+        }
+
+        .moduleState[module-state="Policy_Violation"] {
+            color: rgba(var(--bs-danger-rgb), 1) !important;
+        }
+
+        .moduleState[module-state="Override_Required"] {
+            color: rgba(var(--bs-warning-rgb), 1) !important;
         }
     </style>
 </head>

@@ -57,7 +57,6 @@
                         <strong>Force Unlock</strong>
                     </button>
                 </div>
-
                 <dl>
                     <div class="row">
                         <div class="col-6">
@@ -169,6 +168,55 @@
                                     </div>
                                 </div>
                             </dl>
+                            {{if $run.PolicyResult}}
+                            <div class="p-2 mb-1">
+                                {{if $run.PolicyResult.Allowed}}
+                                <span class="badge text-bg-success">Policy: Allowed</span>
+                                {{else if gt (len $run.PolicyResult.HardDenies) 0}}
+                                {{if gt (len $run.PolicyResult.SoftDenies) 0}}
+                                <span class="badge text-bg-danger">Policy: Violated ({{len $run.PolicyResult.HardDenies}} hard_deny, {{len $run.PolicyResult.SoftDenies}} soft_deny)</span>
+                                {{else}}
+                                <span class="badge text-bg-danger">Policy: Violated ({{len $run.PolicyResult.HardDenies}} hard_deny)</span>
+                                {{end}}
+                                {{else if $run.PolicyResult.Overridden}}
+                                <span class="badge text-bg-success">Policy: Allowed (Overridden)</span>
+                                {{else}}
+                                <span class="badge text-bg-warning">Policy: Override Required</span>
+                                {{end}}
+                                {{if gt (len $run.PolicyResult.Warnings) 0}}
+                                <small class="text-warning d-block">⚠️ {{len $run.PolicyResult.Warnings}} warning(s)</small>
+                                {{end}}
+                            </div>
+                            {{end}}
+                            {{if and $run.PolicyResult (or (len $run.PolicyResult.HardDenies) (len $run.PolicyResult.SoftDenies))}}
+                            <a href="#{{sanitizedUniqueName .Module}}-{{$i}}-policy" data-bs-toggle="collapse"
+                                class="px-2" role="button">
+                                Policy Violations
+                            </a>
+                            <div class="collapse show" id="{{sanitizedUniqueName .Module}}-{{$i}}-policy">
+                                <ul class="mb-0">
+                                    {{range $run.PolicyResult.HardDenies}}
+                                    <li>{{.Msg}}</li>
+                                    {{end}}
+                                    {{range $run.PolicyResult.SoftDenies}}
+                                    <li>{{.Msg}}</li>
+                                    {{end}}
+                                </ul>
+                            {{end}}
+                            {{if and (eq $i 0) $run.PolicyResult (eq (len $run.PolicyResult.HardDenies) 0) (gt (len $run.PolicyResult.SoftDenies) 0) (not $run.PolicyResult.Overridden)}}
+                            <small class="text-muted d-block p-2">Prefer fixing the module; override only after reviewing the plan output.</small>
+                            <div class="d-flex align-items-center gap-2 p-2">
+                                <input type="text" id="overrideReasonInput" class="form-control form-control-sm flex-grow-1"
+                                    placeholder="Reason for override (required)" oninput="updateOverrideButton()">
+                                <button type="button" id="overrideRunButton" class="btn btn-sm btn-outline-warning force-button text-nowrap flex-shrink-0"
+                                    data-namespace="{{$m.Module.Namespace}}" data-name="{{$m.Module.Name}}"
+                                    data-commit-hash="{{$run.CommitHash}}" disabled
+                                    onclick="forceRun('{{$m.Module.Namespace}}','{{ $m.Module.Name }}','false',true)">
+                                    Override &amp; Apply
+                                </button>
+                            </div>
+                            {{end}}
+                            </div>
                             <div class="mh-100 overflow-auto">
                                 <!-- init output -->
                                 <a href="#{{sanitizedUniqueName .Module}}-{{$i}}-init" data-bs-toggle="collapse"

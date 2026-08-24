@@ -153,6 +153,7 @@ type ForceRunHandler struct {
 	ClusterClt    client.Client
 	KubeClt       kubernetes.Interface
 	RunStatus     *sysutil.RunStatus
+	Redis         sysutil.RedisInterface
 	Log           *slog.Logger
 }
 
@@ -250,7 +251,53 @@ func (f *ForceRunHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// An override is offered while the module has pending soft_deny violations —
+	// either because the module status already demands one (Override_Required)
+	// or because the latest run's policy result carries un-overridden soft_deny
+	// violations (e.g. from a plan-only run). Plain Force Apply/Force Plan are
+	// always allowed: the runner's own policy gate blocks the run at run time
+	// if the policy is still violated.
+	isOverride := payload["override"] == "true"
+
+	if isOverride {
+		if payload["overrideReason"] == "" {
+			f.Log.Error("force run rejected, override reason is required", "module", namespacedName)
+			http.Error(w, "overrideReason is required when override is set", http.StatusBadRequest)
+			return
+		}
+		if payload["commitHash"] == "" {
+			f.Log.Error("force run rejected, commit hash is required for override", "module", namespacedName)
+			http.Error(w, "commitHash is required when override is set", http.StatusBadRequest)
+			return
+		}
+
+		// reject if the module no longer has pending soft_deny violations
+		lastRun, err := f.Redis.DefaultLastRun(r.Context(), module.NamespacedName())
+		if !pendingOverride(module.Status, lastRun) {
+			f.Log.Error("force run rejected as module is not pending a policy override", "module", namespacedName, "err", err)
+			http.Error(w, "module is not pending a policy override", http.StatusConflict)
+			return
+		}
+
+		// reject if the module has moved on since the evaluated commit
+		if err != nil || lastRun == nil || lastRun.CommitHash != payload["commitHash"] {
+			f.Log.Error("force run rejected as module commit has changed since the policy failure",
+				"module", namespacedName, "err", err)
+			http.Error(w, "module commit has changed since the policy failure; run a fresh plan", http.StatusConflict)
+			return
+		}
+	}
+
 	req := module.NewRunRequest(reqType, payload["lockID"])
+
+	if isOverride {
+		req.PolicyOverride = true
+		req.OverrideReason = payload["overrideReason"]
+		req.OverriddenHash = payload["commitHash"]
+		if user != nil {
+			req.OverriddenBy = user.Email
+		}
+	}
 
 	err = sysutil.EnsureRequest(r.Context(), f.ClusterClt, module.NamespacedName(), req)
 	switch {
@@ -269,6 +316,22 @@ func (f *ForceRunHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
+}
+
+// pendingOverride reports whether the module currently has pending soft_deny
+// policy violations that an admin override can address: either the module
+// status already demands one (Override_Required) or the latest run's policy
+// result carries soft_deny violations that were not hard denies and have not
+// been overridden. Hard denies are never bypassable and always yield false.
+func pendingOverride(status tfaplv1beta1.ModuleStatus, lastRun *tfaplv1beta1.Run) bool {
+	if status.CurrentState == string(tfaplv1beta1.StatusOverrideRequired) {
+		return true
+	}
+	if lastRun == nil || lastRun.PolicyResult == nil {
+		return false
+	}
+	pr := lastRun.PolicyResult
+	return len(pr.HardDenies) == 0 && len(pr.SoftDenies) > 0 && !pr.Overridden
 }
 
 func parseBody(respBody io.ReadCloser) (map[string]string, error) {
@@ -327,6 +390,7 @@ func (ws *WebServer) Start(ctx context.Context) error {
 		ws.ClusterClt,
 		ws.KubeClient,
 		ws.RunStatus,
+		ws.Redis,
 		ws.Log,
 	}
 	m.PathPrefix("/static/").Handler(http.FileServer(http.FS(staticFiles)))
