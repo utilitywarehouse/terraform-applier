@@ -9,6 +9,7 @@ import (
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
+	tfjson "github.com/hashicorp/terraform-json"
 )
 
 // MockTFExecuter is a mock of TFExecuter interface.
@@ -105,6 +106,21 @@ func (m *MockTFExecuter) plan(arg0 context.Context) (bool, string, error) {
 func (mr *MockTFExecuterMockRecorder) plan(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "plan", reflect.TypeOf((*MockTFExecuter)(nil).plan), arg0)
+}
+
+// showPlanFileJSON mocks base method.
+func (m *MockTFExecuter) showPlanFileJSON(arg0 context.Context) (*tfjson.Plan, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "showPlanFileJSON", arg0)
+	ret0, _ := ret[0].(*tfjson.Plan)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// showPlanFileJSON indicates an expected call of showPlanFileJSON.
+func (mr *MockTFExecuterMockRecorder) showPlanFileJSON(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "showPlanFileJSON", reflect.TypeOf((*MockTFExecuter)(nil).showPlanFileJSON), arg0)
 }
 
 // showPlanFileRaw mocks base method.
