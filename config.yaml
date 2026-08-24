@@ -9,3 +9,12 @@ git_mirror:
       ssh_known_hosts_path: /etc/git-secret/known_hosts
   repositories:
     - remote: git@github.com:utilitywarehouse/terraform-applier.git
+
+# Policy enforcement is optional. Set paths to Rego bundles to enable.
+#   hard_deny:
+#     - /policies/hard
+#   soft_deny:
+#     - /policies/soft
+#   data:
+#     - /policies/data
+policies: {}
