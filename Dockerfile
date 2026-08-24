@@ -11,6 +11,15 @@ RUN os=$(go env GOOS) && arch=$(go env GOARCH) \
            > /usr/local/bin/strongbox \
       && chmod +x /usr/local/bin/strongbox
 
+# The policy engine shells out to conftest binary
+ARG CONFTEST_VERSION=0.69.0
+RUN os=$(go env GOOS) && arch=$(go env GOARCH) && case "$arch" in \
+        amd64) arch=x86_64 ;; \
+      esac \
+      && curl -Ls https://github.com/open-policy-agent/conftest/releases/download/v${CONFTEST_VERSION}/conftest_${CONFTEST_VERSION}_Linux_${arch}.tar.gz \
+           | tar xz -C /usr/local/bin conftest \
+      && chmod +x /usr/local/bin/conftest
+
 WORKDIR /workspace
 # Copy the Go Modules manifests
 COPY go.mod go.mod
@@ -44,6 +53,7 @@ RUN adduser -S -H -u $USER_ID tf-applier \
       && apk --no-cache add ca-certificates git openssh-client
 
 COPY --from=builder /usr/local/bin/strongbox /usr/local/bin/
+COPY --from=builder /usr/local/bin/conftest /usr/local/bin/
 
 WORKDIR /
 COPY --from=builder /workspace/tf-applier .

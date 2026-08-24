@@ -4,11 +4,13 @@ import (
 	"os"
 
 	"github.com/utilitywarehouse/git-mirror/repopool"
+	"github.com/utilitywarehouse/terraform-applier/policy"
 	"gopkg.in/yaml.v2"
 )
 
 type Config struct {
 	GitMirror repopool.Config `yaml:"git_mirror"`
+	Policies  policy.Config   `yaml:"policies"`
 }
 
 func parseConfigFile(path string) (*Config, error) {
