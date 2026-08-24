@@ -23,7 +23,7 @@ spec:
   repoRef: master
   path: dev/hello
   schedule: "00 */1 * * *"
-  planOnly: false 
+  planOnly: false
   autoApply: false
   pollInterval: 60
   runTimeout: 900
@@ -76,20 +76,20 @@ for more details.
 
 The controller determines the execution intent based on the following priority:
 
-**Global Lock (`planOnly`: true):** The module is strictly "Read-Only." 
+**Global Lock (`planOnly`: true):** The module is strictly "Read-Only."
 No applies are allowed, even if manually requested.
 
-**Manual Intent:** If a user triggers a Forced Apply from the UI/API, 
+**Manual Intent:** If a user triggers a Forced Apply from the UI/API,
 the controller will attempt an apply (provided the Global Lock is off).
 
-**Automation Policy (autoApply):** For automated runs (Schedule/Git Polling), 
+**Automation Policy (autoApply):** For automated runs (Schedule/Git Polling),
 the controller will only apply if `autoApply` is set to true.
 
-| Trigger Type | planOnly: true<br>autoApply:any | planOnly: false<br>autoApply: true | planOnly: false<br>autoApply: false | 
-|--|--|--|--|
-| Scheduled / Polling | Plan Only | Apply | Plan Only  | 
-| Forced Apply (UI) | Plan Only (Rejected) | Apply | Apply | 
-| Pull Request | Plan Only | Plan Only | Plan Only | 
+| Trigger Type        | planOnly: true<br>autoApply:any | planOnly: false<br>autoApply: true | planOnly: false<br>autoApply: false |
+| ------------------- | ------------------------------- | ---------------------------------- | ----------------------------------- |
+| Scheduled / Polling | Plan Only                       | Apply                              | Plan Only                           |
+| Forced Apply (UI)   | Plan Only (Rejected)            | Apply                              | Apply                               |
+| Pull Request        | Plan Only                       | Plan Only                          | Plan Only                           |
 
 ### Delegate ServiceAccount
 
@@ -129,7 +129,7 @@ Since key is set on controller it can be used by ALL modules managed by the cont
 
 ### Strongbox decryption
 
-Terraform applier supports strongbox decryption, its triggered if 
+Terraform applier supports strongbox decryption, its triggered if
 `TF_APPLIER_STRONGBOX_KEYRING` or `TF_APPLIER_STRONGBOX_IDENTITY` EVN is set on module.
 content of this ENV should be valid strongbox keyring file data which should include strongbox key used to encrypt secrets in the module.
 TF Applier will also configure Git and Strongbox Home before running `init` to decrypt any encrypted file from remote terraform module as well.
@@ -203,7 +203,7 @@ PR Planner feature is enabled by default, but can be disabled either for a speci
 
 - `--repos-root-path (REPOS_ROOT_PATH)` - (default: `/src`) Absolute path to the directory containing all repositories of the modules.
   This dir will be cleared on start.
-- `--config (TF_APPLIER_CONFIG)` - (default: `/config/config.yaml`) Path to the tf applier config file containing repository config.
+- `--config (TF_APPLIER_CONFIG)` - (default: `/config/config.yaml`) Path to the tf applier config file containing repository config. The `policies` key in this file enables OPA policy enforcement (see [Policy enforcement](#policy-enforcement)).
 - `--min-interval-between-runs (MIN_INTERVAL_BETWEEN_RUNS)` - (default: `60`) The minimum interval in seconds, user can set between 2 consecutive runs. This value defines the frequency of runs.
 - `--termination-grace-period (TERMINATION_GRACE_PERIOD)` - (default: `60`) Termination grace period is the ime given to
   the running job to finish current run after 1st TERM signal is received. After this timeout runner will be forced to shutdown.
@@ -274,6 +274,54 @@ PR Planner feature is enabled by default, but can be disabled either for a speci
 
 **If `OIDC Issuer` is not set then web server will skip authentication and all `force run` requests will be allowed.**
 
+## Policy enforcement
+
+Terraform-applier evaluates each plan against OPA policies by shelling out to
+the [conftest](https://github.com/open-policy-agent/conftest) CLI binary for
+behavioral parity with local `conftest test` runs.
+
+Policies are split into two independent tiers:
+
+- **hard_deny** - unconditional. Any violation blocks the run and is never bypassable.
+- **soft_deny** - conditional. A violation blocks apply until an admin overrides.
+
+### Policy configuration
+
+Policies are configured globally on the controller via the `policies` key of
+the config file:
+
+```yaml
+policies:
+  namespace: main # optional, defaults to main (conftest --namespace)
+  hard_deny:
+    - /path/to/policies/hard
+  soft_deny:
+    - /path/to/policies/soft
+  data: # optional conftest --data dirs
+    - /path/to/data
+```
+
+### Policy conventions
+
+Policies are conftest-compatible Rego, so the same bundle works locally:
+
+- `package main` (configurable via `namespace`), `import rego.v1`, and a `deny`
+  rule that is a set of objects `{"rule": "...", "msg": "..."}`. String-valued
+  extra fields pass through to the violation's `metadata` verbatim (conftest
+  adds `query`).
+- `warn` rules are advisory: surfaced as warnings, never blocking.
+
+### Behavior
+
+- hard_deny violation -> module state `Policy_Violation` / reason
+  `HardDenyViolation`; the run fails and can never be bypassed.
+- soft_deny violation -> module state `Override_Required` / reason
+  `SoftDenyViolation`; apply is blocked until an admin override. Plan-only runs
+  report them as advisory.
+- An override is only honored when pinned to the commit being run
+  (`Request.OverriddenHash` matches the running commit); stale or CRD-injected
+  overrides are ignored. The actor and reason are recorded on the run's request.
+
 ## Kube backend
 
 For modules using kubernetes backend or provider, ideally module should be using its own SA's token (terraform-applier-delegate-token) for authentication with kube cluster and not depend on default in cluster config of controller's SA but kube provider ignores `host` and `token` backend attributes if kube config is not set. [related issue](https://github.com/hashicorp/terraform/issues/31275)
@@ -301,7 +349,7 @@ spec:
 ## Vault integration
 
 terraform-applier supports fetching (generating) secrets for AWS & GCP Secrets from the vault.
-Only kubernetes auth method is supported using module's delegated service account's jwt (secret:terraform-applier-delegate-token) for vault login. 
+Only kubernetes auth method is supported using module's delegated service account's jwt (secret:terraform-applier-delegate-token) for vault login.
 For AWS creds given `vaultRole` will be used as `authRole` and in GCP it will be name of the `roleset` or `account`.
 For GCP only [OAuth2 access token](https://developer.hashicorp.com/vault/docs/secrets/gcp#access-tokens) is supported.
 [access-token are better then keys for frequent repetitive tasks.](https://developer.hashicorp.com/vault/docs/secrets/gcp#access-tokens-vs-service-account-keys)
@@ -315,43 +363,44 @@ spec:
     aws:
       # VaultRole Specifies the name of the vault role to generate credentials against.
       vaultRole: dev_aws_some-vault-role
-      
+
       # Must be one of iam_user, assumed_role, or federation_token.
       credentialType: assumed_role
-      
+
       # The ARN of the role to assume if credential_type on the Vault role is assumed_role.
       # Optional if the Vault role only allows a single AWS role ARN.
       roleARN: arn:aws:iam::00000000:role/sys-tf-applier-example
-    
+
     # If gcp specified, controller will request OAuth2 access token and
     # sets GOOGLE_OAUTH_ACCESS_TOKEN envs during terraform runs
     # one of roleset, staticAccount or impersonatedAccount must be set
      gcp:
-       # roleset Specifies the name of an roleset with secret type access_token 
+       # roleset Specifies the name of an roleset with secret type access_token
        # to generate access_token under.
        roleset: gcp_proj_roleset
-      
-       # staticAccount Specifies the name name of the static account with secret 
+
+       # staticAccount Specifies the name name of the static account with secret
        # type access_token to generate access_token under.
        staticAccount: gcp_proj_static-account
-      
-       # impersonatedAccount Specifies the name of the impersonated account to 
+
+       # impersonatedAccount Specifies the name of the impersonated account to
        # generate access_token under.
        impersonatedAccount: gcp_proj_impersonate-account
 
 ```
 
 ### Vault CA Reload
+
 terraform-applier support hot reload of vault CA cert for secure communication.
 CA is updated before making vault API Calls. Following envs are supported.
 
-* `VAULT_CACERT`: value should be path to a PEM-encoded certificate file or bundle.
+- `VAULT_CACERT`: value should be path to a PEM-encoded certificate file or bundle.
   Takes precedence over CACertificate and CAPath.
 
-* `VAULT_CAPATH`: value should be path to a directory populated with PEM-encoded certificates.
+- `VAULT_CAPATH`: value should be path to a directory populated with PEM-encoded certificates.
 
-* `VAULT_CAURL`: value should be URL which returns a PEM-encoded certificate or bundle as body.
-   Takes precedence over CAPath.
+- `VAULT_CAURL`: value should be URL which returns a PEM-encoded certificate or bundle as body.
+  Takes precedence over CAPath.
 
 ## Monitoring
 
@@ -368,11 +417,10 @@ In addition to the [controller-runtime](https://book.kubebuilder.io/reference/me
   each module, tagged with the result of the run (`success=true|false`)
 - `terraform_applier_module_last_run_success` - (tags: `module`,`namespace`, `run_type`) A `Gauge` which
   tracks whether the last terraform run for a module was successful.
-- `terraform_applier_module_last_run_timestamp` - (tags: `module`,`namespace`,`run_type`) A Gauge that captures the Timestamp of the last successful module run.
+- `terraform_applier_module_last_run_timestamp` - (tags: `module`,`namespace`,`run_type`) A Gauge that captures the Timestamp of the last module run.
 - `terraform_applier_git_last_mirror_timestamp` - (tags: `repo`) A Gauge that captures the Timestamp of the last successful git sync per repo.
 - `terraform_applier_git_mirror_count` - (tags: `repo`,`success`) A Counter for each repo sync, incremented with each sync attempt and tagged with the result (`success=true|false`)
 - `terraform_applier_git_mirror_latency_seconds` - (tags: `repo`) A Summary that keeps track of the git sync latency per repo.
-
 
 ## Github Actions
 
@@ -384,8 +432,8 @@ The [ci-rbac](manifests/base/ci-rbac) base can be imported in namespace to provi
 to trigger runs on any modules in the namespace.
 base will create `terraform-applier-ci` service account and corresponding secret.
 
-
 Import `ci-rbac` base to create required sa and secret
+
 ```yaml
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
@@ -394,8 +442,9 @@ resources:
   - github.com/utilitywarehouse/terraform-applier//manifests/base/ci-rbac?ref=master
 ```
 
-To get the bearer token you can find the Secret in k8s. 
+To get the bearer token you can find the Secret in k8s.
 this token should be added to `Repository secrets` of the repo.
+
 ```sh
 kubectl --context <environment> -n <namespace> get secrets terraform-applier-ci-token -o json | jq -r '.data.token' | base64 -d
 ```
@@ -404,6 +453,7 @@ kubectl --context <environment> -n <namespace> get secrets terraform-applier-ci-
 
 Following workflow will trigger apply run on `hello` module from `default` namespace
 on push to `master` branch.
+
 ```yaml
 name: trigger-terraform-run
 
@@ -422,11 +472,11 @@ jobs:
         env:
           # The address and port of the Kubernetes API server (required)
           TFA_K8S_API_SERVER: https://k8s-api-server-url
-          
+
           # Bearer token for authentication to the API server (required)
           # if ci base is used then this is the token from 'terraform-applier-ci-token' secret
           TFA_K8S_TOKEN: ${{ secrets.K8S_TOKEN }}
-          
+
           # The namespace of the module (required)
           TFA_NAMESPACE: default
 
