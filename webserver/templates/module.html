@@ -196,10 +196,26 @@
                             <div class="collapse show" id="{{sanitizedUniqueName .Module}}-{{$i}}-policy">
                                 <ul class="mb-0">
                                     {{range $run.PolicyResult.HardDenies}}
-                                    <li>{{.Msg}}</li>
+                                    <li>{{.Msg}}
+                                        {{if .Metadata}}
+                                        <ul class="list-unstyled mb-0 ms-3">
+                                            {{range $k, $v := .Metadata}}
+                                            <li><code>{{$k}}</code>: {{$v}}</li>
+                                            {{end}}
+                                        </ul>
+                                        {{end}}
+                                    </li>
                                     {{end}}
                                     {{range $run.PolicyResult.SoftDenies}}
-                                    <li>{{.Msg}}</li>
+                                    <li>{{.Msg}}
+                                        {{if .Metadata}}
+                                        <ul class="list-unstyled mb-0 ms-3">
+                                            {{range $k, $v := .Metadata}}
+                                            <li><code>{{$k}}</code>: {{$v}}</li>
+                                            {{end}}
+                                        </ul>
+                                        {{end}}
+                                    </li>
                                     {{end}}
                                 </ul>
                             {{end}}
