@@ -35,4 +35,9 @@ jobs:
             chmod +x .bin/strongbox
             export PATH="$PWD/.bin:$PATH"
 
+            conftest=$(sed -n 's/^ENV CONFTEST_VERSION=//p' Dockerfile)
+            curl -Ls https://github.com/open-policy-agent/conftest/releases/download/v${conftest}/conftest_${conftest}_Linux_x86_64.tar.gz \
+                | tar xz -C /usr/local/bin conftest \
+            chmod +x /usr/local/bin/conftest
+
             go test -race -v ./...
