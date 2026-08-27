@@ -314,6 +314,47 @@ func Test_runOutputMsg(t *testing.T) {
 					CommitID: "hash2",
 				}),
 		},
+		{
+			"4",
+			args{cluster: "default", module: types.NamespacedName{Name: "one", Namespace: "baz"}, path: "path/baz/one", run: &v1beta1.Run{
+				Status:     v1beta1.StatusOk,
+				CommitHash: "hash2",
+				Summary:    "Plan: x to add, x to change, x to destroy.",
+				Output:     "some plan output",
+				PolicyResult: &v1beta1.PolicyEvalResult{
+					HardDenies: []v1beta1.PolicyViolation{
+						{Msg: "blocked", Metadata: map[string]string{"rule": "deny_all", "resource": "s3_bucket"}},
+					},
+					SoftDenies: []v1beta1.PolicyViolation{
+						{Msg: "soft violation", Metadata: map[string]string{"rule": "warn_s3"}},
+					},
+					Warnings: []v1beta1.PolicyViolation{
+						{Msg: "advisory", Metadata: map[string]string{"rule": "info_owner"}},
+					},
+				},
+			}},
+			"### Terraform Plan Output for `one`\n" +
+				"🏷️ **Commit:** hash2 | 🔗 [View in default terraform-applier web UI](https://dashboard-url/#baz_one)\n\n" +
+				"> To manually trigger plan again please post `@terraform-applier plan path/baz/one` as comment.\n" +
+				"<details><summary><b>✅ Run Status: Ok, Run Summary: Plan: x to add, x to change, x to destroy.</b></summary>\n\n" +
+				"```terraform\nsome plan output\n```\n" +
+				"</details>\n" +
+				"<details>\n<summary><b>❌ Policy: Violated (hard_deny: 1, soft_deny: 1)</b></summary>\n\n" +
+				"**Hard denies**\n\n" +
+				"- blocked\n  - `resource`: s3_bucket\n  - `rule`: deny_all\n\n" +
+				"**Soft denies**\n\n" +
+				"- soft violation\n  - `rule`: warn_s3\n\n" +
+				"**Warnings**\n\n" +
+				"- advisory\n  - `rule`: info_owner\n" +
+				"\n</details>\n" +
+				embedMetadata(CommentMetadata{
+					Type:     MsgTypeRunOutput,
+					Cluster:  "default",
+					Module:   "baz/one",
+					Path:     "path/baz/one",
+					CommitID: "hash2",
+				}),
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
