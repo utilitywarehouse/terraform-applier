@@ -218,6 +218,7 @@
                                     </li>
                                     {{end}}
                                 </ul>
+                            </div>
                             {{end}}
                             {{if and (eq $i 0) $run.PolicyResult (eq (len $run.PolicyResult.HardDenies) 0) (gt (len $run.PolicyResult.SoftDenies) 0) (not $run.PolicyResult.Overridden)}}
                             <small class="text-muted d-block p-2">Prefer fixing the module; override only after reviewing the plan output.</small>
@@ -232,7 +233,6 @@
                                 </button>
                             </div>
                             {{end}}
-                            </div>
                             <div class="mh-100 overflow-auto">
                                 <!-- init output -->
                                 <a href="#{{sanitizedUniqueName .Module}}-{{$i}}-init" data-bs-toggle="collapse"
