@@ -318,13 +318,13 @@ Plan: 7 to add, 0 to change, 0 to destroy.`,
 						PolicyResult: &tfaplv1beta1.PolicyEvalResult{
 							Allowed: false,
 							HardDenies: []tfaplv1beta1.PolicyViolation{
-								{Msg: "blocked", Metadata: map[string]string{"rule": "deny_all", "resource": "s3_bucket"}},
+								{Msg: "blocked", Metadata: map[string]any{"rule": "deny_all", "resource": "s3_bucket"}},
 							},
 							SoftDenies: []tfaplv1beta1.PolicyViolation{
-								{Msg: "soft violation", Metadata: map[string]string{"rule": "warn_s3"}},
+								{Msg: "soft violation", Metadata: map[string]any{"rule": "warn_s3"}},
 							},
 							Warnings: []tfaplv1beta1.PolicyViolation{
-								{Msg: "advisory", Metadata: map[string]string{"rule": "info_owner"}},
+								{Msg: "advisory", Metadata: map[string]any{"rule": "info_owner"}},
 							},
 						},
 					},
