@@ -227,7 +227,7 @@ func writeSection(body *strings.Builder, title string, vs []v1beta1.PolicyViolat
 		fmt.Fprintf(body, "- %s\n", v.Msg)
 		// add metadata
 		for _, k := range slices.Sorted(maps.Keys(v.Metadata)) {
-			fmt.Fprintf(body, "  - `%s`: %s\n", k, v.Metadata[k])
+			fmt.Fprintf(body, "  - `%s`: %v\n", k, v.Metadata[k])
 		}
 	}
 }

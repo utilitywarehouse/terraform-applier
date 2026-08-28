@@ -81,7 +81,7 @@ func evalInput(t *testing.T, e *Engine, input interface{}) *v1beta1.PolicyEvalRe
 // violation builds the expected PolicyViolation for a deny element carrying
 // the given extra metadata keys. conftest populates "query" and "rule" itself,
 // so the expected metadata is the element's string-valued passthrough fields.
-func violation(msg string, extra map[string]string) v1beta1.PolicyViolation {
+func violation(msg string, extra map[string]any) v1beta1.PolicyViolation {
 	return v1beta1.PolicyViolation{Msg: msg, Metadata: extra}
 }
 
@@ -102,7 +102,7 @@ func TestEval(t *testing.T) {
 			},
 			input:   map[string]interface{}{"format_version": "bad"},
 			allowed: false,
-			hard:    []v1beta1.PolicyViolation{violation("hard denied", map[string]string{"query": "data.main.deny", "rule": "hard_test"})},
+			hard:    []v1beta1.PolicyViolation{violation("hard denied", map[string]any{"query": "data.main.deny", "rule": "hard_test"})},
 			soft:    nil,
 		},
 		{
@@ -113,7 +113,7 @@ func TestEval(t *testing.T) {
 			input:   map[string]interface{}{"format_version": "warn"},
 			allowed: false,
 			hard:    nil,
-			soft:    []v1beta1.PolicyViolation{violation("soft denied", map[string]string{"query": "data.main.deny", "rule": "soft_test"})},
+			soft:    []v1beta1.PolicyViolation{violation("soft denied", map[string]any{"query": "data.main.deny", "rule": "soft_test"})},
 		},
 		{
 			name:    "empty config disables both tiers",
@@ -137,7 +137,7 @@ func TestEval(t *testing.T) {
 			},
 			input:   map[string]interface{}{"format_version": "bad"},
 			allowed: false,
-			hard:    []v1beta1.PolicyViolation{violation("hard denied", map[string]string{"query": "data.main.deny", "rule": "hard_test"})},
+			hard:    []v1beta1.PolicyViolation{violation("hard denied", map[string]any{"query": "data.main.deny", "rule": "hard_test"})},
 			soft:    nil, // input "bad" does not fire the soft rule
 		},
 		{
@@ -162,8 +162,8 @@ deny contains {"rule": "s", "msg": "soft"} if {
 			},
 			input:   map[string]interface{}{"format_version": "boom"},
 			allowed: false,
-			hard:    []v1beta1.PolicyViolation{violation("hard", map[string]string{"query": "data.main.deny", "rule": "h"})},
-			soft:    []v1beta1.PolicyViolation{violation("soft", map[string]string{"query": "data.main.deny", "rule": "s"})},
+			hard:    []v1beta1.PolicyViolation{violation("hard", map[string]any{"query": "data.main.deny", "rule": "h"})},
+			soft:    []v1beta1.PolicyViolation{violation("soft", map[string]any{"query": "data.main.deny", "rule": "s"})},
 		},
 		{
 			name: "malformed deny entry is handled by conftest",
@@ -196,9 +196,9 @@ deny contains 42 if {
 			input:   map[string]interface{}{"format_version": "mix"},
 			allowed: false,
 			hard: []v1beta1.PolicyViolation{
-				violation("fine", map[string]string{"query": "data.main.deny", "rule": "ok"}),
-				violation("severe", map[string]string{"query": "data.main.deny", "severity": "high"}),
-				v1beta1.PolicyViolation{Msg: "bare message", Metadata: map[string]string{"query": "data.main.deny"}},
+				violation("fine", map[string]any{"query": "data.main.deny", "rule": "ok"}),
+				violation("severe", map[string]any{"query": "data.main.deny", "severity": "high"}),
+				v1beta1.PolicyViolation{Msg: "bare message", Metadata: map[string]any{"query": "data.main.deny"}},
 			},
 		},
 	}
@@ -547,6 +547,41 @@ deny contains {"rule": "r", "msg": "denied", "severity": "high", "owner": "alice
 	md := res.HardDenies[0].Metadata
 	if md["rule"] != "r" || md["query"] != "data.main.deny" || md["severity"] != "high" || md["owner"] != "alice" {
 		t.Fatalf("metadata passthrough mismatch, got %+v", md)
+	}
+}
+
+// TestNonStringMetadata proves non-string metadata values (numbers, booleans)
+// survive the conftest JSON round trip. Metadata is map[string]any, so a deny
+// element carrying such values must not fail unmarshal.
+func TestNonStringMetadata(t *testing.T) {
+	requireConftest(t)
+	dir := writeDir(t, map[string]string{"ns.rego": `package main
+
+import rego.v1
+
+deny contains {"rule": "r", "msg": "denied", "attempts": 3, "blocking": true, "tags": ["prod", "eu"]} if {
+	input.format_version == "bad"
+}
+`})
+
+	e, err := New(Config{HardDeny: []string{dir}})
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+
+	res := evalInput(t, e, map[string]interface{}{"format_version": "bad"})
+	if len(res.HardDenies) != 1 {
+		t.Fatalf("expected one violation, got %+v", res)
+	}
+	md := res.HardDenies[0].Metadata
+	if md["rule"] != "r" || md["query"] != "data.main.deny" {
+		t.Fatalf("metadata mismatch, got %+v", md)
+	}
+	if md["attempts"] != float64(3) || md["blocking"] != true {
+		t.Fatalf("non-string metadata mismatch, got %+v", md)
+	}
+	if tags, ok := md["tags"].([]interface{}); !ok || len(tags) != 2 || tags[0] != "prod" || tags[1] != "eu" {
+		t.Fatalf("nested metadata mismatch, got %+v", md["tags"])
 	}
 }
 
