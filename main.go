@@ -26,6 +26,7 @@ import (
 	"github.com/utilitywarehouse/git-mirror/repopool"
 	"github.com/utilitywarehouse/git-mirror/repository"
 	"github.com/utilitywarehouse/terraform-applier/metrics"
+	"github.com/utilitywarehouse/terraform-applier/policy"
 	"github.com/utilitywarehouse/terraform-applier/prplanner"
 	"github.com/utilitywarehouse/terraform-applier/runner"
 	"github.com/utilitywarehouse/terraform-applier/sysutil"
@@ -750,6 +751,17 @@ func run(c *cli.Context) {
 		ClusterClt:   mgr.GetClient(),
 		Recorder:     mgr.GetEventRecorderFor("terraform-applier"),
 		DataRootPath: dataRootPath,
+	}
+
+	// Construct the OPA policy engine when policies are configured.
+	if len(conf.Policies.SoftDeny) > 0 || len(conf.Policies.HardDeny) > 0 {
+		policyEngine, err := policy.New(conf.Policies)
+		if err != nil {
+			logger.Error("unable to init policy engine", "err", err)
+			os.Exit(1)
+		}
+		runner.PolicyEngine = policyEngine
+		logger.Info("policy engine enabled", "softDenyPaths", len(conf.Policies.SoftDeny), "hardDenyPaths", len(conf.Policies.HardDeny))
 	}
 
 	if err := runner.Init(!c.Bool("disable-plugin-cache"), c.Int("max-concurrent-runs")); err != nil {

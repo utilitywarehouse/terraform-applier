@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 
 	"github.com/hashicorp/terraform-exec/tfexec"
+	tfjson "github.com/hashicorp/terraform-json"
 	tfaplv1beta1 "github.com/utilitywarehouse/terraform-applier/api/v1beta1"
 	"github.com/utilitywarehouse/terraform-applier/sysutil"
 )
@@ -24,6 +25,7 @@ type TFExecuter interface {
 	init(ctx context.Context, backendConf map[string]string) (string, error)
 	plan(ctx context.Context) (bool, string, error)
 	showPlanFileRaw(ctx context.Context) (string, error)
+	showPlanFileJSON(ctx context.Context) (*tfjson.Plan, error)
 	apply(ctx context.Context) (string, error)
 	forceUnlock(ctx context.Context, lockID string) (string, error)
 	cleanUp()
@@ -217,6 +219,13 @@ func (te *tfRunner) plan(ctx context.Context) (bool, string, error) {
 func (te *tfRunner) showPlanFileRaw(ctx context.Context) (string, error) {
 	planOut := filepath.Join(te.workingDir, te.planFileName)
 	return te.tf.ShowPlanFileRaw(ctx, planOut)
+}
+
+// showPlanFileJSON reads a given plan file and returns the parsed, structured
+// JSON plan used as input for OPA policy evaluation.
+func (te *tfRunner) showPlanFileJSON(ctx context.Context) (*tfjson.Plan, error) {
+	planOut := filepath.Join(te.workingDir, te.planFileName)
+	return te.tf.ShowPlanFile(ctx, planOut)
 }
 
 func (te *tfRunner) apply(ctx context.Context) (string, error) {

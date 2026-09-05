@@ -45,11 +45,16 @@ const (
 	ReasonPlanFailed           = "PlanFailed"
 	ReasonApplyFailed          = "ApplyFailed"
 	ReasonInvalidRequest       = "InvalidRequest"
+	ReasonPolicyEvalFailed     = "PolicyEvalFailed"
 
 	ReasonInitialised           = "Initialised"
 	ReasonPlanOnlyDriftDetected = "PlanOnlyDriftDetected"
 	ReasonNoDriftDetected       = "NoDriftDetected"
 	ReasonApplied               = "Applied"
+
+	ReasonHardDenyViolation = "HardDenyViolation"
+	ReasonSoftDenyViolation = "SoftDenyViolation"
+	ReasonPolicyOverridden  = "PolicyOverridden"
 )
 
 const (
@@ -82,6 +87,10 @@ const (
 	StatusDriftDetected state = "Drift_Detected"
 	// 'Errored' -> last run finished with Error
 	StatusErrored state = "Errored"
+	// 'Override_Required' -> soft_deny policy failed; apply requires an admin override
+	StatusOverrideRequired state = "Override_Required"
+	// 'Policy_Violation' -> hard_deny policy failed; cannot be bypassed
+	StatusPolicyViolation state = "Policy_Violation"
 )
 
 // ModuleSpec defines the desired state of Module
