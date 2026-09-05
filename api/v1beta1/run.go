@@ -22,6 +22,9 @@ const (
 )
 
 // Run represents a complete run result of the terraform run
+//
+// Run is not a CRD type:
+// +kubebuilder:object:generate=false
 type Run struct {
 	Module  types.NamespacedName `json:"module,omitempty"`
 	Request *Request             `json:"request,omitempty"`
@@ -54,6 +57,7 @@ func NewRun(module *Module, req *Request) Run {
 }
 
 // PolicyEvalResult captures the outcome of an OPA policy evaluation for a run.
+// +kubebuilder:object:generate=false
 type PolicyEvalResult struct {
 	Allowed    bool              `json:"allowed"`
 	HardDenies []PolicyViolation `json:"hardDenies,omitempty"`
@@ -67,12 +71,17 @@ type PolicyEvalResult struct {
 
 // PolicyViolation is a single deny-set element from a policy tier, shaped
 // like conftest's failure entries: the message plus metadata passthrough.
+// Metadata values are kept as arbitrary JSON because conftest passes through
+// every non-"msg" field of a deny-set element verbatim
+//
+// +kubebuilder:object:generate=false
 type PolicyViolation struct {
-	Msg      string            `json:"msg"`
-	Metadata map[string]string `json:"metadata,omitempty"` // element fields minus "msg", plus "query"
+	Msg      string         `json:"msg"`
+	Metadata map[string]any `json:"metadata,omitempty"` // element fields minus "msg", plus "query"
 }
 
 // Request represents terraform run request
+// +kubebuilder:object:generate=false
 type Request struct {
 	RequestedAt *metav1.Time `json:"reqAt,omitempty"`
 	Type        string       `json:"type,omitempty"`
@@ -90,6 +99,7 @@ type Request struct {
 	OverriddenHash string `json:"overriddenHash,omitempty"`
 }
 
+// +kubebuilder:object:generate=false
 type PullRequest struct {
 	Number     int    `json:"num,omitempty"`
 	HeadBranch string `json:"headBranch,omitempty"`

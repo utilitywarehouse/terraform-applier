@@ -4,7 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"maps"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -152,6 +154,8 @@ func runOutputMsg(cluster string, module types.NamespacedName, path string, run 
 		runOutput = run.InitOutput + "\n" + run.Output
 	}
 
+	policySection := policyResultMsg(run.PolicyResult)
+
 	msgTml := runOutputMsgTml
 	if strings.Contains(run.Summary, "Apply complete!") {
 		msgTml = strings.Replace(msgTml, "Terraform Plan Output", "Terraform Apply Output", 1)
@@ -167,6 +171,7 @@ func runOutputMsg(cluster string, module types.NamespacedName, path string, run 
 	moduleURL := webserverURL + "/#" + module.Namespace + "_" + module.Name
 
 	display := fmt.Sprintf(msgTml, module.Name, run.CommitHash, cluster, moduleURL, path, statusSymbol, run.Status, run.Summary, runOutput)
+	display += policySection
 
 	meta := CommentMetadata{
 		Type:     MsgTypeRunOutput,
@@ -177,6 +182,54 @@ func runOutputMsg(cluster string, module types.NamespacedName, path string, run 
 	}
 
 	return display + embedMetadata(meta)
+}
+
+// policyResultMsg renders the OPA policy evaluation section of the PR comment.
+func policyResultMsg(res *v1beta1.PolicyEvalResult) string {
+	if res == nil {
+		return ""
+	}
+
+	var summary string
+	switch {
+	case len(res.HardDenies) > 0 && len(res.SoftDenies) > 0:
+		summary = fmt.Sprintf("❌ Policy: Violated (hard_deny: %d, soft_deny: %d)", len(res.HardDenies), len(res.SoftDenies))
+	case len(res.HardDenies) > 0:
+		summary = fmt.Sprintf("❌ Policy: Violated (hard_deny: %d)", len(res.HardDenies))
+	case len(res.SoftDenies) > 0:
+		summary = fmt.Sprintf("⚠️ Policy: Violated (soft_deny: %d)", len(res.SoftDenies))
+	case len(res.Warnings) > 0:
+		summary = fmt.Sprintf("✅ Policy: Allowed (warnings: %d)", len(res.Warnings))
+	default:
+		summary = "✅ Policy: Allowed"
+	}
+
+	var body strings.Builder
+	writeSection(&body, "Hard denies", res.HardDenies)
+	writeSection(&body, "Soft denies", res.SoftDenies)
+	writeSection(&body, "Warnings", res.Warnings)
+
+	return fmt.Sprintf("<details>\n<summary><b>%s</b></summary>\n\n%s\n</details>\n", summary, body.String())
+}
+
+// writeSection appends a titled group of policy violations to body, skipping
+// empty groups entirely so no empty/duplicate sections are rendered.
+func writeSection(body *strings.Builder, title string, vs []v1beta1.PolicyViolation) {
+	if len(vs) == 0 {
+		return
+	}
+
+	if body.Len() > 0 {
+		body.WriteByte('\n')
+	}
+	fmt.Fprintf(body, "**%s**\n\n", title)
+	for _, v := range vs {
+		fmt.Fprintf(body, "- %s\n", v.Msg)
+		// add metadata
+		for _, k := range slices.Sorted(maps.Keys(v.Metadata)) {
+			fmt.Fprintf(body, "  - `%s`: %v\n", k, v.Metadata[k])
+		}
+	}
 }
 
 func parseNamespaceName(str string) types.NamespacedName {
