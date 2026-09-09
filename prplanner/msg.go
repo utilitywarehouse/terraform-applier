@@ -3,6 +3,7 @@ package prplanner
 import (
 	"encoding/json"
 	"fmt"
+	"html"
 	"log/slog"
 	"maps"
 	"regexp"
@@ -226,10 +227,10 @@ func writeSection(body *strings.Builder, title string, vs []v1beta1.PolicyViolat
 	}
 	fmt.Fprintf(body, "**%s**\n\n", title)
 	for _, v := range vs {
-		fmt.Fprintf(body, "- %s\n", v.Msg)
+		fmt.Fprintf(body, "- %s\n", html.EscapeString(v.Msg))
 		// add metadata
 		for _, k := range slices.Sorted(maps.Keys(v.Metadata)) {
-			fmt.Fprintf(body, "  - `%s`: %v\n", k, v.Metadata[k])
+			fmt.Fprintf(body, "  - `%s`: %s\n", k, html.EscapeString(fmt.Sprintf("%v", v.Metadata[k])))
 		}
 	}
 }
