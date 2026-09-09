@@ -192,6 +192,8 @@ func policyResultMsg(res *v1beta1.PolicyEvalResult) string {
 
 	var summary string
 	switch {
+	case res.Overridden:
+		summary = "✅ Policy: Allowed (Overridden)"
 	case len(res.HardDenies) > 0 && len(res.SoftDenies) > 0:
 		summary = fmt.Sprintf("❌ Policy: Violated (hard_deny: %d, soft_deny: %d)", len(res.HardDenies), len(res.SoftDenies))
 	case len(res.HardDenies) > 0:
