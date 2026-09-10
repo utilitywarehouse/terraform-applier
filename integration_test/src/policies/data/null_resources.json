@@ -1,0 +1,14 @@
+{
+  "allowed_null_resources": [
+    "echo_hw",
+    "echo_v1",
+    "echo_v2",
+    "echo_v3",
+    "echo_env1",
+    "echo_env2",
+    "echo_env3",
+    "echo_AWS_KEY",
+    "verify_gcp_token",
+    "slow_provider"
+  ]
+}
