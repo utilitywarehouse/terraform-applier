@@ -140,7 +140,9 @@ func (r *Runner) NewTFRunner(
 		runEnv["TF_PLUGIN_CACHE_MAY_BREAK_DEPENDENCY_LOCK_FILE"] = "1"
 	}
 
-	tfr.tf.SetEnv(runEnv)
+	if err := tfr.tf.SetEnv(runEnv); err != nil {
+		return nil, fmt.Errorf("unable to set terraform env: %w", err)
+	}
 
 	// Setup *.auto.tfvars.json file to auto load TF variables during plan and apply
 	jsonBytes, err := json.Marshal(vars)
