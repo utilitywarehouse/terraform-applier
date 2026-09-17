@@ -171,7 +171,7 @@
                             {{if $run.PolicyResult}}
                             <div class="p-2 mb-1">
                                 {{if $run.PolicyResult.Allowed}}
-                                <span class="badge text-bg-success">Policy: Allowed</span>
+                                <span class="badge text-bg-success">Policy: Compliant</span>
                                 {{else if gt (len $run.PolicyResult.HardDenies) 0}}
                                 {{if gt (len $run.PolicyResult.SoftDenies) 0}}
                                 <span class="badge text-bg-danger">Policy: Violated ({{len $run.PolicyResult.HardDenies}} hard_deny, {{len $run.PolicyResult.SoftDenies}} soft_deny)</span>
@@ -179,7 +179,7 @@
                                 <span class="badge text-bg-danger">Policy: Violated ({{len $run.PolicyResult.HardDenies}} hard_deny)</span>
                                 {{end}}
                                 {{else if $run.PolicyResult.Overridden}}
-                                <span class="badge text-bg-success">Policy: Allowed (Overridden)</span>
+                                <span class="badge text-bg-warning">Policy: Overridden ({{len $run.PolicyResult.SoftDenies}} soft_deny)</span>
                                 {{else}}
                                 <span class="badge text-bg-warning">Policy: Override Required</span>
                                 {{end}}
