@@ -328,6 +328,37 @@ Plan: 7 to add, 0 to change, 0 to destroy.`,
 							},
 						},
 					},
+					{
+						Module:     types.NamespacedName{Name: "groups", Namespace: "bar"},
+						Request:    &tfaplv1beta1.Request{Type: tfaplv1beta1.PollingRun},
+						StartedAt:  getMetaTime(12, 30, 1),
+						Status:     tfaplv1beta1.StatusOk,
+						Duration:   60 * time.Second,
+						CommitHash: "abcccf2a0f758ba0d8e88a834a2acdba5885577c",
+						CommitMsg:  `initial commit (john)`,
+						Output: `
+Plan: 0 to add, 0 to change, 0 to destroy.`,
+						InitOutput:   `Terraform has been successfully initialized!`,
+						PolicyResult: &tfaplv1beta1.PolicyEvalResult{Allowed: true},
+					},
+					{
+						Module:     types.NamespacedName{Name: "groups", Namespace: "bar"},
+						Request:    &tfaplv1beta1.Request{Type: tfaplv1beta1.PollingRun},
+						StartedAt:  getMetaTime(9, 30, 1),
+						Status:     tfaplv1beta1.StatusOk,
+						Duration:   60 * time.Second,
+						CommitHash: "abcccf2a0f758ba0d8e88a834a2acdba5885577c",
+						CommitMsg:  `initial commit (john)`,
+						Output: `
+Plan: 1 to add, 0 to change, 0 to destroy.`,
+						InitOutput: `Terraform has been successfully initialized!`,
+						PolicyResult: &tfaplv1beta1.PolicyEvalResult{
+							SoftDenies: []tfaplv1beta1.PolicyViolation{
+								{Msg: "soft violation", Metadata: map[string]any{"rule": "warn_s3"}},
+							},
+							Overridden: true,
+						},
+					},
 				}, nil
 
 			default:
