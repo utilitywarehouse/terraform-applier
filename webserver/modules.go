@@ -26,6 +26,11 @@ type Module struct {
 	Module tfaplv1beta1.Module
 	Runs   []*tfaplv1beta1.Run
 	Events []corev1.Event
+
+	// OverrideCommitHash is non-empty when an admin may override the soft_deny
+	// policy gate for the default branch. It pins the override to the commit the
+	// backend validates against, and is empty for PR runs (which cannot be applied).
+	OverrideCommitHash string
 }
 
 func createNamespaceMap(modules []tfaplv1beta1.Module) map[string]*Namespace {
@@ -69,6 +74,15 @@ func moduleWithRunsInfo(ctx context.Context, clt client.Client, kubeClient kuber
 	module := Module{Module: m}
 
 	module.Runs = runInfo(ctx, redis, namespacedName)
+
+	// Offer the policy override only for the default branch: DefaultLastRun is
+	// never a PR run, and pendingOverride mirrors the check the force-run handler
+	// applies before honouring the override.
+	if lastRun, err := redis.DefaultLastRun(ctx, namespacedName); err == nil && lastRun != nil {
+		if pendingOverride(m.Status, lastRun) {
+			module.OverrideCommitHash = lastRun.CommitHash
+		}
+	}
 
 	// get events
 	fieldSelector := fmt.Sprintf("involvedObject.kind=Module,involvedObject.name=%s", namespacedName.Name)

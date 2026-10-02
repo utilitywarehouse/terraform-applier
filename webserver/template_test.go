@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -397,5 +398,110 @@ Plan: 1 to add, 0 to change, 0 to destroy.`,
 			t.Errorf("error writing test file:  %v\n", err)
 			return
 		}
+	}
+}
+
+// Test_OverrideCheckboxVisibility guards the policy override affordance: it is
+// offered only for a default-branch run whose commit matches the pending
+// override, and never for a PR run (which cannot be applied) or a plan-only
+// module.
+func Test_OverrideCheckboxVisibility(t *testing.T) {
+	moduleHTML, err := os.ReadFile("templates/module.html")
+	if err != nil {
+		t.Fatalf("error reading template: %v", err)
+	}
+	moduleTempt, err := createTemplate(string(moduleHTML))
+	if err != nil {
+		t.Fatalf("error parsing template: %v", err)
+	}
+
+	const commit = "abcccf2a0f758ba0d8e88a834a2acdba5885577c"
+
+	policy := &tfaplv1beta1.PolicyEvalResult{
+		SoftDenies: []tfaplv1beta1.PolicyViolation{
+			{Msg: "soft violation", Metadata: map[string]any{"rule": "warn_s3"}},
+		},
+	}
+
+	defaultRun := &tfaplv1beta1.Run{
+		Module:       types.NamespacedName{Name: "audit", Namespace: "sys-vault"},
+		Request:      &tfaplv1beta1.Request{Type: tfaplv1beta1.ForcedApply, RequestedAt: getMetaTime(1, 0, 0)},
+		StartedAt:    getMetaTime(1, 0, 0),
+		Status:       tfaplv1beta1.StatusOk,
+		CommitHash:   commit,
+		PolicyResult: policy,
+	}
+	prRun := &tfaplv1beta1.Run{
+		Module:       types.NamespacedName{Name: "audit", Namespace: "sys-vault"},
+		Request:      &tfaplv1beta1.Request{Type: tfaplv1beta1.PRPlan, RequestedAt: getMetaTime(2, 0, 0), PR: &tfaplv1beta1.PullRequest{Number: 7, HeadBranch: "feat"}},
+		StartedAt:    getMetaTime(2, 0, 0),
+		Status:       tfaplv1beta1.StatusOk,
+		CommitHash:   commit,
+		PolicyResult: policy,
+	}
+
+	planOnly := true
+	tests := []struct {
+		name           string
+		module         *Module
+		wantCheckboxes int
+	}{
+		{
+			name: "default branch run offers override, PR run does not",
+			module: &Module{
+				Module:             tfaplv1beta1.Module{ObjectMeta: metav1.ObjectMeta{Name: "audit", Namespace: "sys-vault"}},
+				OverrideCommitHash: commit,
+				Runs:               []*tfaplv1beta1.Run{prRun, defaultRun},
+			},
+			wantCheckboxes: 1,
+		},
+		{
+			name: "plan-only module cannot apply",
+			module: &Module{
+				Module: tfaplv1beta1.Module{
+					ObjectMeta: metav1.ObjectMeta{Name: "audit", Namespace: "sys-vault"},
+					Spec:       tfaplv1beta1.ModuleSpec{PlanOnly: &planOnly},
+				},
+				OverrideCommitHash: commit,
+				Runs:               []*tfaplv1beta1.Run{defaultRun},
+			},
+			wantCheckboxes: 0,
+		},
+		{
+			name: "queued or running run hides the override",
+			module: &Module{
+				Module: tfaplv1beta1.Module{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:        "audit",
+						Namespace:   "sys-vault",
+						Annotations: map[string]string{tfaplv1beta1.RunRequestAnnotationKey: `{"type":"ForcedApply"}`},
+					},
+				},
+				OverrideCommitHash: commit,
+				Runs:               []*tfaplv1beta1.Run{defaultRun},
+			},
+			wantCheckboxes: 0,
+		},
+		{
+			name: "no pending override offers nothing",
+			module: &Module{
+				Module: tfaplv1beta1.Module{ObjectMeta: metav1.ObjectMeta{Name: "audit", Namespace: "sys-vault"}},
+				Runs:   []*tfaplv1beta1.Run{defaultRun},
+			},
+			wantCheckboxes: 0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rendered := &bytes.Buffer{}
+			if err := moduleTempt.ExecuteTemplate(rendered, "module", tt.module); err != nil {
+				t.Fatalf("error executing template: %v\n", err)
+			}
+			got := strings.Count(rendered.String(), `id="overrideCheckbox"`)
+			if got != tt.wantCheckboxes {
+				t.Errorf("override checkbox count = %d, want %d", got, tt.wantCheckboxes)
+			}
+		})
 	}
 }

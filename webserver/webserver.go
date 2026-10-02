@@ -260,11 +260,6 @@ func (f *ForceRunHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	isOverride := payload["override"] == "true"
 
 	if isOverride {
-		if payload["overrideReason"] == "" {
-			f.Log.Error("force run rejected, override reason is required", "module", namespacedName)
-			http.Error(w, "overrideReason is required when override is set", http.StatusBadRequest)
-			return
-		}
 		if payload["commitHash"] == "" {
 			f.Log.Error("force run rejected, commit hash is required for override", "module", namespacedName)
 			http.Error(w, "commitHash is required when override is set", http.StatusBadRequest)
