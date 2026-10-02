@@ -26,6 +26,12 @@ type Module struct {
 	Module tfaplv1beta1.Module
 	Runs   []*tfaplv1beta1.Run
 	Events []corev1.Event
+
+	// OverrideRunIndex is the index in Runs of the default last run that an
+	// admin may override, or -1 when there is no pending override. The checkbox
+	// is rendered on exactly this run, so runs sharing a commit cannot render
+	// duplicate ids; the run's own commit is the value the backend validates.
+	OverrideRunIndex int
 }
 
 func createNamespaceMap(modules []tfaplv1beta1.Module) map[string]*Namespace {
@@ -36,7 +42,7 @@ func createNamespaceMap(modules []tfaplv1beta1.Module) map[string]*Namespace {
 		if !ok {
 			namespaces[m.Namespace] = &Namespace{}
 		}
-		module := Module{Module: m}
+		module := Module{Module: m, OverrideRunIndex: -1}
 
 		namespaces[m.Namespace].Modules = append(namespaces[m.Namespace].Modules, module)
 	}
@@ -66,9 +72,19 @@ func moduleWithRunsInfo(ctx context.Context, clt client.Client, kubeClient kuber
 		return nil, err
 	}
 
-	module := Module{Module: m}
+	module := Module{Module: m, OverrideRunIndex: -1}
 
 	module.Runs = runInfo(ctx, redis, namespacedName)
+
+	// Offer the policy override only for the default branch: DefaultLastRun is
+	// never a PR run, and pendingOverride mirrors the check the force-run handler
+	// applies before honouring the override. The index pins the checkbox to that
+	// one run so runs sharing a commit do not render duplicate ids.
+	if lastRun, err := redis.DefaultLastRun(ctx, namespacedName); err == nil && lastRun != nil {
+		if pendingOverride(m.Status, lastRun) {
+			module.OverrideRunIndex = indexOfStartedAt(module.Runs, lastRun.StartedAt)
+		}
+	}
 
 	// get events
 	fieldSelector := fmt.Sprintf("involvedObject.kind=Module,involvedObject.name=%s", namespacedName.Name)
@@ -111,4 +127,18 @@ func runInfo(ctx context.Context, redis sysutil.RedisInterface, namespacedName t
 	})
 
 	return runs
+}
+
+// indexOfStartedAt returns the index of the run with the given start time, or -1
+// if none matches. runInfo dedups on StartedAt, so the result is unique.
+func indexOfStartedAt(runs []*tfaplv1beta1.Run, startedAt *metav1.Time) int {
+	if startedAt == nil {
+		return -1
+	}
+	for i, run := range runs {
+		if run != nil && run.StartedAt != nil && run.StartedAt.Time.Equal(startedAt.Time) {
+			return i
+		}
+	}
+	return -1
 }

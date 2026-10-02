@@ -49,7 +49,7 @@ function filterModulesList(hash) {
 }
 
 // Send an XHR request to the server to force a run.
-function forceRun(namespace, module, planOnly, override) {
+function forceRun(namespace, module, planOnly) {
   // Disable the buttons and close existing alert
   setForcedButtonDisabled(true)
 
@@ -63,12 +63,16 @@ function forceRun(namespace, module, planOnly, override) {
     lockID: lockID,
   }
 
-  if (override === true) {
-    const overrideReason = document.getElementById("overrideReasonInput").value
-    const commitHash = document.getElementById("overrideRunButton").dataset.commitHash
+  // A ticked override checkbox turns a Force Apply into a policy override,
+  // pinned to the commit the backend validates.
+  const overrideCheckbox = document.getElementById("overrideCheckbox")
+  if (
+    overrideCheckbox &&
+    overrideCheckbox.checked &&
+    planOnly === "false"
+  ) {
     body.override = "true"
-    body.overrideReason = overrideReason
-    body.commitHash = commitHash
+    body.commitHash = overrideCheckbox.dataset.commitHash
   }
 
   fetch(url, {
@@ -221,25 +225,27 @@ function closeOpenAlert() {
   }
 }
 
-// tracks whether a force run request is in flight so the "Override & Apply"
-// button stays disabled until the request completes
-var forceRunInFlight = false
-
+// disable the force controls while a force run request is in flight
 function setForcedButtonDisabled(disabled) {
-  forceRunInFlight = disabled
   document.querySelectorAll(".force-button").forEach(function (btn) {
     btn.disabled = disabled
   })
-  updateOverrideButton()
+  const checkbox = document.getElementById("overrideCheckbox")
+  if (checkbox) {
+    checkbox.disabled = disabled
+  }
+  updateOverrideState()
 }
 
-// keep the "Override & Apply" button disabled while the override reason is
-// empty (or while a force run request is in flight)
-function updateOverrideButton() {
-  const input = document.getElementById("overrideReasonInput")
-  const btn = document.getElementById("overrideRunButton")
-  if (!input || !btn) {
+// reflect the override checkbox on the Force Apply button so a policy override
+// is never a silent change
+function updateOverrideState() {
+  const checkbox = document.getElementById("overrideCheckbox")
+  const applyBtn = document.getElementById("forceApplyButton")
+  if (!checkbox || !applyBtn) {
     return
   }
-  btn.disabled = forceRunInFlight || input.value.trim() === ""
+  applyBtn.innerHTML = checkbox.checked
+    ? "<strong>Override &amp; Apply</strong>"
+    : "<strong>Force Apply</strong>"
 }

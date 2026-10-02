@@ -12,6 +12,7 @@ import (
 	"github.com/golang/mock/gomock"
 	tfaplv1beta1 "github.com/utilitywarehouse/terraform-applier/api/v1beta1"
 	"github.com/utilitywarehouse/terraform-applier/policy"
+	"github.com/utilitywarehouse/terraform-applier/sysutil"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/fake"
@@ -244,6 +245,9 @@ func TestModuleController_PolicyRunner(t *testing.T) {
 		if len(lastRun.PolicyResult.SoftDenies) != 0 {
 			t.Errorf("Expected no soft denials, got %+v", lastRun.PolicyResult)
 		}
+		if lastRun.Status != tfaplv1beta1.StatusPolicyViolation {
+			t.Errorf("Expected run status %q, got %q", tfaplv1beta1.StatusPolicyViolation, lastRun.Status)
+		}
 		if strings.Contains(lastApplyRun.Output, "Apply complete!") {
 			t.Error("Hard deny must not apply")
 		}
@@ -317,6 +321,9 @@ func TestModuleController_PolicyRunner(t *testing.T) {
 		if lastRun.PolicyResult.Overridden {
 			t.Error("Expected Overridden=false; hard deny must not be bypassable by an override")
 		}
+		if lastRun.Status != tfaplv1beta1.StatusPolicyViolation {
+			t.Errorf("Expected run status %q, got %q", tfaplv1beta1.StatusPolicyViolation, lastRun.Status)
+		}
 		if strings.Contains(lastApplyRun.Output, "Apply complete!") {
 			t.Error("Hard deny must not apply, even under a forced apply with override")
 		}
@@ -371,6 +378,9 @@ func TestModuleController_PolicyRunner(t *testing.T) {
 		}
 		if len(lastRun.PolicyResult.HardDenies) != 0 {
 			t.Errorf("Expected no hard denials, got %+v", lastRun.PolicyResult)
+		}
+		if lastRun.Status != tfaplv1beta1.StatusOverrideRequired {
+			t.Errorf("Expected run status %q, got %q", tfaplv1beta1.StatusOverrideRequired, lastRun.Status)
 		}
 		if strings.Contains(lastApplyRun.Output, "Apply complete!") {
 			t.Error("Soft deny without override must not apply")
@@ -441,6 +451,9 @@ func TestModuleController_PolicyRunner(t *testing.T) {
 		if !lastRun.PolicyResult.Overridden {
 			t.Error("Expected Overridden=true")
 		}
+		if lastRun.Status != tfaplv1beta1.StatusOk {
+			t.Errorf("Expected run status %q, got %q", tfaplv1beta1.StatusOk, lastRun.Status)
+		}
 		if !strings.Contains(lastApplyRun.Output, "Apply complete!") {
 			t.Error("Expected apply output")
 		}
@@ -507,6 +520,9 @@ func TestModuleController_PolicyRunner(t *testing.T) {
 		if lastRun.PolicyResult.Overridden {
 			t.Error("Expected Overridden=false for stale override")
 		}
+		if lastRun.Status != tfaplv1beta1.StatusOverrideRequired {
+			t.Errorf("Expected run status %q, got %q", tfaplv1beta1.StatusOverrideRequired, lastRun.Status)
+		}
 		if strings.Contains(lastApplyRun.Output, "Apply complete!") {
 			t.Error("Stale override must not apply")
 		}
@@ -556,6 +572,65 @@ func TestModuleController_PolicyRunner(t *testing.T) {
 		// Plan-only runs record the denial but finish without failing.
 		if lastRun.Status != tfaplv1beta1.StatusOk {
 			t.Errorf("Expected plan-only run status OK, got %q", lastRun.Status)
+		}
+	})
+
+	t.Run("soft deny on a PR plan is advisory and does not fail the run", func(t *testing.T) {
+		redisDoneCh := make(chan struct{})
+		ctrl := setup(t, "hello-with-providers")
+		defer ctrl.Finish()
+
+		var lastRun *tfaplv1beta1.Run
+		testRedis.EXPECT().SetPRRun(gomock.Any(), gomock.Any()).
+			DoAndReturn(func(ctx context.Context, run *tfaplv1beta1.Run) error {
+				lastRun = run
+				// The runner does not auto-remove PR requests, so clear it here
+				// to stop the controller re-triggering the plan.
+				if err := sysutil.RemoveRequest(ctx, k8sClient, run.Module, run.Request); err != nil {
+					t.Errorf("unable to remove PR run request: %v", err)
+				}
+				close(redisDoneCh) // PR plans are stored under the PR key only
+				return nil
+			})
+
+		module := buildModule("hello-policy-pr", "hello-with-providers", false)
+		req := tfaplv1beta1.Request{
+			RequestedAt: &metav1.Time{Time: time.Now()},
+			Type:        tfaplv1beta1.PRPlan,
+			PR:          &tfaplv1beta1.PullRequest{Number: 1, HeadBranch: "HEAD"},
+		}
+		module.ObjectMeta.Annotations = map[string]string{
+			tfaplv1beta1.RunRequestAnnotationKey: mustMarshalRequest(t, &req),
+		}
+
+		fakeClient := fake.NewSimpleClientset()
+		testDelegate.EXPECT().DelegateToken(gomock.Any(), gomock.Any(), moduleNamespace, "terraform-applier-delegate").Return("token.P8", nil)
+		testDelegate.EXPECT().SetupDelegation(gomock.Any(), "token.P8").Return(fakeClient, nil)
+
+		createModule(t, module)
+
+		select {
+		case <-redisDoneCh:
+		case <-time.After(120 * time.Second):
+			t.Fatal("Timeout waiting for runner to complete")
+		}
+
+		if lastRun.PolicyResult == nil {
+			t.Fatal("Expected non-nil PolicyResult")
+		}
+		if lastRun.PolicyResult.Allowed {
+			t.Error("Expected Allowed=false (soft deny recorded)")
+		}
+		if len(lastRun.PolicyResult.SoftDenies) == 0 {
+			t.Errorf("Expected soft denials, got %+v", lastRun.PolicyResult)
+		}
+		// A PR cannot be applied or overridden, so the soft deny is recorded
+		// but the plan must still finish successfully.
+		if lastRun.Status != tfaplv1beta1.StatusOk {
+			t.Errorf("Expected PR plan run status OK, got %q", lastRun.Status)
+		}
+		if strings.HasPrefix(lastRun.Output, "soft_deny policy violations detected") {
+			t.Error("policy gate message must not be injected into the plan output")
 		}
 	})
 }

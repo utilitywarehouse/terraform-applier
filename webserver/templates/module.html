@@ -38,7 +38,7 @@
                             <strong>Force Plan</strong>
                         </button>
                         <button data-namespace=" {{ .Module.Namespace }}" data-name="{{ .Module.Name }}"
-                            data-plan-only="false" class="force-button force-module-button btn btn-warning"
+                            id="forceApplyButton" data-plan-only="false" class="force-button force-module-button btn btn-warning"
                             onclick="forceRun('{{.Module.Namespace}}','{{ .Module.Name }}','false')" {{ if
                             .Module.IsPlanOnly }}disabled title="Apply is disabled because PlanOnly is true" {{ end }}>
                             <strong>Force Apply</strong>
@@ -188,6 +188,17 @@
                                 {{end}}
                             </div>
                             {{end}}
+                            {{if and (eq $i $m.OverrideRunIndex) (not $run.Request.PR) (not $m.Module.IsPlanOnly) (not (index $m.Module.ObjectMeta.Annotations "terraform-applier.uw.systems/run-request"))}}
+                            <div class="border border-warning-subtle rounded bg-warning-subtle mb-2 px-3 py-2">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="overrideCheckbox"
+                                        data-commit-hash="{{$run.CommitHash}}" onchange="updateOverrideState()">
+                                    <label class="form-check-label fw-semibold" for="overrideCheckbox">
+                                        Override policy violations
+                                    </label>
+                                </div>
+                            </div>
+                            {{end}}
                             {{if and $run.PolicyResult (or (len $run.PolicyResult.HardDenies) (len $run.PolicyResult.SoftDenies))}}
                             <a href="#{{sanitizedUniqueName .Module}}-{{$i}}-policy" data-bs-toggle="collapse"
                                 class="px-2" role="button">
@@ -218,19 +229,6 @@
                                     </li>
                                     {{end}}
                                 </ul>
-                            </div>
-                            {{end}}
-                            {{if and (eq $i 0) $run.PolicyResult (eq (len $run.PolicyResult.HardDenies) 0) (gt (len $run.PolicyResult.SoftDenies) 0) (not $run.PolicyResult.Overridden)}}
-                            <small class="text-muted d-block p-2">Prefer fixing the module; override only after reviewing the plan output.</small>
-                            <div class="d-flex align-items-center gap-2 p-2">
-                                <input type="text" id="overrideReasonInput" class="form-control form-control-sm flex-grow-1"
-                                    placeholder="Reason for override (required)" oninput="updateOverrideButton()">
-                                <button type="button" id="overrideRunButton" class="btn btn-sm btn-outline-warning force-button text-nowrap flex-shrink-0"
-                                    data-namespace="{{$m.Module.Namespace}}" data-name="{{$m.Module.Name}}"
-                                    data-commit-hash="{{$run.CommitHash}}" disabled
-                                    onclick="forceRun('{{$m.Module.Namespace}}','{{ $m.Module.Name }}','false',true)">
-                                    Override &amp; Apply
-                                </button>
                             </div>
                             {{end}}
                             <div class="mh-100 overflow-auto">
