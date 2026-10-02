@@ -287,7 +287,6 @@ func (f *ForceRunHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	if isOverride {
 		req.PolicyOverride = true
-		req.OverrideReason = payload["overrideReason"]
 		req.OverriddenHash = payload["commitHash"]
 		if user != nil {
 			req.OverriddenBy = user.Email
@@ -316,9 +315,13 @@ func (f *ForceRunHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 // pendingOverride reports whether the module currently has pending soft_deny
 // policy violations that an admin override can address: either the module
 // status already demands one (Override_Required) or the latest run's policy
-// result carries soft_deny violations that were not hard denies and have not
-// been overridden. Hard denies are never bypassable and always yield false.
+// result carries un-overridden soft_deny violations. Hard denies are never
+// bypassable and always yield false, even when a stale module status would
+// otherwise demand an override.
 func pendingOverride(status tfaplv1beta1.ModuleStatus, lastRun *tfaplv1beta1.Run) bool {
+	if lastRun != nil && lastRun.PolicyResult != nil && len(lastRun.PolicyResult.HardDenies) > 0 {
+		return false
+	}
 	if status.CurrentState == string(tfaplv1beta1.StatusOverrideRequired) {
 		return true
 	}
@@ -326,7 +329,7 @@ func pendingOverride(status tfaplv1beta1.ModuleStatus, lastRun *tfaplv1beta1.Run
 		return false
 	}
 	pr := lastRun.PolicyResult
-	return len(pr.HardDenies) == 0 && len(pr.SoftDenies) > 0 && !pr.Overridden
+	return len(pr.SoftDenies) > 0 && !pr.Overridden
 }
 
 func parseBody(respBody io.ReadCloser) (map[string]string, error) {

@@ -188,11 +188,11 @@
                                 {{end}}
                             </div>
                             {{end}}
-                            {{if and $m.OverrideCommitHash (eq $run.CommitHash $m.OverrideCommitHash) (not $run.Request.PR) (not $m.Module.IsPlanOnly) (not (index $m.Module.ObjectMeta.Annotations "terraform-applier.uw.systems/run-request"))}}
+                            {{if and (eq $i $m.OverrideRunIndex) (not $run.Request.PR) (not $m.Module.IsPlanOnly) (not (index $m.Module.ObjectMeta.Annotations "terraform-applier.uw.systems/run-request"))}}
                             <div class="border border-warning-subtle rounded bg-warning-subtle mb-2 px-3 py-2">
                                 <div class="form-check">
                                     <input class="form-check-input" type="checkbox" id="overrideCheckbox"
-                                        data-commit-hash="{{$m.OverrideCommitHash}}" onchange="updateOverrideState()">
+                                        data-commit-hash="{{$run.CommitHash}}" onchange="updateOverrideState()">
                                     <label class="form-check-label fw-semibold" for="overrideCheckbox">
                                         Override policy violations
                                     </label>

@@ -439,6 +439,16 @@ func Test_OverrideCheckboxVisibility(t *testing.T) {
 		CommitHash:   commit,
 		PolicyResult: policy,
 	}
+	// applyRun is a second non-PR run at the same commit (e.g. a stored
+	// lastApply), which must not render a second override checkbox.
+	applyRun := &tfaplv1beta1.Run{
+		Module:       types.NamespacedName{Name: "audit", Namespace: "sys-vault"},
+		Request:      &tfaplv1beta1.Request{Type: tfaplv1beta1.ForcedApply, RequestedAt: getMetaTime(1, 30, 0)},
+		StartedAt:    getMetaTime(1, 30, 0),
+		Status:       tfaplv1beta1.StatusOk,
+		CommitHash:   commit,
+		PolicyResult: policy,
+	}
 
 	planOnly := true
 	tests := []struct {
@@ -447,11 +457,11 @@ func Test_OverrideCheckboxVisibility(t *testing.T) {
 		wantCheckboxes int
 	}{
 		{
-			name: "default branch run offers override, PR run does not",
+			name: "override is offered on exactly one run sharing the commit",
 			module: &Module{
-				Module:             tfaplv1beta1.Module{ObjectMeta: metav1.ObjectMeta{Name: "audit", Namespace: "sys-vault"}},
-				OverrideCommitHash: commit,
-				Runs:               []*tfaplv1beta1.Run{prRun, defaultRun},
+				Module:           tfaplv1beta1.Module{ObjectMeta: metav1.ObjectMeta{Name: "audit", Namespace: "sys-vault"}},
+				OverrideRunIndex: 1,
+				Runs:             []*tfaplv1beta1.Run{prRun, defaultRun, applyRun},
 			},
 			wantCheckboxes: 1,
 		},
@@ -462,8 +472,8 @@ func Test_OverrideCheckboxVisibility(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{Name: "audit", Namespace: "sys-vault"},
 					Spec:       tfaplv1beta1.ModuleSpec{PlanOnly: &planOnly},
 				},
-				OverrideCommitHash: commit,
-				Runs:               []*tfaplv1beta1.Run{defaultRun},
+				OverrideRunIndex: 0,
+				Runs:             []*tfaplv1beta1.Run{defaultRun},
 			},
 			wantCheckboxes: 0,
 		},
@@ -477,8 +487,8 @@ func Test_OverrideCheckboxVisibility(t *testing.T) {
 						Annotations: map[string]string{tfaplv1beta1.RunRequestAnnotationKey: `{"type":"ForcedApply"}`},
 					},
 				},
-				OverrideCommitHash: commit,
-				Runs:               []*tfaplv1beta1.Run{defaultRun},
+				OverrideRunIndex: 0,
+				Runs:             []*tfaplv1beta1.Run{defaultRun},
 			},
 			wantCheckboxes: 0,
 		},
@@ -486,7 +496,9 @@ func Test_OverrideCheckboxVisibility(t *testing.T) {
 			name: "no pending override offers nothing",
 			module: &Module{
 				Module: tfaplv1beta1.Module{ObjectMeta: metav1.ObjectMeta{Name: "audit", Namespace: "sys-vault"}},
-				Runs:   []*tfaplv1beta1.Run{defaultRun},
+				// -1 is the "no override" sentinel.
+				OverrideRunIndex: -1,
+				Runs:             []*tfaplv1beta1.Run{defaultRun},
 			},
 			wantCheckboxes: 0,
 		},
