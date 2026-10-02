@@ -492,8 +492,9 @@ func (r *Runner) evaluatePolicies(
 	//
 	// process soft_deny violations
 	//
-	if run.Mode != tfaplv1beta1.ModeApply && run.Request.Type != tfaplv1beta1.PRPlan {
-		// advisory for scheduled/forced plan-only runs: record but do not fail
+	if run.Mode != tfaplv1beta1.ModeApply {
+		// advisory for plan-only runs (including PR plans): record the soft
+		// denials but do not fail; a PR cannot be applied or overridden yet.
 		log.Warn("soft_deny policy violations on plan-only run", "violations", len(run.PolicyResult.SoftDenies))
 		return true
 	}
@@ -514,7 +515,7 @@ func (r *Runner) evaluatePolicies(
 			"by", run.Request.OverriddenBy, "reason", run.Request.OverrideReason)
 	}
 
-	// everything else (apply without override, or any PR plan) requires an override
+	// everything else (an apply without a valid override) requires an override
 	msg := "soft_deny policy violations detected, override required"
 	log.Error(msg, "violations", len(run.PolicyResult.SoftDenies))
 	r.setPolicyFailedStatus(run, module, string(tfaplv1beta1.StatusOverrideRequired), tfaplv1beta1.ReasonSoftDenyViolation, msg)
@@ -572,15 +573,31 @@ func (r *Runner) setFailedStatus(run *tfaplv1beta1.Run, module *tfaplv1beta1.Mod
 }
 
 // setStatusFailed records a failed run on the run and module statuses.
-// currentState is the module state to persist (StatusErrored for ordinary
-// failures, policy states for policy-driven ones). bumpRetry controls whether
-// the run counts towards the module's retry budget:
+// currentState is the state to persist (StatusErrored for ordinary failures,
+// StatusPolicyViolation/StatusOverrideRequired for policy-driven ones); it is
+// mirrored on run.Status so the run is self-describing. bumpRetry controls
+// whether the run counts towards the module's retry budget.
+//
+// run.Summary is the terraform run summary, so only genuine errors overwrite it
+// with the failure message. Policy violations are reported through
+// run.PolicyResult and leave the terraform summary intact.
 func (r *Runner) setStatusFailed(run *tfaplv1beta1.Run, module *tfaplv1beta1.Module, state, reason, msg string, bumpRetry bool) {
 	run.Status = tfaplv1beta1.StatusErrored
+	switch state {
+	case string(tfaplv1beta1.StatusPolicyViolation):
+		// hard_deny: terminal
+		run.Status = tfaplv1beta1.StatusPolicyViolation
+	case string(tfaplv1beta1.StatusOverrideRequired):
+		// soft_deny on an apply: recoverable with an admin override
+		run.Status = tfaplv1beta1.StatusOverrideRequired
+	}
 	run.Duration = time.Since(run.StartedAt.Time)
-	run.Summary = msg
-	// msg in this case is an error message
-	run.Output = msg + "\n" + run.Output
+
+	if state == string(tfaplv1beta1.StatusErrored) {
+		// msg is an error message
+		run.Summary = msg
+		run.Output = msg + "\n" + run.Output
+	}
 
 	r.Recorder.Event(module, corev1.EventTypeWarning, reason, msg)
 

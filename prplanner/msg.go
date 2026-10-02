@@ -38,8 +38,8 @@ var (
 
 	runOutputMsgTml = "### Terraform Plan Output for `%s`\n" +
 		"🏷️ **Commit:** %s | 🔗 [View in %s terraform-applier web UI](%s)\n\n" +
-		"> To manually trigger plan again please post `@terraform-applier plan %s` as comment.\n" +
-		"<details><summary><b>%s Run Status: %s, Run Summary: %s</b></summary>" +
+		"%s" +
+		"<details><summary><b>%s</b></summary>" +
 		"\n\n```terraform\n%s\n```\n</details>\n"
 )
 
@@ -148,18 +148,44 @@ func runOutputMsg(cluster string, module types.NamespacedName, path string, run 
 	statusSymbol := "✅"
 
 	runOutput := run.Output
-	// when run fails upload init output as well since it may contain
-	// reason of the failure
+
+	// A run is only a terraform error when the status says so; policy states
+	// carry their own meaning and keep the plan output clean.
 	if run.Status == v1beta1.StatusErrored {
 		statusSymbol = "⛔"
+		// when run fails upload init output as well since it may contain
+		// reason of the failure
 		runOutput = run.InitOutput + "\n" + run.Output
+	}
+
+	summaryLine := fmt.Sprintf("%s Run Status: %s, Run Summary: %s", statusSymbol, run.Status, run.Summary)
+	switch run.Status {
+	case v1beta1.StatusPolicyViolation:
+		// hard_deny: terminal, the apply can never proceed.
+		blocked := "Apply will be blocked by policy"
+		if run.Mode == v1beta1.ModeApply {
+			blocked = "Apply blocked by policy"
+		}
+		summaryLine = fmt.Sprintf("%s, Run Summary: %s", blocked, run.Summary)
+	case v1beta1.StatusOverrideRequired:
+		// soft_deny: recoverable with an admin override
+		summaryLine = fmt.Sprintf("Apply requires a policy override, Run Summary: %s", run.Summary)
 	}
 
 	policySection := policyResultMsg(run.PolicyResult)
 
 	msgTml := runOutputMsgTml
+	// The title reflects the content: an apply run only produces apply output
+	// once the apply actually completes.
 	if strings.Contains(run.Summary, "Apply complete!") {
 		msgTml = strings.Replace(msgTml, "Terraform Plan Output", "Terraform Apply Output", 1)
+	}
+
+	// An apply run is surfaced on an already-merged PR, where the reader can no
+	// longer request a plan, so drop the trigger hint for applies.
+	planAgain := fmt.Sprintf("> To manually trigger plan again please post `@terraform-applier plan %s` as comment.\n", path)
+	if run.Mode == v1beta1.ModeApply {
+		planAgain = ""
 	}
 
 	runes := []rune(runOutput)
@@ -171,7 +197,7 @@ func runOutputMsg(cluster string, module types.NamespacedName, path string, run 
 
 	moduleURL := webserverURL + "/#" + module.Namespace + "_" + module.Name
 
-	display := fmt.Sprintf(msgTml, module.Name, run.CommitHash, cluster, moduleURL, path, statusSymbol, run.Status, run.Summary, runOutput)
+	display := fmt.Sprintf(msgTml, module.Name, run.CommitHash, cluster, moduleURL, planAgain, summaryLine, runOutput)
 	display += policySection
 
 	meta := CommentMetadata{
