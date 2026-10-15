@@ -400,6 +400,11 @@ func (r *Runner) runTF(
 			log.Error("unable to set drift status", "err", err)
 			return false
 		}
+		// A plan-only run with a soft_deny is advisory: stamp the run (not the
+		// module) so the plan output warns that an apply will require an override.
+		if run.PolicyResult != nil && len(run.PolicyResult.SoftDenies) > 0 {
+			run.Status = tfaplv1beta1.StatusOverrideRequired
+		}
 		return true
 	}
 

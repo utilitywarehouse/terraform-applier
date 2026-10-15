@@ -169,7 +169,11 @@ func runOutputMsg(cluster string, module types.NamespacedName, path string, run 
 		summaryLine = fmt.Sprintf("%s, Run Summary: %s", blocked, run.Summary)
 	case v1beta1.StatusOverrideRequired:
 		// soft_deny: recoverable with an admin override
-		summaryLine = fmt.Sprintf("Apply requires a policy override, Run Summary: %s", run.Summary)
+		required := "Apply will require a policy override"
+		if run.Mode == v1beta1.ModeApply {
+			required = "Apply requires a policy override"
+		}
+		summaryLine = fmt.Sprintf("%s, Run Summary: %s", required, run.Summary)
 	}
 
 	policySection := policyResultMsg(run.PolicyResult)

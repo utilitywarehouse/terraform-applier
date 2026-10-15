@@ -569,9 +569,10 @@ func TestModuleController_PolicyRunner(t *testing.T) {
 		if len(lastRun.PolicyResult.SoftDenies) == 0 {
 			t.Errorf("Expected soft denials, got %+v", lastRun.PolicyResult)
 		}
-		// Plan-only runs record the denial but finish without failing.
-		if lastRun.Status != tfaplv1beta1.StatusOk {
-			t.Errorf("Expected plan-only run status OK, got %q", lastRun.Status)
+		// Plan-only runs record the denial and are flagged as requiring an
+		// override, but the run still succeeds.
+		if lastRun.Status != tfaplv1beta1.StatusOverrideRequired {
+			t.Errorf("Expected plan-only run status %q, got %q", tfaplv1beta1.StatusOverrideRequired, lastRun.Status)
 		}
 	})
 
@@ -624,10 +625,10 @@ func TestModuleController_PolicyRunner(t *testing.T) {
 		if len(lastRun.PolicyResult.SoftDenies) == 0 {
 			t.Errorf("Expected soft denials, got %+v", lastRun.PolicyResult)
 		}
-		// A PR cannot be applied or overridden, so the soft deny is recorded
-		// but the plan must still finish successfully.
-		if lastRun.Status != tfaplv1beta1.StatusOk {
-			t.Errorf("Expected PR plan run status OK, got %q", lastRun.Status)
+		// A PR cannot be applied or overridden, so the soft deny is recorded and
+		// flagged as requiring an override, but the plan must still succeed.
+		if lastRun.Status != tfaplv1beta1.StatusOverrideRequired {
+			t.Errorf("Expected PR plan run status %q, got %q", tfaplv1beta1.StatusOverrideRequired, lastRun.Status)
 		}
 		if strings.HasPrefix(lastRun.Output, "soft_deny policy violations detected") {
 			t.Error("policy gate message must not be injected into the plan output")
