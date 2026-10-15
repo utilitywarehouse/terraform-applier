@@ -12,7 +12,7 @@ import (
 	"github.com/golang/mock/gomock"
 	tfaplv1beta1 "github.com/utilitywarehouse/terraform-applier/api/v1beta1"
 	"github.com/utilitywarehouse/terraform-applier/policy"
-	"github.com/utilitywarehouse/terraform-applier/sysutil"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/fake"
@@ -125,7 +125,8 @@ func TestModuleController_PolicyRunner(t *testing.T) {
 			t.Fatalf("Failed to create module: %v", err)
 		}
 		t.Cleanup(func() {
-			if err := k8sClient.Delete(context.Background(), module); err != nil {
+			// A scenario may delete the module itself once it is done with it.
+			if err := k8sClient.Delete(context.Background(), module); err != nil && !apierrors.IsNotFound(err) {
 				t.Errorf("Failed to delete module: %v", err)
 			}
 		})
@@ -585,10 +586,15 @@ func TestModuleController_PolicyRunner(t *testing.T) {
 		testRedis.EXPECT().SetPRRun(gomock.Any(), gomock.Any()).
 			DoAndReturn(func(ctx context.Context, run *tfaplv1beta1.Run) error {
 				lastRun = run
-				// The runner does not auto-remove PR requests, so clear it here
-				// to stop the controller re-triggering the plan.
-				if err := sysutil.RemoveRequest(ctx, k8sClient, run.Module, run.Request); err != nil {
-					t.Errorf("unable to remove PR run request: %v", err)
+				// The runner does not clear PR requests itself. Removing just
+				// the request would leave the module looking like it never had
+				// a default run, so the controller would schedule a follow-up
+				// PollingRun. Delete the module instead to stop any further
+				// runs once this one has finished.
+				if err := k8sClient.Delete(ctx, &tfaplv1beta1.Module{
+					ObjectMeta: metav1.ObjectMeta{Name: run.Module.Name, Namespace: run.Module.Namespace},
+				}); err != nil {
+					t.Errorf("unable to delete PR module: %v", err)
 				}
 				close(redisDoneCh) // PR plans are stored under the PR key only
 				return nil
