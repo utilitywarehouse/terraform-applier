@@ -12,7 +12,7 @@ import (
 	"github.com/golang/mock/gomock"
 	tfaplv1beta1 "github.com/utilitywarehouse/terraform-applier/api/v1beta1"
 	"github.com/utilitywarehouse/terraform-applier/policy"
-	"github.com/utilitywarehouse/terraform-applier/sysutil"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/fake"
@@ -125,7 +125,8 @@ func TestModuleController_PolicyRunner(t *testing.T) {
 			t.Fatalf("Failed to create module: %v", err)
 		}
 		t.Cleanup(func() {
-			if err := k8sClient.Delete(context.Background(), module); err != nil {
+			// A scenario may delete the module itself once it is done with it.
+			if err := k8sClient.Delete(context.Background(), module); err != nil && !apierrors.IsNotFound(err) {
 				t.Errorf("Failed to delete module: %v", err)
 			}
 		})
@@ -569,9 +570,10 @@ func TestModuleController_PolicyRunner(t *testing.T) {
 		if len(lastRun.PolicyResult.SoftDenies) == 0 {
 			t.Errorf("Expected soft denials, got %+v", lastRun.PolicyResult)
 		}
-		// Plan-only runs record the denial but finish without failing.
-		if lastRun.Status != tfaplv1beta1.StatusOk {
-			t.Errorf("Expected plan-only run status OK, got %q", lastRun.Status)
+		// Plan-only runs record the denial and are flagged as requiring an
+		// override, but the run still succeeds.
+		if lastRun.Status != tfaplv1beta1.StatusOverrideRequired {
+			t.Errorf("Expected plan-only run status %q, got %q", tfaplv1beta1.StatusOverrideRequired, lastRun.Status)
 		}
 	})
 
@@ -584,10 +586,15 @@ func TestModuleController_PolicyRunner(t *testing.T) {
 		testRedis.EXPECT().SetPRRun(gomock.Any(), gomock.Any()).
 			DoAndReturn(func(ctx context.Context, run *tfaplv1beta1.Run) error {
 				lastRun = run
-				// The runner does not auto-remove PR requests, so clear it here
-				// to stop the controller re-triggering the plan.
-				if err := sysutil.RemoveRequest(ctx, k8sClient, run.Module, run.Request); err != nil {
-					t.Errorf("unable to remove PR run request: %v", err)
+				// The runner does not clear PR requests itself. Removing just
+				// the request would leave the module looking like it never had
+				// a default run, so the controller would schedule a follow-up
+				// PollingRun. Delete the module instead to stop any further
+				// runs once this one has finished.
+				if err := k8sClient.Delete(ctx, &tfaplv1beta1.Module{
+					ObjectMeta: metav1.ObjectMeta{Name: run.Module.Name, Namespace: run.Module.Namespace},
+				}); err != nil {
+					t.Errorf("unable to delete PR module: %v", err)
 				}
 				close(redisDoneCh) // PR plans are stored under the PR key only
 				return nil
@@ -624,10 +631,10 @@ func TestModuleController_PolicyRunner(t *testing.T) {
 		if len(lastRun.PolicyResult.SoftDenies) == 0 {
 			t.Errorf("Expected soft denials, got %+v", lastRun.PolicyResult)
 		}
-		// A PR cannot be applied or overridden, so the soft deny is recorded
-		// but the plan must still finish successfully.
-		if lastRun.Status != tfaplv1beta1.StatusOk {
-			t.Errorf("Expected PR plan run status OK, got %q", lastRun.Status)
+		// A PR cannot be applied or overridden, so the soft deny is recorded and
+		// flagged as requiring an override, but the plan must still succeed.
+		if lastRun.Status != tfaplv1beta1.StatusOverrideRequired {
+			t.Errorf("Expected PR plan run status %q, got %q", tfaplv1beta1.StatusOverrideRequired, lastRun.Status)
 		}
 		if strings.HasPrefix(lastRun.Output, "soft_deny policy violations detected") {
 			t.Error("policy gate message must not be injected into the plan output")

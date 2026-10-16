@@ -1,24 +1,24 @@
 # Build the manager binary
-FROM golang:1.26-alpine AS builder
+FROM golang:1.27-alpine AS builder
 ARG TARGETOS
 ARG TARGETARCH
 
 ENV STRONGBOX_VERSION=2.1.0
 
 RUN os=$(go env GOOS) && arch=$(go env GOARCH) \
-      && apk --no-cache add curl git \
-      && curl -Ls https://github.com/uw-labs/strongbox/releases/download/v${STRONGBOX_VERSION}/strongbox_${STRONGBOX_VERSION}_${os}_${arch} \
-           > /usr/local/bin/strongbox \
-      && chmod +x /usr/local/bin/strongbox
+    && apk --no-cache add curl git \
+    && curl -Ls https://github.com/uw-labs/strongbox/releases/download/v${STRONGBOX_VERSION}/strongbox_${STRONGBOX_VERSION}_${os}_${arch} \
+    > /usr/local/bin/strongbox \
+    && chmod +x /usr/local/bin/strongbox
 
 # The policy engine shells out to conftest binary
 ARG CONFTEST_VERSION=0.69.0
 RUN os=$(go env GOOS) && arch=$(go env GOARCH) && case "$arch" in \
-        amd64) arch=x86_64 ;; \
-      esac \
-      && curl -Ls https://github.com/open-policy-agent/conftest/releases/download/v${CONFTEST_VERSION}/conftest_${CONFTEST_VERSION}_Linux_${arch}.tar.gz \
-           | tar xz -C /usr/local/bin conftest \
-      && chmod +x /usr/local/bin/conftest
+    amd64) arch=x86_64 ;; \
+    esac \
+    && curl -Ls https://github.com/open-policy-agent/conftest/releases/download/v${CONFTEST_VERSION}/conftest_${CONFTEST_VERSION}_Linux_${arch}.tar.gz \
+    | tar xz -C /usr/local/bin conftest \
+    && chmod +x /usr/local/bin/conftest
 
 WORKDIR /workspace
 # Copy the Go Modules manifests
@@ -39,7 +39,7 @@ COPY . .
 # the docker BUILDPLATFORM arg will be linux/arm64 when for Apple x86 it will be linux/amd64. Therefore,
 # by leaving it empty we can ensure that the container and binary shipped on it will have the same platform.
 RUN \
- go test -v -cover ./... && \
+    go test -v -cover ./... && \
     CGO_ENABLED=0 GOOS=${TARGETOS:-linux} \
     GOARCH=${TARGETARCH} \
     GOTOOLCHAIN=go$(awk '/^go /{print $2; exit}' go.mod) \
@@ -50,7 +50,7 @@ FROM alpine:3.23
 ENV USER_ID=65532
 
 RUN adduser -S -H -u $USER_ID tf-applier \
-      && apk --no-cache add ca-certificates git openssh-client
+    && apk --no-cache add ca-certificates git openssh-client
 
 COPY --from=builder /usr/local/bin/strongbox /usr/local/bin/
 COPY --from=builder /usr/local/bin/conftest /usr/local/bin/
