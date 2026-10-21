@@ -1,6 +1,6 @@
 module github.com/utilitywarehouse/terraform-applier
 
-go 1.27.2
+go 1.27.3
 
 require (
 	filippo.io/age v1.3.2
@@ -27,10 +27,8 @@ require (
 	k8s.io/client-go v0.37.1
 	sigs.k8s.io/controller-runtime v0.25.2
 	sigs.k8s.io/controller-runtime/tools/setup-envtest v0.25.2
-	sigs.k8s.io/controller-tools v0.22.0
+	sigs.k8s.io/controller-tools v0.23.0
 )
-
-replace k8s.io/apimachinery v0.36.0-alpha.1 => k8s.io/apimachinery v0.35.1
 
 require (
 	cel.dev/expr v0.25.2 // indirect
