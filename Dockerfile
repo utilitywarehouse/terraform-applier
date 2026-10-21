@@ -45,7 +45,7 @@ RUN \
     GOTOOLCHAIN=go$(awk '/^go /{print $2; exit}' go.mod) \
     go build -a -o tf-applier
 
-FROM alpine:3.23
+FROM alpine:3.24
 
 ENV USER_ID=65532
 
