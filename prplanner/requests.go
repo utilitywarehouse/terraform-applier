@@ -12,6 +12,11 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
+// maxPlanRequestAttempts bounds how many times a plan can be requested for the
+// same module and commit, so a run that never produces output cannot make the
+// planner re-request it on every poll.
+const maxPlanRequestAttempts = 3
+
 func (p *Planner) ensurePlanRequests(ctx context.Context, pr *pr, commitsInfo []repository.CommitInfo, prModules []types.NamespacedName, skipCommitRun bool) {
 	for _, moduleName := range prModules {
 		// Check if module has a pending plan request
@@ -56,37 +61,51 @@ func (p *Planner) ensurePlanRequest(ctx context.Context, pr *pr, commitsInfo []r
 }
 
 func (p *Planner) checkPRCommits(ctx context.Context, pr *pr, commitsInfo []repository.CommitInfo, module *tfaplv1beta1.Module) (*tfaplv1beta1.Request, error) {
-	// loop through commits to check if module path is updated
-	for _, commit := range commitsInfo {
-		if !isModuleUpdated(module, commit) {
-			continue
-		}
-
-		// check if we have already processed (uploaded output) this commit
-		if isPlanOutputPostedForCommit(p.ClusterEnvName, pr, commit.Hash, module.Spec.Path, module.NamespacedName()) {
-			return nil, nil
-		}
-
-		if isPlanRequestAckPostedForCommit(p.ClusterEnvName, pr, commit.Hash, module.Spec.Path, module.NamespacedName()) {
-			return nil, nil
-		}
-
-		// check if run is already completed for this commit
-		runOutput, err := p.RedisClient.PRRun(ctx, module.NamespacedName(), pr.Number, commit.Hash)
-		if err != nil && !errors.Is(err, sysutil.ErrKeyNotFound) {
-			return nil, err
-		}
-
-		if runOutput != nil && runOutput.CommitHash == commit.Hash {
-			return nil, nil
-		}
-
-		// request run
-		p.Log.Info("triggering plan due to new commit", "module", module.NamespacedName(), "pr", pr.Number, "author", pr.Author.Login)
-		return p.addNewRequest(ctx, module, pr, commit.Hash)
+	if !isModuleUpdatedInCommits(module, commitsInfo) {
+		return nil, nil
 	}
 
-	return nil, nil
+	// A run and its output are keyed by the commit that last touched the module
+	// path (git log -n1 <ref> -- <path>), which is the identity the runner stamps
+	// on run.CommitHash. That is not necessarily the newest commit in
+	// commitsInfo listing the path: a merge commit that changes the path (a
+	// hand-resolved conflict, for instance) is listed without any file. Dedup on
+	// the runner's identity, otherwise no output ever matches and the plan is
+	// re-requested on every poll.
+	modulePathHash, err := p.Repos.Hash(ctx, module.Spec.RepoURL, pr.HeadRefName, module.Spec.Path)
+	if err != nil {
+		return nil, err
+	}
+
+	// check if we have already processed (uploaded output) this commit
+	if isPlanOutputPostedForCommit(p.ClusterEnvName, pr, modulePathHash, module.Spec.Path, module.NamespacedName()) {
+		return nil, nil
+	}
+
+	if isPlanRequestAckPostedForCommit(p.ClusterEnvName, pr, modulePathHash, module.Spec.Path, module.NamespacedName()) {
+		return nil, nil
+	}
+
+	// check if run is already completed for this commit
+	runOutput, err := p.RedisClient.PRRun(ctx, module.NamespacedName(), pr.Number, modulePathHash)
+	if err != nil && !errors.Is(err, sysutil.ErrKeyNotFound) {
+		return nil, err
+	}
+
+	if runOutput != nil && runOutput.CommitHash == modulePathHash {
+		return nil, nil
+	}
+
+	// a run that fails before it is stored leaves nothing to dedup on, so cap
+	// the number of requests per commit instead of retrying indefinitely
+	if attempts := planRequestAttempts(p.ClusterEnvName, pr, modulePathHash, module.Spec.Path, module.NamespacedName()); attempts >= maxPlanRequestAttempts {
+		p.Log.Warn("plan request attempts limit reached, not requesting plan again", "module", module.NamespacedName(), "pr", pr.Number, "commit", modulePathHash, "attempts", attempts)
+		return nil, nil
+	}
+
+	// request run
+	p.Log.Info("triggering plan due to new commit", "module", module.NamespacedName(), "pr", pr.Number, "author", pr.Author.Login)
+	return p.addNewRequest(ctx, module, pr, modulePathHash)
 }
 
 func (p *Planner) checkPRCommentsForPlanRequests(ctx context.Context, pr *pr, module *tfaplv1beta1.Module) (*tfaplv1beta1.Request, error) {
@@ -170,6 +189,22 @@ func isPlanRequestAckPostedForCommit(cluster string, pr *pr, commitID, modulePat
 	}
 
 	return false
+}
+
+// planRequestAttempts counts the plan requests posted for the given commit
+func planRequestAttempts(cluster string, pr *pr, commitID, modulePath string, module types.NamespacedName) int {
+	attempts := 0
+	for _, comment := range pr.Comments.Nodes {
+		commentCluster, commentModule, commentPath, commentCommitID, _ := parseRequestAcknowledgedMsg(comment.Body)
+		if commentCluster == cluster &&
+			commentModule == module &&
+			commentPath == modulePath &&
+			commentCommitID == commitID {
+			attempts++
+		}
+	}
+
+	return attempts
 }
 
 func (p *Planner) addNewRequest(ctx context.Context, module *tfaplv1beta1.Module, pr *pr, commitID string) (*tfaplv1beta1.Request, error) {

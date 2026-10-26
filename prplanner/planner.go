@@ -175,9 +175,22 @@ func (p *Planner) getPRModuleList(pr *pr, commitsInfo []repository.CommitInfo, k
 	return modulesUpdated, nil
 }
 
+// isModuleUpdated reports whether the commit touched a file inside the module path.
+// Matching stops at directory boundaries so that a module at "one" is not
+// considered updated by a change to a sibling module at "one-extra".
 func isModuleUpdated(module *tfaplv1beta1.Module, commit repository.CommitInfo) bool {
-	for _, path := range commit.ChangedFiles {
-		if strings.HasPrefix(path, module.Spec.Path) {
+	modulePath := strings.TrimSuffix(module.Spec.Path, "/")
+	for _, file := range commit.ChangedFiles {
+		if modulePath == "" || file == modulePath || strings.HasPrefix(file, modulePath+"/") {
+			return true
+		}
+	}
+	return false
+}
+
+func isModuleUpdatedInCommits(module *tfaplv1beta1.Module, commitsInfo []repository.CommitInfo) bool {
+	for _, commit := range commitsInfo {
+		if isModuleUpdated(module, commit) {
 			return true
 		}
 	}
