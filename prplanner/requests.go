@@ -12,10 +12,10 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
-// maxPlanRequestAttempts bounds how many times a plan can be requested for the
-// same module and commit, so a run that never produces output cannot make the
+// maxPlanRequestAcks bounds how many unconverted plan requests a module and
+// commit can accumulate, so a run that never produces output cannot make the
 // planner re-request it on every poll.
-const maxPlanRequestAttempts = 3
+const maxPlanRequestAcks = 3
 
 func (p *Planner) ensurePlanRequests(ctx context.Context, pr *pr, commitsInfo []repository.CommitInfo, prModules []types.NamespacedName, skipCommitRun bool) {
 	for _, moduleName := range prModules {
@@ -76,6 +76,10 @@ func (p *Planner) checkPRCommits(ctx context.Context, pr *pr, commitsInfo []repo
 	if err != nil {
 		return nil, err
 	}
+	if modulePathHash == "" {
+		p.Log.Warn("no commit found for module path, not requesting plan", "module", module.NamespacedName(), "pr", pr.Number, "path", module.Spec.Path)
+		return nil, nil
+	}
 
 	// check if we have already processed (uploaded output) this commit
 	if isPlanOutputPostedForCommit(p.ClusterEnvName, pr, modulePathHash, module.Spec.Path, module.NamespacedName()) {
@@ -98,8 +102,8 @@ func (p *Planner) checkPRCommits(ctx context.Context, pr *pr, commitsInfo []repo
 
 	// a run that fails before it is stored leaves nothing to dedup on, so cap
 	// the number of requests per commit instead of retrying indefinitely
-	if attempts := planRequestAttempts(p.ClusterEnvName, pr, modulePathHash, module.Spec.Path, module.NamespacedName()); attempts >= maxPlanRequestAttempts {
-		p.Log.Warn("plan request attempts limit reached, not requesting plan again", "module", module.NamespacedName(), "pr", pr.Number, "commit", modulePathHash, "attempts", attempts)
+	if acks := planRequestAckCount(p.ClusterEnvName, pr, modulePathHash, module.Spec.Path, module.NamespacedName()); acks >= maxPlanRequestAcks {
+		p.Log.Warn("plan request acknowledgements limit reached, not requesting plan again", "module", module.NamespacedName(), "pr", pr.Number, "commit", modulePathHash, "acks", acks)
 		return nil, nil
 	}
 
@@ -191,20 +195,22 @@ func isPlanRequestAckPostedForCommit(cluster string, pr *pr, commitID, modulePat
 	return false
 }
 
-// planRequestAttempts counts the plan requests posted for the given commit
-func planRequestAttempts(cluster string, pr *pr, commitID, modulePath string, module types.NamespacedName) int {
-	attempts := 0
+// planRequestAckCount counts the plan request acknowledgements posted for the
+// given commit that no run output has replaced yet, which is what the planner
+// retries on.
+func planRequestAckCount(cluster string, pr *pr, commitID, modulePath string, module types.NamespacedName) int {
+	acks := 0
 	for _, comment := range pr.Comments.Nodes {
 		commentCluster, commentModule, commentPath, commentCommitID, _ := parseRequestAcknowledgedMsg(comment.Body)
 		if commentCluster == cluster &&
 			commentModule == module &&
 			commentPath == modulePath &&
 			commentCommitID == commitID {
-			attempts++
+			acks++
 		}
 	}
 
-	return attempts
+	return acks
 }
 
 func (p *Planner) addNewRequest(ctx context.Context, module *tfaplv1beta1.Module, pr *pr, commitID string) (*tfaplv1beta1.Request, error) {

@@ -2,6 +2,7 @@ package prplanner
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"testing"
@@ -31,6 +32,12 @@ func generateMockPR(num int, ref string, comments []string) *pr {
 	}
 
 	return p
+}
+
+// expectModulePathHash expects the git lookup of the commit that last touched
+// the module path, which is the identity runs and outputs are keyed by.
+func expectModulePathHash(testGit *git.MockRepositories, module *tfaplv1beta1.Module, hash string) {
+	testGit.EXPECT().Hash(gomock.Any(), module.Spec.RepoURL, "ref1", module.Spec.Path).Return(hash, nil)
 }
 
 func TestCheckPRCommits(t *testing.T) {
@@ -95,8 +102,7 @@ func TestCheckPRCommits(t *testing.T) {
 				return 111, nil
 			})
 
-		// the runner keys a run by the commit that last touched the module path
-		testGit.EXPECT().Hash(gomock.Any(), module.Spec.RepoURL, "ref1", "foo/one").Return("hash1", nil)
+		expectModulePathHash(testGit, module, "hash1")
 
 		// Call Test function
 		gotReq, err := planner.checkPRCommits(ctx, p, commitsInfo, module)
@@ -165,8 +171,7 @@ func TestCheckPRCommits(t *testing.T) {
 				return 111, nil
 			})
 
-		// the runner keys a run by the commit that last touched the module path
-		testGit.EXPECT().Hash(gomock.Any(), module.Spec.RepoURL, "ref1", "foo/two").Return("hash3", nil)
+		expectModulePathHash(testGit, module, "hash3")
 
 		// Call Test function
 		gotReq, err := planner.checkPRCommits(ctx, p, commitsInfo, module)
@@ -247,8 +252,7 @@ func TestCheckPRCommits(t *testing.T) {
 			},
 		}
 
-		// the runner keys a run by the commit that last touched the module path
-		testGit.EXPECT().Hash(gomock.Any(), module.Spec.RepoURL, "ref1", "foo/two").Return("hash3", nil)
+		expectModulePathHash(testGit, module, "hash3")
 
 		// Call Test function
 		gotReq, err := planner.checkPRCommits(ctx, p, commitsInfo, module)
@@ -309,8 +313,7 @@ func TestCheckPRCommits(t *testing.T) {
 				return 111, nil
 			})
 
-		// the runner keys a run by the commit that last touched the module path
-		testGit.EXPECT().Hash(gomock.Any(), module.Spec.RepoURL, "ref1", "foo/two").Return("hash3", nil)
+		expectModulePathHash(testGit, module, "hash3")
 
 		// Call Test function
 		gotReq, err := planner.checkPRCommits(ctx, p, commitsInfo, module)
@@ -355,8 +358,7 @@ func TestCheckPRCommits(t *testing.T) {
 			},
 		}
 
-		// the runner keys a run by the commit that last touched the module path
-		testGit.EXPECT().Hash(gomock.Any(), module.Spec.RepoURL, "ref1", "foo/two").Return("hash3", nil)
+		expectModulePathHash(testGit, module, "hash3")
 
 		// Call Test function
 		gotReq, err := planner.checkPRCommits(ctx, p, commitsInfo, module)
@@ -417,8 +419,7 @@ func TestCheckPRCommits(t *testing.T) {
 				return 111, nil
 			})
 
-		// the runner keys a run by the commit that last touched the module path
-		testGit.EXPECT().Hash(gomock.Any(), module.Spec.RepoURL, "ref1", "foo/two").Return("hash3", nil)
+		expectModulePathHash(testGit, module, "hash3")
 
 		// Call Test function
 		gotReq, err := planner.checkPRCommits(ctx, p, commitsInfo, module)
@@ -486,8 +487,7 @@ func TestCheckPRCommits(t *testing.T) {
 				return 111, nil
 			})
 
-		// the runner keys a run by the commit that last touched the module path
-		testGit.EXPECT().Hash(gomock.Any(), module.Spec.RepoURL, "ref1", "foo/two").Return("hash3", nil)
+		expectModulePathHash(testGit, module, "hash3")
 
 		// Call Test function
 		gotReq, err := planner.checkPRCommits(ctx, p, commitsInfo, module)
@@ -537,8 +537,7 @@ func TestCheckPRCommits(t *testing.T) {
 			types.NamespacedName{Namespace: "foo", Name: "two"}, 123, "hash3").
 			Return(&tfaplv1beta1.Run{CommitHash: "hash3"}, nil)
 
-		// the runner keys a run by the commit that last touched the module path
-		testGit.EXPECT().Hash(gomock.Any(), module.Spec.RepoURL, "ref1", "foo/two").Return("hash3", nil)
+		expectModulePathHash(testGit, module, "hash3")
 
 		// Call Test function
 		gotReq, err := planner.checkPRCommits(ctx, p, commitsInfo, module)
@@ -578,8 +577,7 @@ func TestCheckPRCommits(t *testing.T) {
 			},
 		}
 
-		// the runner keys a run by the commit that last touched the module path
-		testGit.EXPECT().Hash(gomock.Any(), module.Spec.RepoURL, "ref1", "foo/two").Return("hash3", nil)
+		expectModulePathHash(testGit, module, "hash3")
 
 		// Call Test function
 		gotReq, err := planner.checkPRCommits(ctx, p, commitsInfo, module)
@@ -594,14 +592,14 @@ func TestCheckPRCommits(t *testing.T) {
 		}
 	})
 
-	t.Run("plan request attempts limit reached", func(t *testing.T) {
+	t.Run("plan request acknowledgment limit reached", func(t *testing.T) {
 		testRedis := sysutil.NewMockRedisInterface(goMockCtrl)
 		testGithub := NewMockGithubInterface(goMockCtrl)
 		planner.github = testGithub
 		planner.RedisClient = testRedis
 
 		// acks older than the dedup window and no run output, so a fresh
-		// request would be posted if the attempts were not capped
+		// request would be posted if the acks were not capped
 		pending := requestAcknowledgedMsg("default", types.NamespacedName{Name: "two", Namespace: "foo"}, "foo/two", "hash3", &metav1.Time{Time: time.Now().Add(-15 * time.Minute)}, "link")
 		p := generateMockPR(123, "ref1",
 			[]string{pending, pending, pending},
@@ -623,10 +621,67 @@ func TestCheckPRCommits(t *testing.T) {
 			types.NamespacedName{Namespace: "foo", Name: "two"}, 123, "hash3").
 			Return(nil, sysutil.ErrKeyNotFound)
 
-		// the runner keys a run by the commit that last touched the module path
-		testGit.EXPECT().Hash(gomock.Any(), module.Spec.RepoURL, "ref1", "foo/two").Return("hash3", nil)
+		expectModulePathHash(testGit, module, "hash3")
 
 		// Call Test function
+		gotReq, err := planner.checkPRCommits(ctx, p, commitsInfo, module)
+		if err != nil {
+			t.Fatalf("unexpected error: %s", err)
+		}
+
+		var wantReq *tfaplv1beta1.Request
+
+		if diff := cmp.Diff(wantReq, gotReq, cmpIgnoreRandFields); diff != "" {
+			t.Errorf("checkPRCommits() mismatch (-want +got):\n%s", diff)
+		}
+	})
+
+	t.Run("module path hash error is returned", func(t *testing.T) {
+		p := generateMockPR(123, "ref1", []string{"random comment"})
+
+		commitsInfo := []repository.CommitInfo{
+			{Hash: "hash3", ChangedFiles: []string{"foo/two"}},
+		}
+
+		module := &tfaplv1beta1.Module{
+			ObjectMeta: metav1.ObjectMeta{Namespace: "foo", Name: "two"},
+			Spec: tfaplv1beta1.ModuleSpec{
+				RepoURL: "https://github.com/owner-a/repo-a.git",
+				Path:    "foo/two",
+			},
+		}
+
+		testGit.EXPECT().Hash(gomock.Any(), module.Spec.RepoURL, "ref1", "foo/two").
+			Return("", errors.New("git log failed"))
+
+		if _, err := planner.checkPRCommits(ctx, p, commitsInfo, module); err == nil {
+			t.Fatal("checkPRCommits() expected an error, got nil")
+		}
+	})
+
+	t.Run("empty module path hash does not request a plan", func(t *testing.T) {
+		testRedis := sysutil.NewMockRedisInterface(goMockCtrl)
+		testGithub := NewMockGithubInterface(goMockCtrl)
+		planner.github = testGithub
+		planner.RedisClient = testRedis
+
+		p := generateMockPR(123, "ref1", []string{"random comment"})
+
+		commitsInfo := []repository.CommitInfo{
+			{Hash: "hash3", ChangedFiles: []string{"foo/two"}},
+		}
+
+		module := &tfaplv1beta1.Module{
+			ObjectMeta: metav1.ObjectMeta{Namespace: "foo", Name: "two"},
+			Spec: tfaplv1beta1.ModuleSpec{
+				RepoURL: "https://github.com/owner-a/repo-a.git",
+				Path:    "foo/two",
+			},
+		}
+
+		testGit.EXPECT().Hash(gomock.Any(), module.Spec.RepoURL, "ref1", "foo/two").
+			Return("", nil)
+
 		gotReq, err := planner.checkPRCommits(ctx, p, commitsInfo, module)
 		if err != nil {
 			t.Fatalf("unexpected error: %s", err)
@@ -794,8 +849,7 @@ func Test_checkPRCommentsForPlanRequests(t *testing.T) {
 			},
 		)
 
-		testGit.EXPECT().Hash(gomock.Any(), gomock.Any(), "ref1", "path/foo/two").
-			Return("hash1", nil)
+		expectModulePathHash(testGit, module, "hash1")
 
 		// mock github API Call adding new request info
 		testGithub.EXPECT().postComment(gomock.Any(), gomock.Any(), gomock.Any(), 0, 123, gomock.Any()).
@@ -865,8 +919,7 @@ func Test_checkPRCommentsForPlanRequests(t *testing.T) {
 				return 111, nil
 			})
 
-		testGit.EXPECT().Hash(gomock.Any(), gomock.Any(), "ref1", "path/foo/two").
-			Return("hash1", nil)
+		expectModulePathHash(testGit, module, "hash1")
 
 		// Call Test function
 		gotReq, err := planner.checkPRCommentsForPlanRequests(context.Background(), p, module)
@@ -922,8 +975,7 @@ func Test_checkPRCommentsForPlanRequests(t *testing.T) {
 				return 111, nil
 			})
 
-		testGit.EXPECT().Hash(gomock.Any(), gomock.Any(), "ref1", "path/foo/two").
-			Return("hash1", nil)
+		expectModulePathHash(testGit, module, "hash1")
 
 		gotReq, err := planner.checkPRCommentsForPlanRequests(context.Background(), pr, module)
 		if err != nil {
@@ -974,8 +1026,7 @@ func Test_checkPRCommentsForPlanRequests(t *testing.T) {
 				return 111, nil
 			})
 
-		testGit.EXPECT().Hash(gomock.Any(), gomock.Any(), "ref1", "path/foo/two").
-			Return("hash1", nil)
+		expectModulePathHash(testGit, module, "hash1")
 
 		gotReq, err := planner.checkPRCommentsForPlanRequests(context.Background(), pr, module)
 		if err != nil {
