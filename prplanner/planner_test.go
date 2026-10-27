@@ -127,3 +127,72 @@ func Test_processPullRequest(t *testing.T) {
 		planner.processPullRequest(ctx, p, kubeModuleList)
 	})
 }
+
+func Test_isModuleUpdated(t *testing.T) {
+	tests := []struct {
+		name         string
+		modulePath   string
+		changedFiles []string
+		wantUpdated  bool
+	}{
+		{
+			name:         "file in module path",
+			modulePath:   "foo/one",
+			changedFiles: []string{"foo/one/main.tf"},
+			wantUpdated:  true,
+		},
+		{
+			name:         "file in nested directory of module path",
+			modulePath:   "foo/one",
+			changedFiles: []string{"foo/one/modules/db/main.tf"},
+			wantUpdated:  true,
+		},
+		{
+			name:         "module path itself is the changed file",
+			modulePath:   "foo/one",
+			changedFiles: []string{"foo/one"},
+			wantUpdated:  true,
+		},
+		{
+			name:         "module path with trailing slash",
+			modulePath:   "foo/one/",
+			changedFiles: []string{"foo/one/main.tf"},
+			wantUpdated:  true,
+		},
+		{
+			name:         "sibling module sharing a name prefix",
+			modulePath:   "foo/one",
+			changedFiles: []string{"foo/one-extra/main.tf"},
+			wantUpdated:  false,
+		},
+		{
+			name:         "unrelated module",
+			modulePath:   "foo/one",
+			changedFiles: []string{"foo/two/main.tf"},
+			wantUpdated:  false,
+		},
+		{
+			name:         "empty module path matches every change",
+			modulePath:   "",
+			changedFiles: []string{"foo/one/main.tf"},
+			wantUpdated:  true,
+		},
+		{
+			name:         "no changed files",
+			modulePath:   "foo/one",
+			changedFiles: nil,
+			wantUpdated:  false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			module := &tfaplv1beta1.Module{Spec: tfaplv1beta1.ModuleSpec{Path: tt.modulePath}}
+			commit := repository.CommitInfo{Hash: "hash1", ChangedFiles: tt.changedFiles}
+
+			if got := isModuleUpdated(module, commit); got != tt.wantUpdated {
+				t.Errorf("isModuleUpdated() = %v, want %v", got, tt.wantUpdated)
+			}
+		})
+	}
+}
