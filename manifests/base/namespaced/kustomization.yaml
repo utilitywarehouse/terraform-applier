@@ -7,3 +7,7 @@ resources:
   - sa-rbac.yaml
   - service.yaml
   - tf-applier.yaml
+
+images:
+  - name: redis
+    newTag: 8.8.4-alpine
